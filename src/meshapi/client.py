@@ -24,6 +24,7 @@ def stream_chat(messages: list, cfg: dict) -> Iterable:
         payload["route"] = cfg["route"]
 
     last_meta: dict = {}
+    last_model: str = ""
     with httpx.stream("POST", url, json=payload, headers=headers, timeout=120) as r:
         r.raise_for_status()
         for line in r.iter_lines():
@@ -37,6 +38,9 @@ def stream_chat(messages: list, cfg: dict) -> Iterable:
             except json.JSONDecodeError:
                 continue
 
+            if obj.get("model"):
+                last_model = obj["model"]
+
             choices = obj.get("choices") or []
             if choices:
                 delta = choices[0].get("delta", {}).get("content")
@@ -48,5 +52,7 @@ def stream_chat(messages: list, cfg: dict) -> Iterable:
             if usage or cost:
                 last_meta = {"usage": usage, "cost": cost}
 
+    if last_model:
+        last_meta["model"] = last_model
     if last_meta:
         yield last_meta

@@ -1,6 +1,7 @@
 """meshapi — terminal chat REPL for Mesh API."""
 import argparse
 import sys
+from pathlib import Path
 
 import httpx
 from prompt_toolkit import PromptSession
@@ -12,7 +13,7 @@ from . import __version__
 from .client import stream_chat
 from .commands import handle_command
 from .config import CONFIG_FILE, HISTORY_FILE, load_config
-from .render import console, fmt_usd, render_stream
+from .render import BRAND, BRAND_BG, BRAND_DIM, console, fmt_usd, pretty_cwd, render_stream
 
 
 def parse_args(argv=None) -> argparse.Namespace:
@@ -47,18 +48,29 @@ def main() -> None:
     session = PromptSession(history=FileHistory(str(HISTORY_FILE)))
     console.print(Panel.fit(
         f"meshapi {__version__}\n"
-        f"model: [bold cyan]{cfg['model']}[/bold cyan]\n"
-        f"route: [cyan]{cfg.get('route') or 'default'}[/cyan]\n"
+        f"cwd:   [{BRAND}]{pretty_cwd()}[/{BRAND}]\n"
+        f"model: [bold {BRAND}]{cfg['model']}[/bold {BRAND}]\n"
+        f"route: [{BRAND}]{cfg.get('route') or 'default'}[/{BRAND}]\n"
         "type /help for commands, /exit to quit",
-        border_style="cyan",
+        border_style=BRAND,
     ))
 
     while True:
         try:
-            user_input = session.prompt(
-                "you > ",
-                style=Style.from_dict({"prompt": "ansicyan bold"}),
+            console.rule(
+                title=f"[{BRAND_DIM}]{Path.cwd().name}[/{BRAND_DIM}]",
+                align="right",
+                style=BRAND_DIM,
+                characters="─",
             )
+            user_input = session.prompt(
+                "› ",
+                style=Style.from_dict({
+                    "prompt": f"bold fg:{BRAND} bg:{BRAND_BG}",
+                    "": f"bg:{BRAND_BG}",
+                }),
+            )
+            console.rule(style=BRAND_DIM, characters="─")
         except (KeyboardInterrupt, EOFError):
             console.print("\n[dim]bye[/dim]")
             break
@@ -83,19 +95,24 @@ def main() -> None:
                 except (TypeError, ValueError):
                     pass
             usage = meta.get("usage") or {}
-            tokens = (
-                f"{usage.get('prompt_tokens', '?')} → {usage.get('completion_tokens', '?')} tok"
-                if usage else ""
+            model = meta.get("model") or state["cfg"]["model"]
+            elapsed = meta.get("elapsed", 0.0)
+            prompt_t = usage.get("prompt_tokens", "?")
+            completion_t = usage.get("completion_tokens", "?")
+            cost_str = fmt_usd(cost) if cost is not None else "—"
+            console.rule(style=BRAND_DIM, characters="─")
+            console.print(
+                f"[dim]{model}  •  {prompt_t}→{completion_t} tok  •  {cost_str}  •  "
+                f"session {fmt_usd(state['session_cost'])}  •  {elapsed:.1f}s[/dim]"
             )
-            cost_line = f"[dim]{tokens}  •  {fmt_usd(cost)}  •  session {fmt_usd(state['session_cost'])}[/dim]"
-            console.print(cost_line)
         except httpx.HTTPStatusError as e:
+            console.rule(style="dim red", characters="─")
             console.print(f"[red]API error {e.response.status_code}: {e.response.text}[/red]")
             state["messages"].pop()
         except Exception as e:
+            console.rule(style="dim red", characters="─")
             console.print(f"[red]Error: {e}[/red]")
             state["messages"].pop()
-        console.print()
 
 
 if __name__ == "__main__":
