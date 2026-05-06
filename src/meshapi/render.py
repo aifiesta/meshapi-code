@@ -29,13 +29,16 @@ def _detect_theme() -> str:
 
 
 # Brand palette — Mesh API purple, theme-adaptive
-BRAND = "#6f5af5"  # foreground brand, same on both themes
 if _detect_theme() == "dark":
-    BRAND_DIM = "#9d92e8"   # lighter dim — visible on dark bg
-    BRAND_BG = "#2d2454"    # darker, brand-tinted highlight against ~#000-#1e1e1e
+    BRAND = "#8b78f7"       # bumped lighter on dark — official #6f5af5 reads dim on dark wine/black
+    BRAND_DIM = "#aea3f0"   # lighter dim — clearly visible on dark backgrounds
+    BRAND_BG = "#372d73"    # mid-dark purple — clearly visible without being loud
+    BRAND_BG_FG = "#f5f0ff" # near-white with slight purple tint for input text
 else:
+    BRAND = "#6f5af5"       # official brand color — strong contrast on white
     BRAND_DIM = "#5a4ec4"   # darker dim — visible on light bg
     BRAND_BG = "#ebe4fc"    # pale lavender highlight against white
+    BRAND_BG_FG = "#2c2540" # near-black with purple tint for input text on light theme
 
 
 def fmt_usd(value) -> str:

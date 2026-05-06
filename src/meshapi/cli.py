@@ -7,13 +7,25 @@ import httpx
 from prompt_toolkit import PromptSession
 from prompt_toolkit.history import FileHistory
 from prompt_toolkit.styles import Style
-from rich.panel import Panel
+from rich.text import Text
 
 from . import __version__
 from .client import stream_chat
 from .commands import handle_command
 from .config import CONFIG_FILE, HISTORY_FILE, load_config
-from .render import BRAND, BRAND_BG, BRAND_DIM, console, fmt_usd, pretty_cwd, render_stream
+from .render import BRAND, BRAND_BG, BRAND_BG_FG, BRAND_DIM, console, fmt_usd, pretty_cwd, render_stream
+
+# ANSI Shadow figlet font
+MESH_LOGO_LINES = [
+    "███╗   ███╗███████╗███████╗██╗  ██╗",
+    "████╗ ████║██╔════╝██╔════╝██║  ██║",
+    "██╔████╔██║█████╗  ███████╗███████║",
+    "██║╚██╔╝██║██╔══╝  ╚════██║██╔══██║",
+    "██║ ╚═╝ ██║███████╗███████║██║  ██║",
+    "╚═╝     ╚═╝╚══════╝╚══════╝╚═╝  ╚═╝",
+]
+LOGO_WIDTH = 35  # chars per line
+LOGO_GUTTER = 3  # spaces between logo and info column
 
 
 def parse_args(argv=None) -> argparse.Namespace:
@@ -46,14 +58,29 @@ def main() -> None:
     }
 
     session = PromptSession(history=FileHistory(str(HISTORY_FILE)))
-    console.print(Panel.fit(
-        f"meshapi {__version__}\n"
-        f"cwd:   [{BRAND}]{pretty_cwd()}[/{BRAND}]\n"
-        f"model: [bold {BRAND}]{cfg['model']}[/bold {BRAND}]\n"
-        f"route: [{BRAND}]{cfg.get('route') or 'default'}[/{BRAND}]\n"
-        "type /help for commands, /exit to quit",
-        border_style=BRAND,
-    ))
+
+    info_per_line: list = [
+        None,
+        None,
+        Text.from_markup(f"[bold {BRAND}]✦  meshapi {__version__}[/bold {BRAND}]"),
+        Text.from_markup(f"cwd:   [{BRAND}]{pretty_cwd()}[/{BRAND}]"),
+        Text.from_markup(f"model: [bold {BRAND}]{cfg['model']}[/bold {BRAND}]"),
+        Text.from_markup(f"route: [{BRAND}]{cfg.get('route') or 'default'}[/{BRAND}]"),
+    ]
+
+    console.print()  # top gap so banner doesn't crowd the shell prompt
+    for i, logo_line in enumerate(MESH_LOGO_LINES):
+        line = Text()
+        line.append(logo_line, style=BRAND)
+        info = info_per_line[i] if i < len(info_per_line) else None
+        if info is not None:
+            pad = max(0, LOGO_WIDTH - len(logo_line))
+            line.append(" " * (pad + LOGO_GUTTER))
+            line.append(info)
+        console.print(line)
+    console.print()
+    console.print("type /help for commands, /exit to quit", style=BRAND_DIM)
+    console.print()  # bottom gap before the first prompt rule
 
     while True:
         try:
@@ -67,7 +94,7 @@ def main() -> None:
                 "› ",
                 style=Style.from_dict({
                     "prompt": f"bold fg:{BRAND} bg:{BRAND_BG}",
-                    "": f"bg:{BRAND_BG}",
+                    "": f"fg:{BRAND_BG_FG} bg:{BRAND_BG}",
                 }),
             )
             console.rule(style=BRAND_DIM, characters="─")
