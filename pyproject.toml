@@ -1,0 +1,41 @@
+[project]
+name = "meshapi-code"
+version = "0.1.0"
+description = "Terminal chat for Mesh API — OpenAI-compatible LLM gateway"
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.10"
+authors = [{ name = "Mesh API" }]
+keywords = ["cli", "llm", "openai", "anthropic", "chat", "mesh", "gateway"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development",
+]
+dependencies = [
+    "httpx>=0.27",
+    "rich>=13.7",
+    "prompt-toolkit>=3.0",
+]
+
+[project.urls]
+Homepage = "https://meshapi.ai"
+Documentation = "https://docs.meshapi.ai"
+Repository = "https://github.com/aifiesta/meshapi-code"
+
+[project.scripts]
+meshapi = "meshapi.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/meshapi"]
