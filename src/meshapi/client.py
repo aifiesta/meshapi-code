@@ -1,14 +1,21 @@
 """Streaming OpenAI-compatible HTTP client for Mesh API."""
 import json
-from typing import Iterable
+from typing import Iterable, Optional
 
 import httpx
 
 
-def stream_chat(messages: list, cfg: dict) -> Iterable:
-    """Yield content deltas, then a final {'usage':..., 'cost':...} dict.
+def stream_chat(
+    messages: list,
+    cfg: dict,
+    tools: Optional[list] = None,
+) -> Iterable:
+    """Yield content deltas, then a final dict with usage/cost/model/tool_calls.
 
-    Mesh API is OpenAI-compatible but adds `cost` to the final SSE chunk.
+    Mesh API is OpenAI-compatible:
+      - `cost` arrives in the final SSE chunk alongside `usage`.
+      - `tool_calls` arrive as deltas indexed by position; we accumulate them
+        and surface as the meta dict's `tool_calls` field.
     """
     url = f"{cfg['base_url']}/chat/completions"
     headers = {
@@ -22,9 +29,14 @@ def stream_chat(messages: list, cfg: dict) -> Iterable:
     }
     if cfg.get("route"):
         payload["route"] = cfg["route"]
+    if tools:
+        payload["tools"] = tools
+        payload["tool_choice"] = "auto"
 
     last_meta: dict = {}
     last_model: str = ""
+    tool_calls_accum: dict = {}  # index -> {id, name, arguments}
+
     with httpx.stream("POST", url, json=payload, headers=headers, timeout=120) as r:
         r.raise_for_status()
         for line in r.iter_lines():
@@ -43,9 +55,24 @@ def stream_chat(messages: list, cfg: dict) -> Iterable:
 
             choices = obj.get("choices") or []
             if choices:
-                delta = choices[0].get("delta", {}).get("content")
-                if delta:
-                    yield delta
+                delta = choices[0].get("delta", {})
+
+                content = delta.get("content")
+                if content:
+                    yield content
+
+                for tc in delta.get("tool_calls") or []:
+                    idx = tc.get("index", 0)
+                    bucket = tool_calls_accum.setdefault(
+                        idx, {"id": "", "name": "", "arguments": ""}
+                    )
+                    if tc.get("id"):
+                        bucket["id"] = tc["id"]
+                    fn = tc.get("function") or {}
+                    if fn.get("name"):
+                        bucket["name"] = fn["name"]
+                    if fn.get("arguments"):
+                        bucket["arguments"] += fn["arguments"]
 
             usage = obj.get("usage")
             cost = obj.get("cost")
@@ -54,5 +81,7 @@ def stream_chat(messages: list, cfg: dict) -> Iterable:
 
     if last_model:
         last_meta["model"] = last_model
+    if tool_calls_accum:
+        last_meta["tool_calls"] = [tool_calls_accum[i] for i in sorted(tool_calls_accum)]
     if last_meta:
         yield last_meta

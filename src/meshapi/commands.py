@@ -4,7 +4,9 @@ from pathlib import Path
 from rich.panel import Panel
 
 from .config import save_config
+from .permissions import LABELS, Mode, from_str
 from .render import console, fmt_usd
+from .tools import build_system_prompt
 
 ROUTES = {"cheapest", "fastest", "balanced"}
 
@@ -19,7 +21,7 @@ def handle_command(cmd: str, state: dict) -> bool:
         return False
 
     if name == "/clear":
-        state["messages"] = [{"role": "system", "content": state["cfg"]["system"]}]
+        state["messages"] = [{"role": "system", "content": build_system_prompt(state["cfg"])}]
         state["session_cost"] = 0.0
         console.print("[dim]Conversation cleared.[/dim]")
 
@@ -56,7 +58,7 @@ def handle_command(cmd: str, state: dict) -> bool:
     elif name == "/system":
         if arg:
             state["cfg"]["system"] = arg
-            state["messages"] = [{"role": "system", "content": arg}]
+            state["messages"] = [{"role": "system", "content": build_system_prompt(state["cfg"])}]
             console.print("[dim]System prompt updated and conversation reset.[/dim]")
         else:
             console.print(f"[dim]{state['cfg']['system']}[/dim]")
@@ -64,12 +66,24 @@ def handle_command(cmd: str, state: dict) -> bool:
     elif name == "/cost":
         console.print(f"[dim]Session spend: {fmt_usd(state.get('session_cost', 0))}[/dim]")
 
+    elif name == "/mode":
+        if not arg:
+            cur = state.get("mode", Mode.ASK)
+            console.print(f"[dim]Current mode: {LABELS[cur]} ({cur.value})[/dim]")
+        else:
+            try:
+                state["mode"] = from_str(arg)
+                console.print(f"[dim]Mode set to {LABELS[state['mode']]}[/dim]")
+            except ValueError as e:
+                console.print(f"[red]{e}[/red]")
+
     elif name == "/help":
         console.print(Panel.fit(
             "/exit             end session\n"
             "/clear            reset conversation\n"
             "/model <name>     switch model (e.g. anthropic/claude-sonnet-4.5)\n"
             "/route <mode>     cheapest|fastest|balanced|default\n"
+            "/mode <perm>      ask|bypass|none  (or shift+tab to cycle)\n"
             "/file <path>      add file to context\n"
             "/system <txt>     set system prompt\n"
             "/cost             show session spend\n"
