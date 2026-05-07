@@ -125,4 +125,4 @@ Any generic OpenAI-compatible chat CLI talks to Mesh. `meshapi` adds three thing
 
 ## License
 
-MIT
+[Apache 2.0](LICENSE)

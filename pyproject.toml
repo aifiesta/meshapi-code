@@ -1,9 +1,10 @@
 [project]
 name = "meshapi-code"
-version = "0.3.1"
+version = "0.3.2"
 description = "Terminal chat for Mesh API — OpenAI-compatible LLM gateway"
 readme = "README.md"
-license = { text = "MIT" }
+license = "Apache-2.0"
+license-files = ["LICENSE"]
 requires-python = ">=3.10"
 authors = [{ name = "Mesh API" }]
 keywords = ["cli", "llm", "openai", "anthropic", "chat", "mesh", "gateway"]
@@ -11,7 +12,7 @@ classifiers = [
     "Development Status :: 3 - Alpha",
     "Environment :: Console",
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: MIT License",
+    "License :: OSI Approved :: Apache Software License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
