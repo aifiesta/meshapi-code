@@ -1,12 +1,12 @@
 [project]
 name = "meshapi-code"
-version = "0.3.3"
+version = "0.3.4"
 description = "Terminal chat for Mesh API — OpenAI-compatible LLM gateway"
 readme = "README.md"
 license = "Apache-2.0"
-license-files = ["LICENSE"]
+license-files = ["LICENSE", "NOTICE"]
 requires-python = ">=3.10"
-authors = [{ name = "Mesh API" }]
+authors = [{ name = "Fiesta Labs Inc." }]
 keywords = ["cli", "llm", "openai", "anthropic", "chat", "mesh", "gateway"]
 classifiers = [
     "Development Status :: 3 - Alpha",
