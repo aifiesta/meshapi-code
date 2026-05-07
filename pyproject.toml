@@ -1,6 +1,6 @@
 [project]
 name = "meshapi-code"
-version = "0.3.2"
+version = "0.3.3"
 description = "Terminal chat for Mesh API — OpenAI-compatible LLM gateway"
 readme = "README.md"
 license = "Apache-2.0"

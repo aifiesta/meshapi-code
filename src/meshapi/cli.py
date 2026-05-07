@@ -1,6 +1,7 @@
 """meshapi — terminal chat REPL for Mesh API."""
 import argparse
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -15,7 +16,7 @@ from rich.text import Text
 from . import __version__
 from .client import stream_chat
 from .commands import handle_command
-from .config import CONFIG_FILE, HISTORY_FILE, load_config
+from .config import CONFIG_FILE, HISTORY_FILE, load_config, secure_file
 from .permissions import HINTS, LABELS, Mode, from_str, next_mode
 from .render import (
     BRAND, BRAND_BG, BRAND_BG_FG, BRAND_DIM, console, fmt_usd, pretty_cwd, render_stream,
@@ -33,6 +34,23 @@ MESH_LOGO_LINES = [
 ]
 LOGO_WIDTH = 35  # chars per line
 LOGO_GUTTER = 3  # spaces between logo and info column
+
+# Mesh data-plane keys are `rsk_` followed by an opaque token. Prevent these
+# strings from being persisted to the prompt-toolkit history file in case a
+# user pastes one at the prompt by accident.
+_API_KEY_RE = re.compile(r"\brsk_[A-Za-z0-9_-]{8,}\b")
+
+
+class ScrubbedFileHistory(FileHistory):
+    """FileHistory that drops entries containing API-key-shaped strings
+    and tightens file perms to 0600 after every write."""
+
+    def store_string(self, string: str) -> None:
+        if _API_KEY_RE.search(string):
+            return
+        super().store_string(string)
+        secure_file(Path(self.filename))
+
 
 def parse_args(argv=None) -> argparse.Namespace:
     p = argparse.ArgumentParser(prog="meshapi", description="Terminal chat for Mesh API")
@@ -72,10 +90,28 @@ def render_banner(cfg: dict) -> None:
     console.print()
 
 
+def _resolved_path_line(raw: str) -> str:
+    """Render `→ /abs/path` and flag if the path escapes the launch cwd."""
+    try:
+        resolved = Path(raw).expanduser().resolve()
+    except Exception:
+        return f"[dim]→ {raw}[/dim]"
+    cwd = Path.cwd().resolve()
+    try:
+        outside = not resolved.is_relative_to(cwd)
+    except AttributeError:  # is_relative_to is 3.9+, but pyproject pins 3.10+
+        outside = not str(resolved).startswith(str(cwd))
+    if outside:
+        return f"[dim]→[/dim] [bold yellow]{resolved}[/bold yellow]  [bold yellow](outside cwd)[/bold yellow]"
+    return f"[dim]→ {resolved}[/dim]"
+
+
 def confirm_tool_call(name: str, args: dict) -> bool:
     """ASK-mode prompt for a single tool call. Returns True if approved."""
     summary = summarize_call(name, args)
     console.print(f"[bold {BRAND}]⚙ approve tool call?[/bold {BRAND}]  [dim]{summary}[/dim]")
+    if name in ("read_file", "write_file"):
+        console.print(_resolved_path_line(args.get("path") or ""))
     if name == "write_file":
         preview = (args.get("content") or "")[:300]
         console.print(f"[dim]──[/dim]\n{preview}{'…' if len(args.get('content') or '') > 300 else ''}\n[dim]──[/dim]")
@@ -163,8 +199,12 @@ def main() -> None:
             ("ansibrightblack", "shift+tab to cycle"),
         ])
 
+    # Touch the history file with 0600 up front so prompt_toolkit doesn't
+    # create it world-readable on first write.
+    HISTORY_FILE.touch(mode=0o600, exist_ok=True)
+    secure_file(HISTORY_FILE)
     session = PromptSession(
-        history=FileHistory(str(HISTORY_FILE)),
+        history=ScrubbedFileHistory(str(HISTORY_FILE)),
         key_bindings=kb,
         bottom_toolbar=bottom_toolbar,
     )
