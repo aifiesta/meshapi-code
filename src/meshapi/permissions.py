@@ -11,9 +11,9 @@ class Mode(Enum):
 ORDER = [Mode.ASK, Mode.BYPASS, Mode.NONE]
 
 LABELS = {
-    Mode.ASK: "approve each",
-    Mode.BYPASS: "bypass perms",
-    Mode.NONE: "no access",
+    Mode.ASK: "ask permissions",
+    Mode.BYPASS: "bypass permissions on",
+    Mode.NONE: "no permissions",
 }
 
 HINTS = {

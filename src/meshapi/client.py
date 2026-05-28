@@ -38,6 +38,8 @@ def stream_chat(
     tool_calls_accum: dict = {}  # index -> {id, name, arguments}
 
     with httpx.stream("POST", url, json=payload, headers=headers, timeout=120) as r:
+        if r.status_code >= 400:
+            r.read()  # so e.response.text works in the caller
         r.raise_for_status()
         for line in r.iter_lines():
             if not line or not line.startswith("data: "):

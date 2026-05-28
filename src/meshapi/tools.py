@@ -1,6 +1,10 @@
 """Tool definitions sent to the model + local executors."""
+import os
+import signal
 import subprocess
 from pathlib import Path
+
+BASH_TIMEOUT = 120  # seconds — matches Claude Code's default
 
 
 def build_system_prompt(cfg: dict) -> str:
@@ -19,7 +23,30 @@ def build_system_prompt(cfg: dict) -> str:
         "directory. When you create or edit files without an explicit "
         "absolute path, place them inside this working directory. Use "
         "the available tools to inspect and modify the filesystem and "
-        "run shell commands — do not ask the user to run commands."
+        "run shell commands — do not ask the user to run commands.\n\n"
+        "PLAN BEFORE ACTING. For any request that will need more than ~3 "
+        "tool calls (building features, multi-file edits, scaffolding a "
+        "project), FIRST call create_plan with a numbered list of small, "
+        "focused steps. Each step should be completable in one or two "
+        "tool calls and finish in under 30 seconds. Then for each step "
+        "call update_step(i, \"in_progress\"), do the work, and call "
+        "update_step(i, \"completed\"). If a step turns out to be wrong "
+        "or impossible, mark it \"blocked\" and call create_plan again "
+        "with a revised plan. For simple one-shot requests (read a file, "
+        "answer a question, run one command), skip the plan and act "
+        "directly.\n\n"
+        "Shell commands run non-interactively — stdin is /dev/null. Always "
+        "pass flags like --yes, -y, or --no-input; interactive prompts will "
+        "hang and time out. The shell timeout is 120s; if a command would "
+        "take longer, break it into smaller pieces.\n\n"
+        "For long-running servers (dev servers like `npm run dev` / `vite` / "
+        "`next dev`, `flask run`, `python -m http.server`, file watchers, etc.) "
+        "use the start_server tool — NOT run_bash. run_bash will kill the "
+        "server at 120s and you'll never see the URL. start_server picks a "
+        "free port, runs the command detached, waits for the port to open, "
+        "and returns the URL. Don't try shell workarounds like `nohup &`, "
+        "`disown`, `setsid`, or `timeout N npm run dev` — `timeout` doesn't "
+        "exist on macOS and backgrounding via shell loses output capture."
     )
 
 # OpenAI-compatible tool spec — Mesh API forwards these to the underlying provider.
@@ -60,7 +87,13 @@ TOOLS = [
         "type": "function",
         "function": {
             "name": "run_bash",
-            "description": "Run a shell command (zsh/bash) and return combined stdout+stderr plus exit code. Times out at 60s.",
+            "description": (
+                "Run a non-interactive shell command (zsh/bash) and return combined "
+                "stdout+stderr plus exit code. stdin is /dev/null, so commands that "
+                "prompt for input will hang and time out — always pass non-interactive "
+                "flags (e.g. `--yes`, `-y`, `--no-input`) or pipe answers in. "
+                f"Times out at {BASH_TIMEOUT}s."
+            ),
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -70,44 +103,167 @@ TOOLS = [
             },
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "create_plan",
+            "description": (
+                "Create or replace the numbered plan for a multi-step task. CALL "
+                "THIS FIRST for any request that needs more than ~3 tool calls. "
+                "Each step should be small, action-oriented, and finishable in one "
+                "or two tool calls (under ~30s). After this, call update_step for "
+                "each step as you work through it. Skip create_plan entirely for "
+                "simple one-shot requests."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "steps": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": (
+                            "Ordered list of short step titles, e.g. "
+                            "['create package.json', 'add index.html', "
+                            "'write game loop in script.js']."
+                        ),
+                    }
+                },
+                "required": ["steps"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "start_server",
+            "description": (
+                "Start a long-running server (dev server, file watcher, anything "
+                "that doesn't terminate on its own) in the background and wait "
+                "until its port is open, then return the URL. Use this for "
+                "`npm run dev`, `vite`, `next dev`, `flask run`, `python -m "
+                "http.server`, etc. Do NOT use run_bash for these — run_bash "
+                "kills the process at 120s.\n"
+                "We set PORT=<port> in the environment so most dev tools bind "
+                "to it automatically. If your tool needs the port as a CLI "
+                "argument instead, include it explicitly in the command."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "command": {
+                        "type": "string",
+                        "description": "Shell command to start the server (e.g. 'npm run dev').",
+                    },
+                    "port": {
+                        "type": "integer",
+                        "description": "Port to bind. Omit to auto-pick a free port starting from 5173.",
+                    },
+                    "cwd": {
+                        "type": "string",
+                        "description": "Working directory for the command. Defaults to the current working directory.",
+                    },
+                    "wait_seconds": {
+                        "type": "integer",
+                        "description": "Max seconds to wait for the port to open. Default 30; bump for slow installs.",
+                    },
+                },
+                "required": ["command"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "update_step",
+            "description": (
+                "Update a step's status in the current plan. Call with "
+                "status='in_progress' when starting step i, then status='completed' "
+                "when done. Use 'blocked' if the step can't be done — then call "
+                "create_plan again with a revised plan."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "index": {
+                        "type": "integer",
+                        "description": "1-based step number from the current plan.",
+                    },
+                    "status": {
+                        "type": "string",
+                        "enum": ["in_progress", "completed", "blocked"],
+                    },
+                },
+                "required": ["index", "status"],
+            },
+        },
+    },
 ]
 
 OUTPUT_LIMIT = 8000
+PLAN_TOOLS = ("create_plan", "update_step")  # meta — auto-approved, no side effects
 
 
 def execute(name: str, arguments: dict) -> str:
     """Run a tool locally and return a string result for the model."""
     if name == "read_file":
+        path = arguments.get("path")
+        if not path:
+            return "Error: read_file requires a `path` argument."
         try:
-            return Path(arguments["path"]).expanduser().read_text()
+            return Path(path).expanduser().read_text()
         except Exception as e:
             return f"Error: {e}"
 
     if name == "write_file":
+        path = arguments.get("path")
+        content = arguments.get("content")
+        if not path:
+            return "Error: write_file requires a `path` argument."
+        if content is None:
+            return "Error: write_file requires a `content` argument (use \"\" for an empty file)."
         try:
-            p = Path(arguments["path"]).expanduser()
+            p = Path(path).expanduser()
             p.parent.mkdir(parents=True, exist_ok=True)
-            content = arguments["content"]
             p.write_text(content)
             return f"OK — wrote {len(content)} chars to {p}"
         except Exception as e:
             return f"Error: {e}"
 
     if name == "run_bash":
+        cmd = arguments.get("command")
+        if not cmd:
+            return "Error: run_bash requires a `command` argument."
         try:
-            r = subprocess.run(
-                arguments["command"],
+            # start_new_session=True puts the shell + all grandchildren in their
+            # own process group so we can SIGKILL the whole tree on timeout.
+            # Without this, esbuild/node workers spawned by `npm create` survive
+            # the timeout and can leak resources.
+            proc = subprocess.Popen(
+                cmd,
                 shell=True,
-                capture_output=True,
+                stdin=subprocess.DEVNULL,  # never let a child block on a prompt
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
                 text=True,
-                timeout=60,
                 cwd=str(Path.cwd()),
+                start_new_session=True,
             )
-            out = (r.stdout or "") + (r.stderr or "")
+            try:
+                out, _ = proc.communicate(timeout=BASH_TIMEOUT)
+            except subprocess.TimeoutExpired:
+                try:
+                    os.killpg(proc.pid, signal.SIGKILL)
+                except ProcessLookupError:
+                    pass
+                proc.communicate()  # reap zombie
+                return (
+                    f"Error: command timed out after {BASH_TIMEOUT}s. The command may "
+                    "be waiting on stdin (stdin is /dev/null) or be genuinely slow. "
+                    "Re-run with a non-interactive flag (--yes / -y / --no-input), "
+                    "or break the work into smaller commands."
+                )
             tail = "...[truncated]" if len(out) > OUTPUT_LIMIT else ""
-            return f"{out[:OUTPUT_LIMIT]}{tail}\n[exit {r.returncode}]"
-        except subprocess.TimeoutExpired:
-            return "Error: command timed out after 60s"
+            return f"{out[:OUTPUT_LIMIT]}{tail}\n[exit {proc.returncode}]"
         except Exception as e:
             return f"Error: {e}"
 
@@ -117,13 +273,26 @@ def execute(name: str, arguments: dict) -> str:
 def summarize_call(name: str, arguments: dict) -> str:
     """One-line summary used in the approval prompt and progress log."""
     if name == "read_file":
-        return f"read_file: {arguments.get('path')}"
+        return f"read_file: {arguments.get('path') or '(missing path)'}"
     if name == "write_file":
-        n = len(arguments.get("content", ""))
-        return f"write_file: {arguments.get('path')} ({n} chars)"
+        path = arguments.get("path") or "(missing path)"
+        n = len(arguments.get("content") or "")
+        return f"write_file: {path} ({n} chars)"
     if name == "run_bash":
-        cmd = arguments.get("command", "")
+        cmd = arguments.get("command") or "(missing command)"
         if len(cmd) > 200:
             cmd = cmd[:200] + "…"
         return f"run_bash: {cmd}"
+    if name == "create_plan":
+        n = len(arguments.get("steps") or [])
+        return f"create_plan ({n} step{'s' if n != 1 else ''})"
+    if name == "update_step":
+        return f"update_step({arguments.get('index')}, {arguments.get('status')!r})"
+    if name == "start_server":
+        cmd = arguments.get("command") or "(missing command)"
+        if len(cmd) > 100:
+            cmd = cmd[:100] + "…"
+        port = arguments.get("port")
+        suffix = f" (port {port})" if port else " (auto-port)"
+        return f"start_server: {cmd}{suffix}"
     return f"{name}({arguments})"

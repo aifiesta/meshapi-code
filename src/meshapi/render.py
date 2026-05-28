@@ -29,16 +29,24 @@ def _detect_theme() -> str:
 
 
 # Brand palette — Mesh API purple, theme-adaptive
+# Two color tracks:
+#   BRAND* (purple)   — Mesh/AI actions: tool invocations, plan, costs, banner
+#   CODE   (cyan)     — code & shell content: file bodies, commands, output
+# Keeping these visually distinct makes the transcript scannable: at a glance
+# you can tell whether a line is "the model is doing something" vs "this is the
+# actual code/command being run."
 if _detect_theme() == "dark":
     BRAND = "#8b78f7"       # bumped lighter on dark — official #6f5af5 reads dim on dark wine/black
     BRAND_DIM = "#aea3f0"   # lighter dim — clearly visible on dark backgrounds
     BRAND_BG = "#372d73"    # mid-dark purple — clearly visible without being loud
     BRAND_BG_FG = "#f5f0ff" # near-white with slight purple tint for input text
+    CODE = "#7dd3fc"        # sky-300 — code/shell content
 else:
     BRAND = "#6f5af5"       # official brand color — strong contrast on white
     BRAND_DIM = "#5a4ec4"   # darker dim — visible on light bg
     BRAND_BG = "#ebe4fc"    # pale lavender highlight against white
     BRAND_BG_FG = "#2c2540" # near-black with purple tint for input text on light theme
+    CODE = "#0369a1"        # sky-700 for light theme
 
 
 def fmt_usd(value) -> str:
