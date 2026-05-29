@@ -23,6 +23,7 @@ from rich.markup import escape as _rich_escape
 from rich.text import Text
 
 from . import __version__, statusbar
+from .attachments import AttachmentError, find_image_tokens, load_image
 from .client import stream_chat
 from .commands import handle_command
 from .config import CONFIG_FILE, HISTORY_FILE, load_config, secure_file
@@ -681,6 +682,7 @@ def main() -> None:
         "mode": from_str(args.mode),
         "plan": None,    # populated by the model via create_plan
         "servers": [],   # background processes spawned via start_server
+        "pending_attachments": [],  # image content parts queued via /image
     }
 
     # Mode cycle — used by both the prompt-toolkit keybinding (while at the
@@ -786,7 +788,40 @@ def main() -> None:
                 break
             continue
 
-        state["messages"].append({"role": "user", "content": user_input})
+        # Auto-detect image paths/URLs in the prompt and attach them. Tokens
+        # that look like unambiguous image paths (start with /, ~, ./, ../,
+        # or http(s)://) and end in a known image extension are pulled out
+        # and replaced with "[Image #N]" so the text reads naturally.
+        auto_text = user_input
+        auto_parts: list = []
+        queued = state.get("pending_attachments") or []
+        n_offset = len(queued)
+        for token in find_image_tokens(user_input):
+            if token not in auto_text:
+                continue  # already replaced (duplicate mention)
+            try:
+                part, info = load_image(token)
+            except AttachmentError as e:
+                console.print(f"[yellow]Couldn't auto-attach {token}: {e}[/yellow]")
+                continue
+            n = n_offset + len(auto_parts) + 1
+            auto_text = auto_text.replace(token, f"[Image #{n}]")
+            auto_parts.append(part)
+            size_kb = max(1, info["size_bytes"] // 1024)
+            console.print(
+                f"[{CODE}]📎 attached {info['name']} ({size_kb} KB, {info['mime']})[/{CODE}]"
+            )
+
+        all_parts = queued + auto_parts
+        if all_parts:
+            console.print(f"[dim]→ sending {len(all_parts)} image(s) with this prompt[/dim]")
+            state["messages"].append({
+                "role": "user",
+                "content": [{"type": "text", "text": auto_text}] + all_parts,
+            })
+            state["pending_attachments"] = []
+        else:
+            state["messages"].append({"role": "user", "content": user_input})
         console.print()
 
         # Tool-calling loop: keep streaming until model returns text without

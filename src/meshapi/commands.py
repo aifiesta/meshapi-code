@@ -3,9 +3,10 @@ from pathlib import Path
 
 from rich.panel import Panel
 
+from .attachments import AttachmentError, load_image
 from .config import save_config
 from .permissions import LABELS, Mode, from_str
-from .render import console, fmt_usd
+from .render import CODE, console, fmt_usd
 from .tools import build_system_prompt
 
 ROUTES = {"cheapest", "fastest", "balanced"}
@@ -55,6 +56,35 @@ def handle_command(cmd: str, state: dict) -> bool:
         else:
             console.print(f"[red]File not found: {path}[/red]")
 
+    elif name == "/image":
+        if not arg:
+            queued = state.get("pending_attachments") or []
+            if not queued:
+                console.print(
+                    "[dim]/image <path-or-url>  attach an image to the next prompt[/dim]"
+                )
+            else:
+                console.print(f"[dim]{len(queued)} image(s) queued for next prompt[/dim]")
+        else:
+            try:
+                part, info = load_image(arg.strip())
+            except AttachmentError as e:
+                console.print(f"[red]Can't attach: {e}[/red]")
+            else:
+                state.setdefault("pending_attachments", []).append(part)
+                size_kb = max(1, info["size_bytes"] // 1024)
+                console.print(
+                    f"[{CODE}]📎 attached {info['name']} ({size_kb} KB, {info['mime']})[/{CODE}]"
+                )
+
+    elif name == "/clear-attach":
+        had = len(state.get("pending_attachments") or [])
+        state["pending_attachments"] = []
+        if had:
+            console.print(f"[dim]Dropped {had} queued attachment(s).[/dim]")
+        else:
+            console.print("[dim]Nothing queued.[/dim]")
+
     elif name == "/system":
         if arg:
             state["cfg"]["system"] = arg
@@ -79,15 +109,20 @@ def handle_command(cmd: str, state: dict) -> bool:
 
     elif name == "/help":
         console.print(Panel.fit(
-            "/exit             end session\n"
-            "/clear            reset conversation\n"
-            "/model <name>     switch model (e.g. anthropic/claude-sonnet-4.5)\n"
-            "/route <mode>     cheapest|fastest|balanced|default\n"
-            "/mode <perm>      ask|bypass|none  (or shift+tab to cycle)\n"
-            "/file <path>      add file to context\n"
-            "/system <txt>     set system prompt\n"
-            "/cost             show session spend\n"
-            "/help             show this",
+            "/exit              end session\n"
+            "/clear             reset conversation\n"
+            "/model <name>      switch model (e.g. anthropic/claude-sonnet-4.5)\n"
+            "/route <mode>      cheapest|fastest|balanced|default\n"
+            "/mode <perm>       ask|bypass|none  (or shift+tab to cycle)\n"
+            "/file <path>       add text file to context\n"
+            "/image <path|url>  attach an image (base64) to the next prompt\n"
+            "/clear-attach      drop any queued image attachments\n"
+            "/system <txt>      set system prompt\n"
+            "/cost              show session spend\n"
+            "/help              show this\n\n"
+            "[dim]Image paths in a prompt auto-attach: drop /path/img.png in your\n"
+            "input and it's sent as a base64 image part. Wrap in backticks to keep\n"
+            "it as text. Multiple images per prompt are supported.[/dim]",
             title="commands",
             border_style="cyan",
         ))
