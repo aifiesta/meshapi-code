@@ -1005,11 +1005,48 @@ def main() -> None:
                         f"[yellow]Stopped after {hopped} tool hops — "
                         "model wasn't converging. Ask it to wrap up or revise the plan.[/yellow]"
                     )
+                    # Breadcrumb: record the incomplete state in history so a
+                    # "continue" turn resumes the right steps instead of the
+                    # model reconstructing (or hallucinating) progress.
+                    _plan = state.get("plan")
+                    if _plan is not None and not _plan.is_complete():
+                        state["messages"].append({
+                            "role": "system",
+                            "content": (
+                                f"[Execution was paused after {hopped} tool hops "
+                                f"with the plan incomplete {_plan.summary()}. "
+                                f"Remaining steps:\n{_plan.reminder_text()}\n"
+                                "When the user asks to continue, resume these "
+                                "remaining steps. Do not claim the task is "
+                                "finished until they are done.]"
+                            ),
+                        })
                     break
                 hopped += 1
 
+                # Re-ground the model in the current plan state on every hop.
+                # The plan lives client-side; without this the model has to
+                # reconstruct "what's left" from buried tool history and tends
+                # to stop early or falsely claim completion. Injected
+                # transiently (not persisted) so it always reflects live state
+                # and history stays clean.
+                turn_messages = state["messages"]
+                _plan = state.get("plan")
+                if _plan is not None and not _plan.is_complete():
+                    turn_messages = state["messages"] + [{
+                        "role": "system",
+                        "content": (
+                            f"[Active plan {_plan.summary()}. Steps still "
+                            f"remaining:\n{_plan.reminder_text()}\n"
+                            "Keep working through these now. Do NOT tell the "
+                            "user the task is complete, and do not treat "
+                            "starting a server as the final step, until every "
+                            "step above is done. If a step is genuinely "
+                            "impossible, mark it blocked and say why.]"
+                        ),
+                    }]
                 reply, meta = render_stream(
-                    stream_chat(state["messages"], state["cfg"], tools=TOOLS)
+                    stream_chat(turn_messages, state["cfg"], tools=TOOLS)
                 )
                 cost = meta.get("cost")
                 if cost is not None:
@@ -1024,6 +1061,21 @@ def main() -> None:
                 tool_calls = meta.get("tool_calls") or []
                 if not tool_calls:
                     state["messages"].append({"role": "assistant", "content": reply})
+                    # Flag premature completion: the model ended its turn with
+                    # plan steps still open. Surfaces the gap to the user (and
+                    # the breadcrumb above keeps it in context for "continue").
+                    _plan = state.get("plan")
+                    if _plan is not None and not _plan.is_complete():
+                        _inc = _plan.incomplete()
+                        console.print(
+                            f"[yellow]⚠ ended its turn with {len(_inc)} plan "
+                            f"step(s) not completed:[/yellow]"
+                        )
+                        for _i, _s in _inc:
+                            console.print(f"[yellow]    {_i}. {_s.title}[/yellow]")
+                        console.print(
+                            "[dim]  If it stopped early, tell it to continue.[/dim]"
+                        )
                     break
 
                 # Model called tools — execute and loop.

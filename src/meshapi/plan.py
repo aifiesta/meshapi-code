@@ -54,6 +54,27 @@ class Plan:
         done = sum(1 for s in self.steps if s.status == "completed")
         return f"({done}/{len(self.steps)} done)"
 
+    def is_complete(self):
+        """True when every step is completed (an empty plan is not 'complete')."""
+        return bool(self.steps) and all(s.status == "completed" for s in self.steps)
+
+    def incomplete(self):
+        """[(1-based index, Step)] for every step not yet completed."""
+        return [(i, s) for i, s in enumerate(self.steps, 1) if s.status != "completed"]
+
+    def reminder_text(self):
+        """Plain-text list of the steps still outstanding, for re-grounding the
+        model mid-turn. One line per step, with a status marker for anything
+        that isn't a plain pending step."""
+        lines = []
+        for i, s in self.incomplete():
+            mark = {
+                "in_progress": " (in progress)",
+                "blocked": " (blocked)",
+            }.get(s.status, "")
+            lines.append(f"  {i}. {s.title}{mark}")
+        return "\n".join(lines)
+
 
 def _icon_style(status):
     if status == "completed":
