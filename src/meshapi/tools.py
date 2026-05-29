@@ -212,6 +212,18 @@ def execute(name: str, arguments: dict) -> str:
         path = arguments.get("path")
         if not path:
             return "Error: read_file requires a `path` argument."
+        # Guard against reading an image as text — return a helpful message
+        # so the model directs the user to /image instead of looping on a
+        # utf-8 decode error.
+        suffix = Path(path).suffix.lower()
+        if suffix in (".png", ".jpg", ".jpeg", ".gif", ".webp"):
+            return (
+                f"Error: {Path(path).name} is an image file and read_file only "
+                "reads text. Tell the user to attach the image instead — either "
+                f"by typing `/image {path}` or by including the path in their "
+                "next prompt (auto-attach picks up paths starting with /, ~, "
+                "./, ../, or http(s)://)."
+            )
         try:
             return Path(path).expanduser().read_text()
         except Exception as e:
