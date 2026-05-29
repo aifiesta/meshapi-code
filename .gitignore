@@ -13,3 +13,8 @@ build/
 extracted/
 files_by_claude.zip
 suggestion_by_claude.md
+
+# Local scratch / scratch captures (not part of the package)
+image.png
+image copy.png
+output.txt
