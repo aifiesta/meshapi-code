@@ -26,10 +26,14 @@ from . import __version__, statusbar
 from .attachments import AttachmentError, find_image_tokens, load_image
 from .client import stream_chat
 from .commands import handle_command
-from .config import CONFIG_FILE, HISTORY_FILE, load_config, secure_file
+from .config import (
+    CONFIG_FILE, HISTORY_FILE, clear_servers_file, load_config, load_servers,
+    save_servers, secure_file,
+)
 from .keywatcher import KeyWatcher
-from .permissions import LABELS, Mode, from_str, next_mode
+from .permissions import AUTO_APPROVE, Mode, from_str, next_mode
 from .plan import Plan
+from . import safety
 from .render import (
     BRAND, BRAND_BG, BRAND_BG_FG, BRAND_DIM, CODE, console, fmt_usd, pretty_cwd, render_stream,
 )
@@ -78,8 +82,8 @@ def parse_args(argv=None) -> argparse.Namespace:
     p.add_argument(
         "--mode",
         choices=[m.value for m in Mode],
-        default="ask",
-        help="Tool permission mode (default: ask). Cycle in-session with shift+tab.",
+        default="default",
+        help="Tool permission mode (default: ask each tool). Cycle in-session with shift+tab.",
     )
     return p.parse_args(argv)
 
@@ -410,11 +414,88 @@ def _kill_server(pid: int) -> None:
         pass
 
 
+def _persist_servers(state: dict) -> None:
+    """Write current live servers to ~/.meshapi/servers.json. Best-effort —
+    a corrupt or missing file should never block the REPL."""
+    try:
+        save_servers(state.get("servers", []))
+    except Exception:
+        pass
+
+
 def _shutdown_servers(state: dict) -> None:
-    """Kill every server we launched. Called on meshapi exit."""
+    """Kill every server we launched. Called on meshapi exit (clean or
+    via SIGTERM/SIGHUP). Also wipes the persisted servers file so the
+    next launch doesn't offer to kill ghosts."""
     for srv in state.get("servers", []):
         _kill_server(srv["pid"])
     state["servers"] = []
+    clear_servers_file()
+
+
+def _adopt_orphaned_servers(state: dict) -> None:
+    """At startup, look for processes recorded by a previous (crashed)
+    meshapi and offer to terminate them. A hard kill of meshapi (SIGKILL,
+    laptop sleep + battery, segfault) skips atexit/SIGTERM, so this is
+    the safety net that catches leaked servers."""
+    rec = load_servers()
+    if not rec:
+        return
+    live = []
+    for s in rec:
+        pid = s.get("pid") if isinstance(s, dict) else None
+        if not isinstance(pid, int):
+            continue
+        try:
+            os.kill(pid, 0)  # signal 0 = existence check, no actual signal
+        except (ProcessLookupError, PermissionError):
+            continue
+        except OSError:
+            continue
+        live.append(s)
+    if not live:
+        clear_servers_file()
+        return
+    console.print(
+        f"[yellow]Found {len(live)} background server(s) left running from a "
+        "previous session:[/yellow]"
+    )
+    for s in live:
+        console.print(
+            f"  [dim]pid {s.get('pid')}, port {s.get('port')}, "
+            f"{s.get('cmd', '')}[/dim]"
+        )
+    try:
+        ans = console.input(
+            "Kill them now? [bold]y[/bold] (yes) / [bold]n[/bold] (no)  › "
+        ).strip().lower()
+    except (KeyboardInterrupt, EOFError):
+        return
+    if ans in ("y", "yes"):
+        for s in live:
+            _kill_server(s.get("pid", 0))
+        clear_servers_file()
+        console.print(f"[dim]Killed {len(live)} server(s).[/dim]")
+    else:
+        clear_servers_file()  # don't keep asking on every launch
+        console.print("[dim]Leaving them running.[/dim]")
+
+
+def _check_image_cap(state: dict, additional_bytes: int) -> tuple[bool, str]:
+    """Per-session image-bytes budget. Counts both already-sent and queued
+    attachments — clearing the queue (/clear-attach) releases them again."""
+    sent = state.get("session_image_bytes", 0)
+    queued = sum(int(a.get("size_bytes", 0))
+                 for a in (state.get("pending_attachments") or []))
+    total = sent + queued + additional_bytes
+    if total > safety.SESSION_IMAGE_BYTE_CAP:
+        cap_mb = safety.SESSION_IMAGE_BYTE_CAP // (1024 * 1024)
+        used_mb = max(1, (sent + queued) // (1024 * 1024))
+        return False, (
+            f"would exceed session image budget ({cap_mb} MB total, "
+            f"{used_mb} MB used)"
+        )
+    return True, ""
 
 
 def _handle_start_server(args: dict, state: dict) -> str:
@@ -520,10 +601,23 @@ def _handle_start_server(args: dict, state: dict) -> str:
             state.setdefault("servers", []).append({
                 "pid": proc.pid, "port": port, "cmd": cmd, "url": url,
             })
+            _persist_servers(state)  # survive a hard kill / crash
 
+            # Make the URL big, plain, on its own line — most terminals
+            # auto-detect bare URLs as cmd-clickable, which is more reliable
+            # than rich's OSC-8 `[link=...]` markup that some terminals
+            # (xterm.js, older Terminal.app) strip silently.
+            from rich.panel import Panel
             console.print(f"  [green]✓ ready in {elapsed:.1f}s[/green]")
             console.print()
-            console.print(f"  🌐  [bold green][link={url}]{url}[/link][/bold green]  [dim](pid {proc.pid})[/dim]")
+            console.print(Panel.fit(
+                f"[bold green]{url}[/bold green]\n"
+                f"[dim]server running in the background  ·  pid {proc.pid}  ·  "
+                "⌘-click or paste the URL in your browser[/dim]",
+                title="🌐 ready",
+                border_style="green",
+                padding=(0, 2),
+            ))
             console.print()
             if preview.strip():
                 console.print("  [dim]── server output ──[/dim]")
@@ -533,10 +627,14 @@ def _handle_start_server(args: dict, state: dict) -> str:
                     console.print(f"    [dim]{_rich_escape(line)}[/dim]")
 
             return (
-                f"Server is running at {url} (pid {proc.pid}, ready in "
-                f"{elapsed:.1f}s). It will keep running in the background "
-                f"until meshapi exits. Tell the user the URL is {url}. "
-                "Do not poll the server further — the user will visit the URL."
+                f"Server up at {url} (pid {proc.pid}, ready in {elapsed:.1f}s).\n"
+                "The user can already see the URL in their terminal — it was "
+                "printed by the CLI. Respond with a SINGLE short text line "
+                "(e.g. 'Server's up at " + url + " — open it in your browser') "
+                "and END THE TURN. Do NOT call any more tools this turn — "
+                "no curl, no read_file, no anything. The server keeps running "
+                "in the background until meshapi exits; the user will interact "
+                "with it through the browser, not through you."
             )
         time.sleep(0.2)
 
@@ -614,7 +712,42 @@ def handle_tool_calls(tool_calls: list, mode: Mode, state: dict) -> None:
                 # effects, so we don't gate them on the approval prompt.
                 result = _handle_plan_tool(tc["name"], args, state)
             else:
-                approved = mode == Mode.BYPASS or confirm_tool_call(
+                # Per-mode auto-approval: each Mode declares which tool names
+                # bypass the y/n prompt. Anything not in the set, OR anything
+                # that fails a safety check, falls back to confirmation —
+                # even in BYPASS we ask before truly dangerous shapes
+                # (sensitive paths, `rm -rf /`, sudo, curl | sh, ...).
+                auto_approved = tc["name"] in AUTO_APPROVE.get(mode, set())
+                safety_reason: str = ""
+                if auto_approved and tc["name"] == "write_file":
+                    ok, reason = safety.is_path_safe_for_auto_write(
+                        args.get("path"), mode
+                    )
+                    if not ok:
+                        auto_approved = False
+                        safety_reason = reason or "path safety check failed"
+                elif auto_approved and tc["name"] == "read_file":
+                    # BYPASS auto-approves reads; we still block sensitive
+                    # paths so the model can't silently leak ~/.ssh/...
+                    # to the upstream provider.
+                    ok, reason = safety.is_path_safe_for_auto_read(
+                        args.get("path"), mode
+                    )
+                    if not ok:
+                        auto_approved = False
+                        safety_reason = reason or "path safety check failed"
+                elif auto_approved and tc["name"] in ("run_bash", "start_server"):
+                    ok, reason = safety.is_command_safe_for_auto(
+                        args.get("command"), mode
+                    )
+                    if not ok:
+                        auto_approved = False
+                        safety_reason = reason or "command safety check failed"
+                if not auto_approved and safety_reason:
+                    console.print(
+                        f"[yellow]⚠ auto-approval blocked: {safety_reason}[/yellow]"
+                    )
+                approved = auto_approved or confirm_tool_call(
                     tc["name"], args, watcher=state.get("watcher")
                 )
                 if approved:
@@ -682,7 +815,10 @@ def main() -> None:
         "mode": from_str(args.mode),
         "plan": None,    # populated by the model via create_plan
         "servers": [],   # background processes spawned via start_server
-        "pending_attachments": [],  # image content parts queued via /image
+        "pending_attachments": [],  # list of {"part","size_bytes","name"}
+        # Cumulative bytes of attachments already sent to the model.
+        # Enforces safety.SESSION_IMAGE_BYTE_CAP across the whole session.
+        "session_image_bytes": 0,
     }
 
     # Mode cycle — used by both the prompt-toolkit keybinding (while at the
@@ -699,22 +835,14 @@ def main() -> None:
         _cycle_mode()
         event.app.invalidate()
 
-    # Live mode indicator on the right side of the input line. Re-evaluated on
-    # every prompt_toolkit redraw, so shift+tab updates it instantly while
-    # typing — the statusbar.print_line above the rule is the "this turn
-    # started in mode X" header; this is the "current mode RIGHT NOW" sticker.
-    def prompt_rprompt():
-        m = state["mode"]
-        if m == Mode.BYPASS:
-            color = "ansired"
-        elif m == Mode.NONE:
-            color = "ansiyellow"
-        else:
-            color = "ansigreen"
-        return FormattedText([
-            (f"bold {color}", f"▶▶ {LABELS[m]}"),
-            ("ansibrightblack", "  ⇧⇥"),
-        ])
+    # Prompt is just the "› " marker. The mode indicator is rendered by
+    # statusbar.print_line ABOVE the cwd separator each turn (matches the
+    # user's mockup — no extra indicator on the input line). Trade-off:
+    # shift+tab during typing still cycles the mode internally, but the
+    # repainted line is only visible at the next prompt or after the next
+    # tool batch (handle_tool_calls also fires statusbar.print_line).
+    def prompt_message():
+        return FormattedText([("class:prompt", "› ")])
 
     # Out-of-prompt key watcher: lets shift+tab cycle mode during streaming
     # and tool execution. Paused while prompt_toolkit owns stdin.
@@ -731,6 +859,7 @@ def main() -> None:
     )
 
     render_banner(cfg)
+    _adopt_orphaned_servers(state)
     watcher.start()  # captures shift+tab whenever prompt_toolkit isn't reading
 
     # Make sure backgrounded servers die with us — even if Python exits via
@@ -753,10 +882,12 @@ def main() -> None:
 
     while True:
         try:
-            # No static mode line above the prompt — rprompt on the input
-            # line itself is the source of truth here, and it updates live
-            # on shift+tab. Printing a static copy above would only show a
-            # stale snapshot whenever the user cycled mode while typing.
+            # cwd separator above the input box. The mode indicator is no
+            # longer printed here — it lives in the bottom_toolbar below the
+            # prompt, which prompt_toolkit repaints live on shift+tab:
+            #   ──────────────────────────────────────────── cli_for_meshapi_v1
+            #   › ...
+            #   ⏵⏵ bypass permissions on  (shift+tab to cycle) · esc to interrupt
             console.rule(
                 title=f"[{BRAND_DIM}]{Path.cwd().name}[/{BRAND_DIM}]",
                 align="right",
@@ -765,16 +896,21 @@ def main() -> None:
             )
             with watcher.paused():
                 # Hand stdin off to prompt_toolkit (canonical-mode termios).
+                # The prompt itself is just "› "; the mode indicator is the
+                # bottom_toolbar, repainted live by the s-tab binding's
+                # event.app.invalidate(). "noreverse" kills prompt_toolkit's
+                # default inverted bar so the toggle reads as plain text.
                 user_input = session.prompt(
-                    "› ",
-                    rprompt=prompt_rprompt,
+                    prompt_message,
+                    bottom_toolbar=lambda: statusbar.bottom_toolbar(state),
                     style=Style.from_dict({
                         "prompt": f"bold fg:{BRAND} bg:{BRAND_BG}",
                         "": f"fg:{BRAND_BG_FG} bg:{BRAND_BG}",
-                        "rprompt": f"bg:{BRAND_BG}",
+                        "bottom-toolbar": "noreverse bg:default",
                     }),
                 )
             console.rule(style=BRAND_DIM, characters="─")
+            console.print()  # bottom padding under the input box per the mockup
         except (KeyboardInterrupt, EOFError):
             _shutdown_servers(state)
             watcher.stop()
@@ -788,37 +924,61 @@ def main() -> None:
                 break
             continue
 
-        # Auto-detect image paths/URLs in the prompt and attach them. Tokens
-        # that look like unambiguous image paths (start with /, ~, ./, ../,
-        # or http(s)://) and end in a known image extension are pulled out
-        # and replaced with "[Image #N]" so the text reads naturally.
+        # Auto-detect image paths/URLs in the prompt and attach them. The
+        # detector is liberal — drag-dropped paths (often quoted), bare
+        # filenames that exist in cwd, and URLs all work. Each match comes
+        # back as (raw_token, normalized): we replace `raw_token` in the
+        # original text (so wrapping quotes go too) with `[Image #N]`.
         auto_text = user_input
-        auto_parts: list = []
+        auto_attachments: list = []  # list of {"part","size_bytes","name"}
         queued = state.get("pending_attachments") or []
         n_offset = len(queued)
-        for token in find_image_tokens(user_input):
-            if token not in auto_text:
-                continue  # already replaced (duplicate mention)
+        for raw_token, source in find_image_tokens(user_input):
+            if raw_token not in auto_text:
+                continue  # already replaced (duplicate mention in same prompt)
             try:
-                part, info = load_image(token)
+                part, info = load_image(source)
             except AttachmentError as e:
-                console.print(f"[yellow]Couldn't auto-attach {token}: {e}[/yellow]")
+                console.print(f"[yellow]Couldn't auto-attach {source}: {e}[/yellow]")
                 continue
-            n = n_offset + len(auto_parts) + 1
-            auto_text = auto_text.replace(token, f"[Image #{n}]")
-            auto_parts.append(part)
+            # Session-cap check: refuse attachments that would push us past
+            # the cumulative budget. Already-sent + queued + this one.
+            ok, reason = _check_image_cap(
+                state,
+                info["size_bytes"]
+                + sum(int(a.get("size_bytes", 0)) for a in auto_attachments),
+            )
+            if not ok:
+                console.print(
+                    f"[red]Skipping {info['name']}: {reason}[/red]"
+                )
+                continue
+            n = n_offset + len(auto_attachments) + 1
+            auto_text = auto_text.replace(raw_token, f"[Image #{n}]")
+            auto_attachments.append({
+                "part": part,
+                "size_bytes": info["size_bytes"],
+                "name": info["name"],
+            })
             size_kb = max(1, info["size_bytes"] // 1024)
             console.print(
                 f"[{CODE}]📎 attached {info['name']} ({size_kb} KB, {info['mime']})[/{CODE}]"
             )
 
-        all_parts = queued + auto_parts
-        if all_parts:
-            console.print(f"[dim]→ sending {len(all_parts)} image(s) with this prompt[/dim]")
-            state["messages"].append({
-                "role": "user",
-                "content": [{"type": "text", "text": auto_text}] + all_parts,
-            })
+        all_attachments = queued + auto_attachments
+        if all_attachments:
+            console.print(
+                f"[dim]→ sending {len(all_attachments)} image(s) with this prompt[/dim]"
+            )
+            parts = [{"type": "text", "text": auto_text}] + [
+                a["part"] for a in all_attachments
+            ]
+            state["messages"].append({"role": "user", "content": parts})
+            # Move the queued + auto bytes from "pending" to "sent" and clear
+            # the queue. session_image_bytes is what's enforced going forward.
+            state["session_image_bytes"] = state.get("session_image_bytes", 0) + sum(
+                int(a.get("size_bytes", 0)) for a in all_attachments
+            )
             state["pending_attachments"] = []
         else:
             state["messages"].append({"role": "user", "content": user_input})
@@ -848,9 +1008,8 @@ def main() -> None:
                     break
                 hopped += 1
 
-                tools_arg = TOOLS if state["mode"] != Mode.NONE else None
                 reply, meta = render_stream(
-                    stream_chat(state["messages"], state["cfg"], tools=tools_arg)
+                    stream_chat(state["messages"], state["cfg"], tools=TOOLS)
                 )
                 cost = meta.get("cost")
                 if cost is not None:

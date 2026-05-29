@@ -71,11 +71,30 @@ def handle_command(cmd: str, state: dict) -> bool:
             except AttachmentError as e:
                 console.print(f"[red]Can't attach: {e}[/red]")
             else:
-                state.setdefault("pending_attachments", []).append(part)
-                size_kb = max(1, info["size_bytes"] // 1024)
-                console.print(
-                    f"[{CODE}]📎 attached {info['name']} ({size_kb} KB, {info['mime']})[/{CODE}]"
+                # Per-session image budget check (SSRF + 20 MB per-image
+                # are already enforced inside load_image).
+                from .safety import SESSION_IMAGE_BYTE_CAP
+                sent = state.get("session_image_bytes", 0)
+                queued_bytes = sum(
+                    int(a.get("size_bytes", 0))
+                    for a in (state.get("pending_attachments") or [])
                 )
+                if sent + queued_bytes + info["size_bytes"] > SESSION_IMAGE_BYTE_CAP:
+                    cap_mb = SESSION_IMAGE_BYTE_CAP // (1024 * 1024)
+                    console.print(
+                        f"[red]Can't attach: would exceed session image budget "
+                        f"({cap_mb} MB).[/red]"
+                    )
+                else:
+                    state.setdefault("pending_attachments", []).append({
+                        "part": part,
+                        "size_bytes": info["size_bytes"],
+                        "name": info["name"],
+                    })
+                    size_kb = max(1, info["size_bytes"] // 1024)
+                    console.print(
+                        f"[{CODE}]📎 attached {info['name']} ({size_kb} KB, {info['mime']})[/{CODE}]"
+                    )
 
     elif name == "/clear-attach":
         had = len(state.get("pending_attachments") or [])
@@ -98,7 +117,7 @@ def handle_command(cmd: str, state: dict) -> bool:
 
     elif name == "/mode":
         if not arg:
-            cur = state.get("mode", Mode.ASK)
+            cur = state.get("mode", Mode.DEFAULT)
             console.print(f"[dim]Current mode: {LABELS[cur]} ({cur.value})[/dim]")
         else:
             try:
@@ -113,7 +132,7 @@ def handle_command(cmd: str, state: dict) -> bool:
             "/clear             reset conversation\n"
             "/model <name>      switch model (e.g. anthropic/claude-sonnet-4.5)\n"
             "/route <mode>      cheapest|fastest|balanced|default\n"
-            "/mode <perm>       ask|bypass|none  (or shift+tab to cycle)\n"
+            "/mode <perm>       default|accept-edits|auto|bypass  (or shift+tab)\n"
             "/file <path>       add text file to context\n"
             "/image <path|url>  attach an image (base64) to the next prompt\n"
             "/clear-attach      drop any queued image attachments\n"
@@ -122,7 +141,13 @@ def handle_command(cmd: str, state: dict) -> bool:
             "/help              show this\n\n"
             "[dim]Image paths in a prompt auto-attach: drop /path/img.png in your\n"
             "input and it's sent as a base64 image part. Wrap in backticks to keep\n"
-            "it as text. Multiple images per prompt are supported.[/dim]",
+            "it as text. Multiple images per prompt are supported.\n\n"
+            "Anything you /file, /image, or that the model reads via tools is sent\n"
+            "to the Mesh API gateway and the upstream model — including file\n"
+            "contents, screenshots, and shell output. Don't attach secrets.\n"
+            "Mode auto-approvals: accept-edits auto-writes inside cwd; auto adds\n"
+            "shell commands; bypass auto-approves everything (still asks before\n"
+            "writing to ~/.ssh, /etc, rm -rf, sudo, curl|sh, etc.).[/dim]",
             title="commands",
             border_style="cyan",
         ))

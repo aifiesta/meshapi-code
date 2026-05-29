@@ -8,6 +8,9 @@ from pathlib import Path
 CONFIG_DIR = Path.home() / ".meshapi"
 CONFIG_FILE = CONFIG_DIR / "config.json"
 HISTORY_FILE = CONFIG_DIR / "history"
+# Backgrounded server pids/ports, persisted so a crashed meshapi can offer
+# to clean them up on next launch (a hard kill skips atexit/SIGTERM).
+SERVERS_FILE = CONFIG_DIR / "servers.json"
 
 DEFAULT_CONFIG = {
     "base_url": "https://api.meshapi.ai/v1",
@@ -77,3 +80,50 @@ def save_config(cfg: dict) -> None:
     persisted = {k: v for k, v in cfg.items() if k != "api_key"}
     CONFIG_FILE.write_text(json.dumps(persisted, indent=2))
     secure_file(CONFIG_FILE)
+
+
+def save_servers(servers: list) -> None:
+    """Persist a list of `{pid, port, cmd, url}` dicts for crash recovery.
+
+    Written atomically (temp + rename) at 0600 alongside the config. Best-
+    effort — failures are swallowed so a broken servers.json never blocks
+    starting a fresh REPL.
+    """
+    try:
+        _secure_dir(CONFIG_DIR)
+        serializable = [
+            {
+                "pid": s.get("pid"),
+                "port": s.get("port"),
+                "cmd": s.get("cmd"),
+                "url": s.get("url"),
+            }
+            for s in (servers or [])
+            if isinstance(s, dict)
+        ]
+        tmp = SERVERS_FILE.with_suffix(".json.tmp")
+        tmp.write_text(json.dumps(serializable, indent=2))
+        os.replace(tmp, SERVERS_FILE)
+        secure_file(SERVERS_FILE)
+    except OSError:
+        pass
+
+
+def load_servers() -> list:
+    """Read persisted server records. Returns [] on any failure."""
+    if not SERVERS_FILE.exists():
+        return []
+    try:
+        data = json.loads(SERVERS_FILE.read_text())
+    except (OSError, json.JSONDecodeError):
+        return []
+    return data if isinstance(data, list) else []
+
+
+def clear_servers_file() -> None:
+    """Drop the persisted servers file. Best-effort."""
+    try:
+        if SERVERS_FILE.exists():
+            SERVERS_FILE.unlink()
+    except OSError:
+        pass

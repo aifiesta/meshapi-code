@@ -1,35 +1,70 @@
-"""Permission modes for tool calls — cycle with Shift+Tab."""
+"""Permission modes for tool calls — cycle with Shift+Tab.
+
+Four modes, escalating from "ask for everything" → "auto-approve everything":
+
+    default       ask for each tool call (safest — no indicator displayed)
+    accept-edits  auto-approve write_file; still ask for shell / start_server
+    auto          auto-approve write_file + run_bash; still ask for start_server
+    bypass        auto-approve everything (use with care)
+
+AUTO_APPROVE drives the dispatch in handle_tool_calls — it's the set of tool
+names that don't go through the y/n confirmation in a given mode. Plan tools
+(create_plan, update_step) are always auto-approved regardless; they don't
+touch the filesystem.
+"""
 from enum import Enum
 
 
 class Mode(Enum):
-    ASK = "ask"        # prompt for each tool call (default — safest)
-    BYPASS = "bypass"  # auto-execute without asking (fast — like `--yolo`)
-    NONE = "none"      # don't expose tools to the model at all (read-only chat)
+    DEFAULT = "default"            # ask for every tool call
+    ACCEPT_EDITS = "accept-edits"  # auto-approve write_file
+    AUTO = "auto"                  # auto-approve write_file + run_bash
+    BYPASS = "bypass"              # auto-approve everything
 
 
-ORDER = [Mode.ASK, Mode.BYPASS, Mode.NONE]
+ORDER = [Mode.DEFAULT, Mode.ACCEPT_EDITS, Mode.AUTO, Mode.BYPASS]
 
+# Display labels. DEFAULT is intentionally blank — no indicator shown.
 LABELS = {
-    Mode.ASK: "ask permissions",
+    Mode.DEFAULT: "",
+    Mode.ACCEPT_EDITS: "accept edits on",
+    Mode.AUTO: "auto mode on",
     Mode.BYPASS: "bypass permissions on",
-    Mode.NONE: "no permissions",
 }
 
-HINTS = {
-    Mode.ASK: "model can request file/shell ops; you confirm each one",
-    Mode.BYPASS: "model executes file/shell ops automatically — be careful",
-    Mode.NONE: "chat only — model has no filesystem or shell access",
+# Tools that bypass the y/n confirmation in each mode. The dispatch in
+# handle_tool_calls checks `tc.name in AUTO_APPROVE[mode]`.
+AUTO_APPROVE: dict = {
+    Mode.DEFAULT:      set(),
+    Mode.ACCEPT_EDITS: {"write_file"},
+    Mode.AUTO:         {"write_file", "run_bash"},
+    Mode.BYPASS:       {"write_file", "run_bash", "read_file", "start_server"},
 }
+
+# Modes that warrant a more aggressive footer hint.
+SHOW_ESC_HINT = {Mode.BYPASS}
 
 
 def next_mode(m: Mode) -> Mode:
     return ORDER[(ORDER.index(m) + 1) % len(ORDER)]
 
 
+# Aliases the user can pass on the command line or to /mode.
+_ALIASES = {
+    "default": Mode.DEFAULT, "ask": Mode.DEFAULT, "blank": Mode.DEFAULT,
+    "accept-edits": Mode.ACCEPT_EDITS, "accept_edits": Mode.ACCEPT_EDITS,
+    "edits": Mode.ACCEPT_EDITS, "accept": Mode.ACCEPT_EDITS,
+    "auto": Mode.AUTO,
+    "bypass": Mode.BYPASS, "yolo": Mode.BYPASS,
+}
+
+
 def from_str(s: str) -> Mode:
-    s = s.strip().lower()
+    s = (s or "").strip().lower()
+    if s in _ALIASES:
+        return _ALIASES[s]
     for m in Mode:
         if m.value == s:
             return m
-    raise ValueError(f"unknown mode: {s} (try {', '.join(m.value for m in Mode)})")
+    valid = ", ".join(m.value for m in Mode)
+    raise ValueError(f"unknown mode: {s!r} (try {valid})")

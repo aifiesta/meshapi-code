@@ -13,10 +13,18 @@ so a dragged-in file path can be attached without an explicit slash command.
 """
 import base64
 import mimetypes
+import re
 from pathlib import Path
 from urllib.parse import urlparse
 
 import httpx
+
+# Tokenizer for find_image_tokens: a single- or double-quoted span (kept
+# whole, INCLUDING internal spaces) OR a run of non-whitespace. Quoted
+# alternatives come first so a drag-dropped path like
+# `'/Users/me/snake game/img.png'` stays one token instead of being shredded
+# on the spaces by str.split().
+_TOKEN_RE = re.compile(r"'[^']*'|\"[^\"]*\"|\S+")
 
 # Size guardrails. We don't refuse — vision tokens are the user's call — but we
 # do report sizes back so the user sees the cost.
@@ -60,43 +68,58 @@ def load_image(source: str, detail: str = "auto") -> tuple[dict, dict]:
     )
 
 
-def find_image_tokens(text: str) -> list[str]:
-    """Return tokens in `text` that look like image paths or URLs.
+def find_image_tokens(text: str) -> list[tuple[str, str]]:
+    """Return `(raw_token, normalized)` pairs for image references in `text`.
 
-    Conservative on purpose — only matches:
+    Strategy: be liberal about what looks like a file/URL, then verify by
+    actually checking existence (local) or extension (URL). The user's
+    natural workflow is "drag the file in" — terminals wrap drag-dropped
+    paths in single quotes when convenient, so we strip wrapping quotes.
+    A bare filename like `screenshot.png` also matches if it exists in the
+    cwd. The only escape is a backtick prefix: `` `foo.png` `` is treated
+    as text.
+
       - http(s) URLs ending in a known image extension
-      - Local paths starting with `/`, `~/`, `./`, or `../` (and ending in an
-        image extension, AND pointing at an existing file)
+      - Any token that, after stripping wrapping quotes and trailing
+        punctuation, resolves to an existing file with an image extension
 
-    Bare filenames (`foo.png`) are NOT matched: too ambiguous with filenames
-    mentioned in conversation. Tokens wrapped in backticks or quotes are
-    skipped (user's escape hatch).
-
-    Trailing sentence punctuation (`.,;:!?)`) is trimmed before matching.
+    `raw_token` is the exact substring to find/replace in the original
+    text (so quotes are preserved when stripping); `normalized` is the
+    cleaned path or URL to pass into load_image().
     """
-    matches: list[str] = []
-    for raw in text.split():
-        if not raw or raw[0] in "`\"'":
+    matches: list[tuple[str, str]] = []
+    for raw in _TOKEN_RE.findall(text):
+        if not raw:
             continue
+        # Backtick prefix = explicit "treat as text" escape.
+        if raw.startswith("`"):
+            continue
+
         token = raw
+        # Strip a matching wrapping pair of single or double quotes
+        # (drag-drop on macOS Terminal/iTerm2 quotes paths automatically).
+        if len(token) >= 2 and token[0] == token[-1] and token[0] in "'\"":
+            token = token[1:-1]
+        # Strip trailing sentence punctuation but leave URL query strings.
         while token and token[-1] in ".,;:!?)":
             token = token[:-1]
         if not token:
             continue
+
         low = token.lower()
         if low.startswith(("http://", "https://")):
             path_part = token.split("?", 1)[0]
             if path_part.lower().endswith(IMAGE_EXTS):
-                matches.append(token)
+                matches.append((raw, token))
             continue
-        if token.startswith(("/", "~/", "./", "../")):
-            if low.endswith(IMAGE_EXTS):
-                try:
-                    p = Path(token).expanduser()
-                    if p.is_file():
-                        matches.append(token)
-                except OSError:
-                    pass
+
+        if low.endswith(IMAGE_EXTS):
+            try:
+                p = Path(token).expanduser()
+                if p.is_file():
+                    matches.append((raw, token))
+            except (OSError, ValueError):
+                pass
     return matches
 
 
@@ -109,6 +132,14 @@ def _looks_like_url(s: str) -> bool:
 
 
 def _fetch_url(url: str) -> tuple[bytes, str, str]:
+    # SSRF guard: refuse loopback/private/link-local before issuing the
+    # request. Imported lazily so attachments.py doesn't pull in safety on
+    # every code path.
+    from .safety import is_url_safe_for_fetch
+
+    ok, reason = is_url_safe_for_fetch(url)
+    if not ok:
+        raise AttachmentError(f"refusing to fetch {url}: {reason}")
     try:
         with httpx.Client(timeout=30, follow_redirects=True) as client:
             r = client.get(url)
