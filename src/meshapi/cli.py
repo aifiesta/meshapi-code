@@ -990,6 +990,7 @@ def main() -> None:
         agg_cost = 0.0
         last_model = state["cfg"]["model"]
         last_usage: dict = {}
+        last_optimize_plan = {}
         last_elapsed = 0.0
         try:
             # While-loop so the cap can be promoted dynamically the moment the
@@ -1057,6 +1058,7 @@ def main() -> None:
                 last_model = meta.get("model") or last_model
                 last_usage = meta.get("usage") or last_usage
                 last_elapsed += meta.get("elapsed", 0.0)
+                last_optimize_plan = meta.get("optimize_plan") or last_optimize_plan
 
                 tool_calls = meta.get("tool_calls") or []
                 if not tool_calls:
@@ -1090,6 +1092,16 @@ def main() -> None:
                 f"[dim]{last_model}  •  {prompt_t}→{completion_t} tok  •  {cost_str}  •  "
                 f"session {fmt_usd(state['session_cost'])}  •  {last_elapsed:.1f}s[/dim]"
             )
+            if last_optimize_plan:
+                if last_optimize_plan.get("degraded"):
+                    console.print(
+                        f"[yellow]⚡ optimize beta: {last_optimize_plan['degraded']}[/yellow]"
+                    )
+                else:
+                    from .optimize import savings_line
+                    line = savings_line(last_optimize_plan, last_usage)
+                    if line:
+                        console.print(f"[dim]{line}[/dim]")
         except KeyboardInterrupt:
             console.rule(style="dim yellow", characters="─")
             console.print("[yellow]aborted by user — returning to prompt[/yellow]")

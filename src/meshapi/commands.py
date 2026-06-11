@@ -115,6 +115,42 @@ def handle_command(cmd: str, state: dict) -> bool:
     elif name == "/cost":
         console.print(f"[dim]Session spend: {fmt_usd(state.get('session_cost', 0))}[/dim]")
 
+    elif name == "/optimize":
+        # BETA: Mesh Optimize dial. 0 = off (full bypass), up to 0.95.
+        if not arg:
+            cur = float(state["cfg"].get("optimize") or 0)
+            label = f"{cur}" if cur > 0 else "off"
+            console.print(
+                f"[dim]optimize (beta): {label}\n"
+                "usage: /optimize <0 to 0.95>   e.g. /optimize 0.3\n"
+                "       /optimize off\n"
+                "0+ injects prompt cache breakpoints and max_tokens defaults; "
+                "0.2+ also prunes consumed tool results from old turns. "
+                "Savings appear in the status line after each turn. This is a "
+                "beta feature; set /optimize off to bypass entirely.[/dim]"
+            )
+        else:
+            raw = arg.strip().lower()
+            try:
+                value = 0.0 if raw == "off" else float(raw)
+            except ValueError:
+                console.print("[red]Not a number. Use 0 to 0.95, or 'off'.[/red]")
+            else:
+                if not 0 <= value <= 0.95:
+                    console.print("[red]Dial range is 0 to 0.95.[/red]")
+                else:
+                    state["cfg"]["optimize"] = value
+                    save_config(state["cfg"])
+                    if value > 0:
+                        console.print(
+                            f"[dim]optimize (beta) set to {value}. Levers: cache "
+                            "injection, max_tokens defaults"
+                            + (", tool result pruning" if value >= 0.2 else "")
+                            + ". /optimize off to disable.[/dim]"
+                        )
+                    else:
+                        console.print("[dim]optimize off. Requests pass through untouched.[/dim]")
+
     elif name == "/mode":
         if not arg:
             cur = state.get("mode", Mode.DEFAULT)
@@ -138,6 +174,7 @@ def handle_command(cmd: str, state: dict) -> bool:
             "/clear-attach      drop any queued image attachments\n"
             "/system <txt>      set system prompt\n"
             "/cost              show session spend\n"
+            "/optimize <dial>   token savings, beta: 0 off, up to 0.95\n"
             "/help              show this\n\n"
             "[dim]Image paths in a prompt auto-attach: drop /path/img.png in your\n"
             "input and it's sent as a base64 image part. Wrap in backticks to keep\n"

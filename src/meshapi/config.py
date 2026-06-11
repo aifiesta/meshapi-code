@@ -18,6 +18,9 @@ DEFAULT_CONFIG = {
     "model": "anthropic/claude-sonnet-4.5",
     "system": "You are a helpful coding assistant. Be concise.",
     "route": None,
+    # Mesh Optimize dial (BETA). 0 = off. 0 to 0.95: how aggressively to
+    # cut token spend. See /optimize in the REPL and README for details.
+    "optimize": 0.0,
 }
 
 _DIR_MODE = stat.S_IRWXU                       # 0700

@@ -48,6 +48,43 @@ Get a key at [meshapi.ai](https://meshapi.ai).
 - **Persistent input history** — up-arrow recalls past prompts across sessions.
 - **Config + env-var override** — `~/.meshapi/config.json`, `MESHAPI_API_KEY`.
 
+## Mesh Optimize (beta)
+
+> **Beta feature.** Off by default. The lever stack, savings math, and command surface may change between releases. `/optimize off` bypasses everything.
+
+One dial that cuts token spend on every request the CLI sends. Same idea as a thermostat: you pick how aggressive, the levers underneath are automatic.
+
+```
+/optimize 0.3        enable at dial 0.3
+/optimize off        disable (requests pass through untouched)
+/optimize            show current setting and help
+```
+
+What the dial does:
+
+| dial | levers | quality impact |
+|---|---|---|
+| 0 | off, byte-identical passthrough | none |
+| 0 to 0.2 | prompt cache breakpoint injection on stable prefixes, max_tokens defaults per task class | none |
+| 0.2 to 0.95 | plus pruning of tool results the model already consumed in earlier turns | minimal |
+
+Why this matters in a tool-calling REPL specifically: every turn re-sends the whole conversation, including every old `run_bash` output and file dump. A 5000-line test log from ten turns ago is billed again on every request after it. The pruning lever truncates those consumed outputs (keeping the last 4 messages untouched), and the cache lever marks the stable conversation prefix so the gateway can serve it at the provider's 90% cache discount instead of full price.
+
+After each turn the status line reports what actually happened, honestly:
+
+```
+anthropic/claude-opus-4.8  •  3122→214 tok  •  $0.021  •  session $0.084  •  6.1s
+⚡ optimize beta (dial 0.3): ~4888 tok pruned, cache breakpoints set
+```
+
+Notes:
+
+- Works with every model Mesh serves, including `anthropic/claude-opus-4.8` and `anthropic/claude-fable-5`. Per-model rules are respected automatically (cache minimums differ per model; below the minimum no breakpoint is injected because it would do nothing).
+- Savings are only claimed when measurable: pruned tokens are a chars/4 estimate, cache reads are reported only when the gateway surfaces them in `usage`.
+- If the gateway rejects an optimized request for any reason, the CLI automatically retries the raw request and tells you. The beta can never be the reason a turn fails.
+- Everything pruned is logged with a sha256 of the original content, so "why did the model forget X" has an answer.
+- Reference implementation, tests, and design notes: [mesh-optimize on GitHub](https://github.com/raushan-aifiesta/mesh-optimize).
+
 ## Tool calling
 
 When tools are enabled, the model can call:
