@@ -84,6 +84,7 @@ Notes:
 - If the gateway rejects an optimized request for any reason, the CLI automatically retries the raw request and tells you. The beta can never be the reason a turn fails.
 - Everything pruned is logged with a sha256 of the original content, so "why did the model forget X" has an answer.
 - Reference implementation, tests, and design notes: [mesh-optimize on GitHub](https://github.com/raushan-aifiesta/mesh-optimize).
+- New to Mesh? Get an API key at [app.meshapi.ai](https://app.meshapi.ai/). One key, 300+ models, and the optimizer works on all of them.
 
 ## Tool calling
 
