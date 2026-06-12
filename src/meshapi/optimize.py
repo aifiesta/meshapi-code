@@ -199,7 +199,12 @@ def savings_line(plan: dict, usage: dict) -> str:
     if pruned:
         parts.append(f"~{pruned} tok pruned")
     usage = usage or {}
-    cache_read = usage.get("cache_read_input_tokens") or 0
+    # explicit anthropic-style field first, OpenAI convention as fallback
+    cache_read = (
+        usage.get("cache_read_input_tokens")
+        or (usage.get("prompt_tokens_details") or {}).get("cached_tokens")
+        or 0
+    )
     if cache_read:
         parts.append(f"{cache_read} tok from cache (90% off)")
     if "cache_injection" in plan["levers_applied"] and not cache_read:
