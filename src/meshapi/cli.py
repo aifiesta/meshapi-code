@@ -25,10 +25,10 @@ from rich.text import Text
 from . import __version__, statusbar
 from .attachments import AttachmentError, find_image_tokens, load_image
 from .client import stream_chat
-from .commands import handle_command
+from .commands import handle_command, prompt_for_api_key
 from .config import (
-    CONFIG_FILE, HISTORY_FILE, clear_servers_file, load_config, load_servers,
-    save_servers, secure_file,
+    CREDENTIALS_FILE, HISTORY_FILE, clear_servers_file,
+    load_config, load_servers, save_servers, secure_file,
 )
 from .keywatcher import KeyWatcher
 from .permissions import AUTO_APPROVE, Mode, from_str, next_mode
@@ -832,11 +832,19 @@ def main() -> None:
         cfg["route"] = args.route
 
     if not cfg["api_key"]:
-        console.print(
-            "[red]No API key found. Set MESHAPI_API_KEY env var or edit "
-            f"{CONFIG_FILE}[/red]"
-        )
-        sys.exit(1)
+        # First run (or key removed): walk the user through connecting a key
+        # instead of bouncing them to docs. Non-interactive stdin (CI, pipes)
+        # can't prompt, so keep the hard error there.
+        if sys.stdin.isatty():
+            if not prompt_for_api_key(cfg):
+                sys.exit(1)
+        else:
+            console.print(
+                "[red]No API key found. Set the MESHAPI_API_KEY env var, or "
+                "run meshapi in a terminal to be prompted (the key is saved "
+                f"to {CREDENTIALS_FILE}).[/red]"
+            )
+            sys.exit(1)
 
     state = {
         "cfg": cfg,

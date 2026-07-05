@@ -8,6 +8,10 @@ from pathlib import Path
 CONFIG_DIR = Path.home() / ".meshapi"
 CONFIG_FILE = CONFIG_DIR / "config.json"
 HISTORY_FILE = CONFIG_DIR / "history"
+# The API key lives in its own 0600 file (like ~/.aws/credentials), NOT in
+# config.json — save_config() strips api_key on every write, so a key stored
+# in config.json would silently vanish on the next /model or /route change.
+CREDENTIALS_FILE = CONFIG_DIR / "credentials"
 # Backgrounded server pids/ports, persisted so a crashed meshapi can offer
 # to clean them up on next launch (a hard kill skips atexit/SIGTERM).
 SERVERS_FILE = CONFIG_DIR / "servers.json"
@@ -60,18 +64,47 @@ def _validate_base_url(url: str) -> str:
     sys.exit(2)
 
 
+def load_api_key() -> str:
+    """Read the persisted API key (single line, 0600). '' if absent."""
+    try:
+        return CREDENTIALS_FILE.read_text().strip()
+    except OSError:
+        return ""
+
+
+def save_api_key(key: str) -> None:
+    """Persist the API key to its own file, created 0600 from the start
+    (os.open with mode, not write-then-chmod, so there's no readable window).
+    """
+    _secure_dir(CONFIG_DIR)
+    fd = os.open(CREDENTIALS_FILE, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w") as f:
+        f.write(key.strip() + "\n")
+    secure_file(CREDENTIALS_FILE)  # tighten a pre-existing looser file
+
+
 def load_config() -> dict:
     _secure_dir(CONFIG_DIR)
     if not CONFIG_FILE.exists():
         CONFIG_FILE.write_text(json.dumps(DEFAULT_CONFIG, indent=2))
     secure_file(CONFIG_FILE)
     cfg = {**DEFAULT_CONFIG, **json.loads(CONFIG_FILE.read_text())}
-    # MESH_API_KEY kept as fallback for one release; prefer MESHAPI_API_KEY.
+    # Resolution order: env > credentials file > legacy hand-edited
+    # config.json. MESH_API_KEY kept as fallback for one release.
+    file_key = (cfg.get("api_key") or "").strip()
     cfg["api_key"] = (
         os.getenv("MESHAPI_API_KEY")
         or os.getenv("MESH_API_KEY")
-        or cfg.get("api_key", "")
+        or load_api_key()
+        or file_key
     )
+    # Migrate a hand-edited config.json key to the credentials file so it
+    # survives the api_key strip in save_config().
+    if file_key and not CREDENTIALS_FILE.exists():
+        try:
+            save_api_key(file_key)
+        except OSError:
+            pass
     cfg["base_url"] = _validate_base_url(
         os.getenv("MESHAPI_BASE_URL", cfg["base_url"])
     )

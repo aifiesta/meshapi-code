@@ -23,7 +23,9 @@ To run the working tree without reinstalling: `PYTHONPATH=src python -m meshapi`
 | `MESHAPI_API_KEY` | Mesh API data-plane key (`rsk_…`). Falls back to `MESH_API_KEY` for one release. |
 | `MESHAPI_BASE_URL` | Override gateway URL. Default `https://api.meshapi.ai/v1`. |
 
-State under `~/.meshapi/`: `config.json` (settings, never the API key), `history` (input history, scrubbed + 0600), `servers.json` (backgrounded server records for crash-recovery). All written 0600.
+State under `~/.meshapi/`: `config.json` (settings, never the API key — `save_config` strips it), `credentials` (the API key, single line; created 0600 via `os.open` so there's no readable window), `history` (input history, scrubbed + 0600), `servers.json` (backgrounded server records for crash-recovery). All written 0600.
+
+**Key resolution order:** `MESHAPI_API_KEY` env > `MESH_API_KEY` env > `~/.meshapi/credentials` > legacy hand-edited `config.json` (auto-migrated to `credentials` on load). **First run with no key anywhere:** if stdin is a tty, `commands.prompt_for_api_key` walks the user through it — hidden input, best-effort live verify against `GET /models` (only an explicit 401/403 rejects; network trouble saves with a warning so onboarding works offline), persisted to `credentials`. Non-tty (CI/pipes) keeps the hard error + exit 1. `/login` re-runs the same flow mid-session.
 
 ## Architecture
 
@@ -51,6 +53,8 @@ src/meshapi/
 `handle_tool_calls` (cli.py) appends the assistant `tool_calls` message + one `tool` result message per call, then the turn loops: re-stream, run any new tool calls, repeat until the model stops calling tools or we hit the hop cap (`MAX_HOPS_NO_PLAN`, raised to `MAX_HOPS_WITH_PLAN` once a plan exists).
 
 Tools (`tools.py` `TOOLS`): `write_file`, `read_file`, `run_bash`, `start_server`, and the two **plan** tools `create_plan` / `update_step` (`PLAN_TOOLS` — pure bookkeeping, no side effects, never gated). `read_file` refuses image files and tells the model to ask the user to attach them (the CLI auto-attaches — see below).
+
+**Doomed-call defense (two layers).** Providers occasionally stream broken `tool_calls` deltas; both layers exist because both failure shapes were seen in the wild. (1) `client.ToolCallAccumulator` repairs delta-level damage — deltas with no `index` (would merge parallel calls into concatenated-JSON garbage), argument fragments arriving under a different index than the call's name (a named call with 0-char args), missing `id`s (synthesized as `call_<n>` so the assistant/tool pairing survives the next hop), nameless buckets (dropped). Orphan args merge only into a prior named call whose args don't already parse — never corrupt a good call to rescue a broken one. (2) What still comes out unusable (empty args, truncated JSON, missing required field per `tools.validate_call`) is short-circuited in `handle_tool_calls` *before* the approval prompt: the precise error goes back as the tool result so the model self-corrects — never ask the user to approve a call that can only fail.
 
 `start_server` runs a long-lived process in the background, waits for readiness, and prints the URL. Server records persist to `servers.json`; `_shutdown_servers` (atexit + SIGTERM/SIGHUP handlers) kills them on exit, and `_adopt_orphaned_servers` offers to clean up survivors of a hard kill on next launch.
 
@@ -93,7 +97,7 @@ The tokenizer is **quote-aware** (`_TOKEN_RE = '...' | "..." | \S+`) — it must
 
 ## Slash commands
 
-`/model` `/route` `/file` `/image` `/system` `/mode` `/cost` `/clear` `/help` `/exit` (`/quit`, `/q`).
+`/model` `/route` `/file` `/image` `/clear-attach` `/system` `/mode` `/cost` `/optimize` `/login` `/clear` `/help` `/exit` (`/quit`, `/q`).
 
 ## Distribution & release
 
