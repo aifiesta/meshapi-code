@@ -7,8 +7,11 @@ from typing import Iterable, Optional
 from rich.console import Console
 from rich.live import Live
 from rich.markdown import Markdown
+from rich.segment import Segment
 from rich.spinner import Spinner
 from rich.text import Text
+
+from .permissions import LABELS, RICH_COLOR
 
 console = Console()
 
@@ -91,12 +94,13 @@ class _StreamView:
     streamed with zero feedback.
     """
 
-    def __init__(self, header: str = "") -> None:
+    def __init__(self, header: str = "", state: "Optional[dict]" = None) -> None:
         self.start = time.monotonic()
         self.buf = ""
         self.first_token_at: Optional[float] = None
         self.done = False
         self.header = header  # static turn context: "model · hop N"
+        self.state = state    # live REPL state: mode / watcher typeahead / queue
         self.tool_name: Optional[str] = None
         self.tool_chars = 0
         self._spinner = Spinner("dots", style=BRAND)
@@ -120,48 +124,130 @@ class _StreamView:
             return f"still meshing · ↓ ~{_fmt_k(max(1, len(self.buf) // 4))} tok"
         return "meshing around"
 
+    def _footer(self, console) -> list:
+        """Live-only input footer: dim rule, always-visible mode row (read
+        per frame — a mid-stream shift+tab shows within one 12fps refresh),
+        and the type-ahead line when the user is typing or has queued
+        messages. Never rendered once done — transcripts stay clean."""
+        state = self.state
+        if state is None:
+            return []
+        width = console.size.width or 80
+        rows = [Text("─" * max(10, width - 1), style=BRAND_DIM)]
+        m = state.get("mode")
+        label = LABELS.get(m, "") if m is not None else ""
+        row = Text()
+        if label:
+            row.append(f"⏵⏵ {label}", style=f"bold {RICH_COLOR.get(m, 'green')}")
+        else:
+            row.append("default mode", style="dim")
+        row.append("  (shift+tab to cycle · esc to interrupt)", style="dim")
+        rows.append(row)
+        watcher = state.get("watcher")
+        typeahead = getattr(watcher, "typeahead", "") if watcher is not None else ""
+        queued = len(state.get("input_queue") or ())
+        if typeahead or queued:
+            line = Text()
+            line.append("› ", style=BRAND)
+            shown = typeahead.replace("\n", "⏎")
+            budget = max(10, width - 18)
+            if len(shown) > budget:
+                shown = "…" + shown[-budget:]
+            line.append(shown)  # Text.append — user text is never markup-parsed
+            line.append("█", style=BRAND)
+            if queued:
+                line.append(f"  ({queued} queued)", style="dim")
+            rows.append(line)
+        return rows
+
     def __rich_console__(self, console, options):
         if self.done:
-            # Transcript stays clean: the header/spinner are live-only.
+            # Transcript stays clean: header/spinner/footer are live-only.
             if self.buf:
                 yield Markdown(self.buf)
             return
         if self.header:
             yield Text(f"✦ {self.header}", style=BRAND_DIM)
         self._spinner.text = Text(f"{self._label()} · {self.elapsed():.1f}s", style=BRAND_DIM)
+        footer = self._footer(console)
         if self.buf:
-            yield Markdown(self.buf)
-            yield self._spinner
-        else:
-            yield self._spinner
+            # Tail-crop: rich.Live's default overflow crops the BOTTOM of an
+            # over-tall renderable — which would hide the spinner (it already
+            # does today) and the footer. Render only the newest lines so
+            # the live edge + footer stay pinned, Claude Code-style. Any
+            # render bug falls back to the plain markdown path — a crop
+            # glitch must never kill a stream.
+            reserve = 2 + (1 if self.header else 0) + len(footer)
+            try:
+                avail = max(3, (console.size.height or 24) - reserve - 1)
+                lines = console.render_lines(
+                    Markdown(self.buf), options, pad=False
+                )
+                if len(lines) > avail:
+                    for line in lines[-avail:]:
+                        yield from line
+                        yield Segment.line()
+                else:
+                    yield Markdown(self.buf)
+            except Exception:
+                yield Markdown(self.buf)
+        yield self._spinner
+        for row in footer:
+            yield row
 
 
-def render_stream(events: Iterable, header: str = "") -> tuple[str, dict]:
+def render_stream(events: Iterable, header: str = "", state: Optional[dict] = None) -> tuple[str, dict]:
     """Live-render streamed content with a phase-aware spinner + timer.
 
     `header` is a static turn-context line ("model · hop 3") shown above
-    the stream while it's live; it does not persist into the transcript.
+    the stream while it's live; `state` (the REPL state dict) powers the
+    live input footer — mode row + type-ahead + queue depth. Neither
+    persists into the transcript. Sets state["live_active"] while the Live
+    region owns the screen so the watcher thread knows not to print.
     Returns (full_text, metadata). Generator yields strings (content deltas)
     and an optional final dict (usage + cost + model from the SSE tail).
     `meta['elapsed']` and `meta['ttft']` (time-to-first-token) are added on
     the way out.
     """
-    view = _StreamView(header)
+    view = _StreamView(header, state)
     meta: dict = {}
-    with Live(view, console=console, refresh_per_second=12, auto_refresh=True) as live:
-        for event in events:
-            if isinstance(event, str):
-                if view.first_token_at is None:
-                    view.first_token_at = view.elapsed()
-                view.buf += event
-            elif isinstance(event, dict):
-                if "stream_progress" in event:
-                    # Spinner feed only — never merged into meta.
-                    view.note_progress(event["stream_progress"] or {})
-                    continue
-                meta.update(event)
-        view.done = True
-        live.refresh()
+    if state is not None:
+        state["live_active"] = True
+    esc = state.get("esc_interrupt") if state is not None else None
+    try:
+        with Live(view, console=console, refresh_per_second=12, auto_refresh=True) as live:
+            try:
+                for event in events:
+                    if esc is not None and esc.is_set():
+                        # Bare ESC pressed mid-stream: close the generator
+                        # (unwinds stream_chat's `with httpx.stream` cleanly)
+                        # and abort via the existing KeyboardInterrupt path.
+                        # Takes effect between deltas — a blocked read still
+                        # needs ctrl+c.
+                        try:
+                            events.close()
+                        except Exception:
+                            pass
+                        raise KeyboardInterrupt
+                    if isinstance(event, str):
+                        if view.first_token_at is None:
+                            view.first_token_at = view.elapsed()
+                        view.buf += event
+                    elif isinstance(event, dict):
+                        if "stream_progress" in event:
+                            # Spinner feed only — never merged into meta.
+                            view.note_progress(event["stream_progress"] or {})
+                            continue
+                        meta.update(event)
+            finally:
+                # Guarantees the unmount frame is transcript-clean on EVERY
+                # exit path — a ctrl+c mid-stream used to leave the stale
+                # spinner/header frame behind in scrollback.
+                view.done = True
+                live.refresh()
+    finally:
+        if state is not None:
+            state["live_active"] = False
     meta["elapsed"] = view.elapsed()
     if view.first_token_at is not None:
         meta["ttft"] = view.first_token_at

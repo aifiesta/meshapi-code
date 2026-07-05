@@ -50,6 +50,15 @@ AUTO_APPROVE: dict = {
 # Modes that warrant a more aggressive footer hint.
 SHOW_ESC_HINT = {Mode.BYPASS}
 
+# rich color per mode — shared by statusbar.print_line and render's live
+# footer (render cannot import statusbar: statusbar imports from render).
+RICH_COLOR = {
+    Mode.BYPASS: "red",
+    Mode.AUTO: "yellow",
+    Mode.ACCEPT_EDITS: "cyan",
+    Mode.DEFAULT: "green",
+}
+
 
 def next_mode(m: Mode) -> Mode:
     return ORDER[(ORDER.index(m) + 1) % len(ORDER)]

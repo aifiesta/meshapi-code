@@ -1,5 +1,6 @@
 """meshapi — terminal chat REPL for Mesh API."""
 import argparse
+import collections
 import contextlib
 import difflib
 import json
@@ -407,6 +408,35 @@ def confirm_tool_call(name: str, args: dict, watcher=None, session_allow=None) -
 @contextlib.contextmanager
 def _noop_ctx():
     yield
+
+
+def _cwd_rule() -> None:
+    """The input frame's top edge: cwd · git-branch, right-aligned."""
+    title = Path.cwd().name
+    branch = _git_branch()
+    if branch:
+        title += f" · {branch}"
+    console.rule(
+        title=f"[{BRAND_DIM}]{title}[/{BRAND_DIM}]",
+        align="right",
+        style=BRAND_DIM,
+        characters="─",
+    )
+
+
+def _print_input_frame(text: str) -> None:
+    """Transcript block for a queue-drained message — visually identical to
+    a typed one (top rule, highlighted `› text` line, closing rule) so the
+    conversation reads uniformly whether the user typed at the prompt or
+    stacked messages mid-run."""
+    _cwd_rule()
+    line = Text()
+    line.append("› ", style=f"bold {BRAND} on {BRAND_BG}")
+    line.append(text, style=f"{BRAND_BG_FG} on {BRAND_BG}")
+    line.append("  (queued)", style="dim")
+    console.print(line)
+    console.rule(style=BRAND_DIM, characters="─")
+    console.print()
 
 
 _BRANCH_CACHE = {"t": 0.0, "cwd": None, "branch": None}
@@ -1154,6 +1184,12 @@ def handle_tool_calls(tool_calls: list, state: dict) -> None:
     })
     shown_mode = state.get("mode")
     for p in prepared:
+        _esc = state.get("esc_interrupt")
+        if _esc is not None and _esc.is_set():
+            # ESC pressed — abort between tool calls. _drop_in_flight_turn
+            # rolls history past the half-batch, preserving the one-result-
+            # per-id invariant the same way ctrl+c does.
+            raise KeyboardInterrupt
         name, args = p["name"], p["args"]
         mode = state.get("mode", Mode.DEFAULT)  # live read — see docstring
         if mode is not shown_mode:
@@ -1375,6 +1411,12 @@ def main() -> None:
         "quality_hop_fired": False,
         "quality_fix_msg": None,
         "stub_guard_off": False,
+        # Always-visible input: messages stacked mid-run (FIFO, one full
+        # turn each), esc-abort signal, and whether a rich.Live owns the
+        # screen (watcher thread must not print then).
+        "input_queue": collections.deque(),
+        "esc_interrupt": threading.Event(),
+        "live_active": False,
     }
 
     # Mode cycle — used by both the prompt-toolkit keybinding (while at the
@@ -1400,9 +1442,34 @@ def main() -> None:
     def prompt_message():
         return FormattedText([("class:prompt", "› ")])
 
-    # Out-of-prompt key watcher: lets shift+tab cycle mode during streaming
-    # and tool execution. Paused while prompt_toolkit owns stdin.
-    watcher = KeyWatcher(on_shift_tab=_cycle_mode)
+    def _queue_input(text: str) -> None:
+        """Watcher-thread callback: Enter was pressed mid-run. Queue the
+        message; when no Live owns the screen (tool exec), acknowledge with
+        a one-shot dim line (rich Console holds an RLock — safe here)."""
+        state["input_queue"].append(text)
+        if not state.get("live_active"):
+            try:
+                ack = Text()
+                ack.append("  › ", style=BRAND_DIM)
+                ack.append(text if len(text) <= 60 else text[:60] + "…")
+                ack.append("  (queued)", style="dim")
+                console.print(ack)
+            except Exception:
+                pass
+
+    def _request_interrupt() -> None:
+        """Watcher-thread callback: bare ESC. Signal the main thread; it
+        aborts between deltas/hops/tool calls (never mid-syscall)."""
+        state["esc_interrupt"].set()
+
+    # Out-of-prompt key watcher: shift+tab cycles the mode, typed text
+    # accumulates as type-ahead (rendered by the live footer), Enter queues,
+    # ESC requests an abort. Paused while prompt_toolkit owns stdin.
+    watcher = KeyWatcher(
+        on_shift_tab=_cycle_mode,
+        on_submit=_queue_input,
+        on_esc=_request_interrupt,
+    )
     state["watcher"] = watcher  # so confirm_tool_call can pause around y/n input
 
     # Touch the history file with 0600 up front so prompt_toolkit doesn't
@@ -1447,42 +1514,48 @@ def main() -> None:
 
     while True:
         try:
-            # Update offer, consume point 2: if the background check landed
-            # after startup, surface it between turns — never mid-prompt.
-            maybe_offer(update_state, watcher=watcher)
-            # cwd separator above the input box. The mode indicator is no
-            # longer printed here — it lives in the bottom_toolbar below the
-            # prompt, which prompt_toolkit repaints live on shift+tab:
-            #   ──────────────────────────────────────────── cli_for_meshapi_v1
-            #   › ...
-            #   ⏵⏵ bypass permissions on  (shift+tab to cycle) · esc to interrupt
-            _rule_title = Path.cwd().name
-            _branch = _git_branch()
-            if _branch:
-                _rule_title += f" · {_branch}"
-            console.rule(
-                title=f"[{BRAND_DIM}]{_rule_title}[/{BRAND_DIM}]",
-                align="right",
-                style=BRAND_DIM,
-                characters="─",
-            )
-            with watcher.paused():
-                # Hand stdin off to prompt_toolkit (canonical-mode termios).
-                # The prompt itself is just "› "; the mode indicator is the
-                # bottom_toolbar, repainted live by the s-tab binding's
-                # event.app.invalidate(). "noreverse" kills prompt_toolkit's
-                # default inverted bar so the toggle reads as plain text.
-                user_input = session.prompt(
-                    prompt_message,
-                    bottom_toolbar=lambda: statusbar.bottom_toolbar(state),
-                    style=Style.from_dict({
-                        "prompt": f"bold fg:{BRAND} bg:{BRAND_BG}",
-                        "": f"fg:{BRAND_BG_FG} bg:{BRAND_BG}",
-                        "bottom-toolbar": "noreverse bg:default",
-                    }),
-                )
-            console.rule(style=BRAND_DIM, characters="─")
-            console.print()  # bottom padding under the input box per the mockup
+            # Queue drain: messages the user stacked mid-run submit in order,
+            # each as its own full turn, BEFORE the interactive prompt shows.
+            # New type-ahead during drained turns keeps queueing (FIFO).
+            queued = state["input_queue"].popleft() if state["input_queue"] else None
+            if queued is not None:
+                _print_input_frame(queued)
+                try:
+                    session.history.append_string(queued)  # up-arrow recall parity
+                except Exception:
+                    pass
+                user_input = queued
+            else:
+                # Update offer, consume point 2: if the background check landed
+                # after startup, surface it between turns — never mid-prompt.
+                maybe_offer(update_state, watcher=watcher)
+                # cwd separator above the input box. The mode indicator is no
+                # longer printed here — it lives in the bottom_toolbar below the
+                # prompt, which prompt_toolkit repaints live on shift+tab:
+                #   ──────────────────────────────────────── cli_for_meshapi_v1
+                #   › ...
+                #   ⏵⏵ bypass permissions on  (shift+tab to cycle) · esc to interrupt
+                _cwd_rule()
+                with watcher.paused():
+                    # Hand stdin off to prompt_toolkit (canonical-mode termios).
+                    # The prompt itself is just "› "; the mode indicator is the
+                    # bottom_toolbar, repainted live by the s-tab binding's
+                    # event.app.invalidate(). "noreverse" kills prompt_toolkit's
+                    # default inverted bar so the toggle reads as plain text.
+                    # Un-submitted type-ahead from the last run prefills the
+                    # buffer (take_typeahead is race-free under paused()).
+                    user_input = session.prompt(
+                        prompt_message,
+                        default=watcher.take_typeahead(),
+                        bottom_toolbar=lambda: statusbar.bottom_toolbar(state),
+                        style=Style.from_dict({
+                            "prompt": f"bold fg:{BRAND} bg:{BRAND_BG}",
+                            "": f"fg:{BRAND_BG_FG} bg:{BRAND_BG}",
+                            "bottom-toolbar": "noreverse bg:default",
+                        }),
+                    )
+                console.rule(style=BRAND_DIM, characters="─")
+                console.print()  # bottom padding under the input box per the mockup
         except (KeyboardInterrupt, EOFError):
             _shutdown_servers(state)
             watcher.stop()
@@ -1566,6 +1639,7 @@ def main() -> None:
         state["quality_hop_fired"] = False
         state["quality_fix_msg"] = None
         state["stub_guard_off"] = stub_guard_suppressed(user_input)
+        state["esc_interrupt"].clear()  # stale abort must not kill this turn
         agg_cost = 0.0
         last_model = state["cfg"]["model"]
         last_usage: dict = {}
@@ -1578,6 +1652,8 @@ def main() -> None:
             hopped = 0
             max_hops = MAX_HOPS_NO_PLAN
             while True:
+                if state["esc_interrupt"].is_set():
+                    raise KeyboardInterrupt  # ESC pressed — abort between hops
                 if state.get("plan") and max_hops < MAX_HOPS_WITH_PLAN:
                     max_hops = MAX_HOPS_WITH_PLAN
                 if hopped >= max_hops:
@@ -1641,6 +1717,7 @@ def main() -> None:
                 reply, meta = render_stream(
                     stream_chat(turn_messages, state["cfg"], tools=TOOLS),
                     header=_hdr,
+                    state=state,
                 )
                 cost = meta.get("cost")
                 if cost is not None:
@@ -1767,6 +1844,15 @@ def main() -> None:
         except KeyboardInterrupt:
             console.rule(style="dim yellow", characters="─")
             console.print("[yellow]aborted by user — returning to prompt[/yellow]")
+            # Abort means "stop everything": discard stacked messages too —
+            # without this the drain would immediately launch the next
+            # queued turn. Partial type-ahead deliberately survives (it
+            # prefills the next prompt).
+            _n_queued = len(state["input_queue"])
+            if _n_queued:
+                state["input_queue"].clear()
+                console.print(f"[dim]discarded {_n_queued} queued message(s)[/dim]")
+            state["esc_interrupt"].clear()
             # Drop the in-flight user turn so the next prompt is a clean slate.
             # Trailing assistant/tool messages from partial hops are left in
             # history; the model can ignore them or summarize as needed.

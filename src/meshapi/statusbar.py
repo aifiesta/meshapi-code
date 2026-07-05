@@ -14,7 +14,7 @@ point the user can act on it.
 from prompt_toolkit.formatted_text import FormattedText
 from rich.text import Text
 
-from .permissions import LABELS, Mode, SHOW_ESC_HINT
+from .permissions import LABELS, Mode, RICH_COLOR, SHOW_ESC_HINT
 from .render import BRAND_DIM, console
 
 
@@ -91,6 +91,13 @@ def bottom_toolbar(state: dict):
     if servers:
         parts.append(("", "\n"))
         parts.append(("ansibrightblack", servers[: max(0, cols - 3)]))
+    # Stacked messages waiting their turn — meshapi's "background tasks"
+    # list. Rarely visible here (the queue drains before the prompt shows),
+    # but truthful when it is.
+    for q in list(state.get("input_queue") or ())[:3]:
+        q = q.replace("\n", "⏎")
+        parts.append(("", "\n"))
+        parts.append(("ansibrightblack", f"○ {q[:40]}{'…' if len(q) > 40 else ''}"))
     parts.append(("", "\n"))
     return FormattedText(parts)
 
@@ -119,14 +126,7 @@ def print_line(state: dict) -> None:
     label_text = LABELS.get(m, "")
     if not label_text:
         return  # DEFAULT mode — no indicator
-    if m == Mode.BYPASS:
-        color = "red"
-    elif m == Mode.AUTO:
-        color = "yellow"
-    elif m == Mode.ACCEPT_EDITS:
-        color = "cyan"
-    else:
-        color = "green"
+    color = RICH_COLOR.get(m, "green")
     hint = "  (shift+tab to cycle)"
     if m in SHOW_ESC_HINT:
         hint += " · esc to interrupt"
@@ -138,5 +138,17 @@ def print_line(state: dict) -> None:
         servers = _servers_text(state)
         if servers:
             console.print(Text(servers, style="dim"), justify="right")
+        # Type-ahead + queue visibility between tool batches (no Live active
+        # there — this is where mid-run typing surfaces in scrollback).
+        watcher = state.get("watcher")
+        typeahead = getattr(watcher, "typeahead", "") if watcher is not None else ""
+        queued = len(state.get("input_queue") or ())
+        if typeahead or queued:
+            line = Text()
+            line.append("› ", style="bold")
+            line.append(typeahead.replace("\n", "⏎")[:120])
+            if queued:
+                line.append(f"  ({queued} queued)", style="dim")
+            console.print(line, justify="right")
     except Exception:
         pass
