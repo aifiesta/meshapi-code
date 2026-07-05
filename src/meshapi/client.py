@@ -112,6 +112,30 @@ class ToolCallAccumulator:
         return calls
 
 
+def build_payload(messages: list, cfg: dict, tools: Optional[list] = None) -> dict:
+    """Build the /chat/completions request body from session config.
+
+    Pure function (unit-testable without a network). Mesh extensions:
+      - auto_route  -> model:"auto" (gateway Auto Router picks per prompt)
+      - fallback_models -> `models` ordered fallback list
+      - reasoning_effort -> passed through when set ("none" is a real level;
+        None means "don't send")
+    """
+    payload: dict = {
+        "model": "auto" if cfg.get("auto_route") else cfg["model"],
+        "messages": messages,
+        "stream": True,
+    }
+    if cfg.get("fallback_models"):
+        payload["models"] = list(cfg["fallback_models"])
+    if cfg.get("reasoning_effort"):
+        payload["reasoning_effort"] = cfg["reasoning_effort"]
+    if tools:
+        payload["tools"] = tools
+        payload["tool_choice"] = "auto"
+    return payload
+
+
 def stream_chat(
     messages: list,
     cfg: dict,
@@ -135,23 +159,16 @@ def stream_chat(
         "Authorization": f"Bearer {cfg['api_key']}",
         "Content-Type": "application/json",
     }
-    payload: dict = {
-        "model": cfg["model"],
-        "messages": messages,
-        "stream": True,
-    }
-    if cfg.get("route"):
-        payload["route"] = cfg["route"]
-    if tools:
-        payload["tools"] = tools
-        payload["tool_choice"] = "auto"
+    payload = build_payload(messages, cfg, tools)
 
     plan: dict = {}
     attempts = [payload]
     dial = float(cfg.get("optimize") or 0)
     if dial > 0:
+        # Pass the model string actually being sent ("auto" falls back to
+        # optimize's default cache-minimum heuristic — harmless).
         opt_messages, extra, plan = prepare(
-            messages, cfg["model"], dial, has_tools=bool(tools)
+            messages, payload["model"], dial, has_tools=bool(tools)
         )
         if plan.get("levers_applied"):
             optimized = {**payload, **extra, "messages": opt_messages}
@@ -175,6 +192,12 @@ def stream_chat(
                     }
                     continue
             r.raise_for_status()
+            # When auto-routed, the gateway names the concrete model it
+            # picked in this header; SSE chunks' `model` agrees, but the
+            # header is the authoritative belt-and-braces.
+            resolved = r.headers.get("x-resolved-model-id")
+            if resolved:
+                last_model = resolved
             for line in r.iter_lines():
                 if not line or not line.startswith("data: "):
                     continue

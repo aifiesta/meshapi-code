@@ -23,7 +23,7 @@ To run the working tree without reinstalling: `PYTHONPATH=src python -m meshapi`
 | `MESHAPI_API_KEY` | Mesh API data-plane key (`rsk_…`). Falls back to `MESH_API_KEY` for one release. |
 | `MESHAPI_BASE_URL` | Override gateway URL. Default `https://api.meshapi.ai/v1`. |
 
-State under `~/.meshapi/`: `config.json` (settings, never the API key — `save_config` strips it), `credentials` (the API key, single line; created 0600 via `os.open` so there's no readable window), `history` (input history, scrubbed + 0600), `servers.json` (backgrounded server records for crash-recovery). All written 0600.
+State under `~/.meshapi/`: `config.json` (settings, never the API key — `save_config` strips it), `credentials` (the API key, single line; created 0600 via `os.open` so there's no readable window), `history` (input history, scrubbed + 0600), `servers.json` (backgrounded server records for crash-recovery), `update_check.json` (last known PyPI version + `declined_version` so a declined release never re-nags). All written 0600.
 
 **Key resolution order:** `MESHAPI_API_KEY` env > `MESH_API_KEY` env > `~/.meshapi/credentials` > legacy hand-edited `config.json` (auto-migrated to `credentials` on load). **First run with no key anywhere:** if stdin is a tty, `commands.prompt_for_api_key` walks the user through it — hidden input, best-effort live verify against `GET /models` (only an explicit 401/403 rejects; network trouble saves with a warning so onboarding works offline), persisted to `credentials`. Non-tty (CI/pipes) keeps the hard error + exit 1. `/login` re-runs the same flow mid-session.
 
@@ -44,6 +44,7 @@ src/meshapi/
   statusbar.py    # mode indicator: bottom_toolbar (live) + print_line (scrollback)
   keywatcher.py   # daemon thread: shift+tab (CSI Z) while prompt_toolkit isn't reading stdin
   plan.py         # plan state model for create_plan / update_step
+  update.py       # PyPI version check (daemon thread) + y/n upgrade offer
   render.py       # rich Console singleton, render_stream, fmt_usd
   __main__.py     # python -m meshapi
 ```
@@ -52,7 +53,7 @@ src/meshapi/
 
 `handle_tool_calls` (cli.py) appends the assistant `tool_calls` message + one `tool` result message per call, then the turn loops: re-stream, run any new tool calls, repeat until the model stops calling tools or we hit the hop cap (`MAX_HOPS_NO_PLAN`, raised to `MAX_HOPS_WITH_PLAN` once a plan exists).
 
-Tools (`tools.py` `TOOLS`): `write_file`, `read_file`, `run_bash`, `start_server`, and the two **plan** tools `create_plan` / `update_step` (`PLAN_TOOLS` — pure bookkeeping, no side effects, never gated). `read_file` refuses image files and tells the model to ask the user to attach them (the CLI auto-attaches — see below).
+Tools (`tools.py` `TOOLS`): `write_file`, `read_file`, `run_bash`, `start_server`, `web_search` (POST `{base_url}/web/search` through the gateway; needs cfg, so `execute()` takes an optional third `cfg` param — filesystem/shell tools ignore it), and the two **plan** tools `create_plan` / `update_step` (`PLAN_TOOLS` — pure bookkeeping, no side effects, never gated). `read_file` refuses image files and tells the model to ask the user to attach them (the CLI auto-attaches — see below).
 
 **Doomed-call defense (two layers).** Providers occasionally stream broken `tool_calls` deltas; both layers exist because both failure shapes were seen in the wild. (1) `client.ToolCallAccumulator` repairs delta-level damage — deltas with no `index` (would merge parallel calls into concatenated-JSON garbage), argument fragments arriving under a different index than the call's name (a named call with 0-char args), missing `id`s (synthesized as `call_<n>` so the assistant/tool pairing survives the next hop), nameless buckets (dropped). Orphan args merge only into a prior named call whose args don't already parse — never corrupt a good call to rescue a broken one. (2) What still comes out unusable (empty args, truncated JSON, missing required field per `tools.validate_call`) is short-circuited in `handle_tool_calls` *before* the approval prompt: the precise error goes back as the tool result so the model self-corrects — never ask the user to approve a call that can only fail.
 
@@ -60,12 +61,16 @@ Tools (`tools.py` `TOOLS`): `write_file`, `read_file`, `run_bash`, `start_server
 
 ## Permission modes & shift+tab
 
-`permissions.Mode`: `DEFAULT` (ask every tool) → `ACCEPT_EDITS` (auto write_file) → `AUTO` (+ run_bash) → `BYPASS` (+ read_file, start_server). `AUTO_APPROVE[mode]` is the set of tool names that skip the y/n confirm. shift+tab cycles via `next_mode`.
+`permissions.Mode`: `DEFAULT` (ask every tool) → `ACCEPT_EDITS` (auto write_file) → `AUTO` (+ run_bash, web_search) → `BYPASS` (+ read_file, start_server). `AUTO_APPROVE[mode]` is the set of tool names that skip the y/n confirm. shift+tab cycles via `next_mode`. web_search rides with run_bash: its only risk is leaking the query off-machine, and run_bash can already `curl` anything; the DEFAULT-mode confirm shows the query verbatim (🔎 line).
 
 - **At the prompt:** the `@kb.add("s-tab")` binding cycles the mode and calls `event.app.invalidate()`.
 - **During streaming / tool execution:** `keywatcher.KeyWatcher` reads stdin in cbreak mode and fires the same cycle. It `paused()`s around `session.prompt(...)` so prompt_toolkit owns the termios state cleanly.
 
 The mode indicator is a prompt_toolkit **`bottom_toolbar`** (`statusbar.bottom_toolbar`), NOT a scrollback line — that's what makes it update **live** on shift+tab (the toolbar is re-evaluated on every `invalidate()`). It's right-aligned, degrades on narrow terminals (drops the esc hint, then the cycle hint), has a trailing pad line, and uses `noreverse` to kill prompt_toolkit's default inverted bar. `statusbar.print_line` still prints a one-shot scrollback line once per tool batch (when no prompt/toolbar is active). Don't move the indicator back to a pre-prompt scrollback print — it can't repaint on keypress and the toggle appears frozen.
+
+## Update check (`update.py`)
+
+Every launch fires a daemon thread (`meshapi-update-check`) against `https://pypi.org/pypi/meshapi-code/json`. **Poll, never push**: the thread only writes `update_state["latest"]` + refreshes `update_check.json`; it never prints or prompts. `maybe_offer` consumes the result at exactly two safe points — after the banner (before `watcher.start()`, stdin still canonical) and at the top of each prompt-loop turn — so the y/n offer can never collide with prompt_toolkit or streaming. Declining a version persists `declined_version` (no re-nag for that release; `/update` asks explicitly and ignores it). **Windows never upgrades in-process** — the running `meshapi.exe` shim is file-locked (WinError 5), so it prints the command and tells the user to exit first; POSIX runs the auto-detected command (`sys.prefix` contains `pipx/venvs` → pipx, `uv/tools` → uv tool, else `python -m pip`) with inherited stdio. Nothing in `update.py` may be POSIX-only (the 0.4.5 SIGHUP lesson).
 
 ## Safety guardrails (`safety.py`)
 
@@ -89,7 +94,8 @@ The tokenizer is **quote-aware** (`_TOKEN_RE = '...' | "..." | \S+`) — it must
 - **Auth:** `Authorization: Bearer rsk_…` — `rsk_` is the data-plane key prefix.
 - **Model format:** `provider/model-name` (e.g. `anthropic/claude-opus-4.8`, `openai/gpt-4o-mini`). See `meshapi-docs/fern/`.
 - **Cost in stream:** the final SSE chunk includes a `cost` field (string USD) alongside `usage`. `client.stream_chat` captures it as the generator's last yield (a dict, not a string), which `render.render_stream` separates from content.
-- **Routing:** request body accepts a `route` key (`cheapest`, `fastest`, `balanced`). Surfaced via `/route` — Mesh's wedge over generic OpenAI-compat CLIs.
+- **Routing:** there is **no** `route: cheapest/fastest/balanced` request key — it never existed gateway-side (verified against the routersvc source; unknown body fields are silently dropped). Real routing is **auto-routing**: send `model: "auto"` and the gateway's Auto Router picks a concrete model per prompt; the resolved model comes back in the SSE chunks' `model` field and the `X-Resolved-Model-Id` response header. `POST /v1/router/select` previews the pick without inference. Surfaced via `/route auto|off|preview` (`cfg["auto_route"]`).
+- **Other request extensions:** `models: [...]` = ordered fallback list (`/fallback`); `reasoning_effort: high|medium|low|none` (`/reasoning` — passthrough unverified in routersvc main, gateway may ignore); `POST /v1/web/search` backs the `web_search` tool (404s degrade gracefully — flag before ship if prod lacks it).
 
 ## Reusable utilities
 
@@ -97,7 +103,7 @@ The tokenizer is **quote-aware** (`_TOKEN_RE = '...' | "..." | \S+`) — it must
 
 ## Slash commands
 
-`/model` `/route` `/file` `/image` `/clear-attach` `/system` `/mode` `/cost` `/optimize` `/login` `/clear` `/help` `/exit` (`/quit`, `/q`).
+`/model` `/models` `/route` (auto|off|preview) `/fallback` `/reasoning` `/file` `/image` `/clear-attach` `/system` `/mode` `/cost` `/optimize` `/login` `/update` `/clear` `/help` `/exit` (`/quit`, `/q`).
 
 ## Distribution & release
 
@@ -120,7 +126,8 @@ The tokenizer is **quote-aware** (`_TOKEN_RE = '...' | "..." | \S+`) — it must
 MESHAPI_API_KEY=rsk_… meshapi
 > hello                                  # streamed markdown reply, then cost line
 > /model openai/gpt-4o-mini              # switch model mid-session
-> /route cheapest                        # ask gateway to pick cheapest route
+> /models gpt                            # browse the catalog (context, $/1M)
+> /route auto                            # gateway's router picks per prompt
 > /file ./pyproject.toml                 # inject file into context
 > write a hello.py and run it            # tool calling: write_file + run_bash
 > [shift+tab]                            # cycle permission mode (toolbar updates live)

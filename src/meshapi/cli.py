@@ -28,7 +28,7 @@ from .client import stream_chat
 from .commands import handle_command, prompt_for_api_key
 from .config import (
     CREDENTIALS_FILE, HISTORY_FILE, clear_servers_file,
-    load_config, load_servers, save_servers, secure_file,
+    load_config, load_servers, load_update_check, save_servers, secure_file,
 )
 from .keywatcher import KeyWatcher
 from .permissions import AUTO_APPROVE, Mode, from_str, next_mode
@@ -38,6 +38,7 @@ from .render import (
     BRAND, BRAND_BG, BRAND_BG_FG, BRAND_DIM, CODE, console, fmt_usd, pretty_cwd, render_stream,
 )
 from .tools import PLAN_TOOLS, TOOLS, build_system_prompt, execute as exec_tool, summarize_call, validate_call
+from .update import maybe_offer, start_background_check
 
 # Hop caps for the tool-calling loop. A turn without a plan rarely needs many
 # hops; one with a plan may legitimately span dozens of small steps (≈3-4 tool
@@ -78,7 +79,10 @@ def parse_args(argv=None) -> argparse.Namespace:
     p = argparse.ArgumentParser(prog="meshapi", description="Terminal chat for Mesh API")
     p.add_argument("--version", action="version", version=f"meshapi {__version__}")
     p.add_argument("--model", help="Override model for this session (e.g. openai/gpt-4o-mini)")
-    p.add_argument("--route", choices=["cheapest", "fastest", "balanced"], help="Routing mode")
+    p.add_argument(
+        "--route", choices=["auto", "off"],
+        help="Auto-routing: 'auto' lets the gateway pick a model per prompt",
+    )
     p.add_argument(
         "--mode",
         choices=[m.value for m in Mode],
@@ -95,7 +99,7 @@ def render_banner(cfg: dict) -> None:
         Text.from_markup(f"[bold {BRAND}]✦  meshapi {__version__}[/bold {BRAND}]"),
         Text.from_markup(f"cwd:   [{BRAND}]{pretty_cwd()}[/{BRAND}]"),
         Text.from_markup(f"model: [bold {BRAND}]{cfg['model']}[/bold {BRAND}]"),
-        Text.from_markup(f"route: [{BRAND}]{cfg.get('route') or 'default'}[/{BRAND}]"),
+        Text.from_markup(f"route: [{BRAND}]{'auto' if cfg.get('auto_route') else 'off'}[/{BRAND}]"),
     ]
     console.print()
     for i, logo_line in enumerate(MESH_LOGO_LINES):
@@ -308,6 +312,10 @@ def _render_tool_result(name: str, args: dict, result: str) -> None:
         console.print(f"  [green]→[/green] [dim]read {nchars} chars ({nlines} line{'s' if nlines != 1 else ''})[/dim]")
         return
 
+    if name == "web_search":
+        console.print(f"  [green]→[/green] [dim]web results ({len(result)} chars)[/dim]")
+        return
+
     # Unknown tool — show a one-line preview.
     preview = result[:200].replace("\n", " ")
     tail = "…" if len(result) > 200 else ""
@@ -358,6 +366,9 @@ def confirm_tool_call(name: str, args: dict, watcher=None) -> bool:
         port = args.get("port") or "auto"
         cwd = args.get("cwd") or str(Path.cwd())
         console.print(f"[dim]$ {args.get('command')}[/dim]  [dim](port {port}, cwd {cwd})[/dim]")
+    elif name == "web_search":
+        # Show the exact query verbatim — approving sends it off-machine.
+        console.print(f"[dim]🔎 {_rich_escape(args.get('query') or '')}[/dim]")
     # Pause the keywatcher so console.input gets canonical-mode stdin.
     paused_ctx = watcher.paused() if watcher is not None else _noop_ctx()
     try:
@@ -795,14 +806,14 @@ def handle_tool_calls(tool_calls: list, mode: Mode, state: dict) -> None:
                             console.print(f"  [red]✗ {_rich_escape(result)}[/red]")
                     elif tc["name"] == "write_file":
                         _print_file_diff(args.get("path") or "", args.get("content") or "")
-                        result = exec_tool(tc["name"], args)
+                        result = exec_tool(tc["name"], args, state["cfg"])
                         _render_tool_result(tc["name"], args, result)
                     elif tc["name"] == "run_bash":
                         _print_shell_command(args.get("command") or "")
-                        result = exec_tool(tc["name"], args)
+                        result = exec_tool(tc["name"], args, state["cfg"])
                         _render_tool_result(tc["name"], args, result)
                     else:
-                        result = exec_tool(tc["name"], args)
+                        result = exec_tool(tc["name"], args, state["cfg"])
                         _render_tool_result(tc["name"], args, result)
                 else:
                     result = "User denied this tool call."
@@ -823,13 +834,43 @@ def handle_tool_calls(tool_calls: list, mode: Mode, state: dict) -> None:
     statusbar.print_line(state)
 
 
+def _turn_status_line(model: str, auto_routed: bool, prompt_t, completion_t,
+                      agg_cost: float, session_cost: float, elapsed: float) -> str:
+    """The dim per-turn summary. Cost segments are omitted when the gateway
+    returned no cost this turn (it's best-effort on some paths) — no
+    dangling '—'. When auto-routed, show which model the router picked."""
+    display_model = f"auto → {model}" if auto_routed else model
+    segments = [display_model, f"{prompt_t}→{completion_t} tok"]
+    if agg_cost:
+        segments.append(fmt_usd(agg_cost))
+    if session_cost:
+        segments.append(f"session {fmt_usd(session_cost)}")
+    segments.append(f"{elapsed:.1f}s")
+    return "  •  ".join(segments)
+
+
 def main() -> None:
     args = parse_args()
     cfg = load_config()
+
+    # Kick off the PyPI version check immediately (daemon thread, never
+    # blocks, needs no API key). The thread only writes into update_state;
+    # maybe_offer() consumes it at safe points — after the banner and at the
+    # top of each prompt-loop turn — so the y/n offer can never collide with
+    # prompt_toolkit or a streaming response.
+    _update_cache = load_update_check()
+    update_state = {
+        "latest": _update_cache.get("latest"),
+        "declined": _update_cache.get("declined_version"),
+        "done": threading.Event(),
+        "prompted": False,
+    }
+    start_background_check(update_state)
+
     if args.model:
         cfg["model"] = args.model
     if args.route:
-        cfg["route"] = args.route
+        cfg["auto_route"] = args.route == "auto"
 
     if not cfg["api_key"]:
         # First run (or key removed): walk the user through connecting a key
@@ -857,6 +898,7 @@ def main() -> None:
         # Cumulative bytes of attachments already sent to the model.
         # Enforces safety.SESSION_IMAGE_BYTE_CAP across the whole session.
         "session_image_bytes": 0,
+        "update": update_state,  # background PyPI check (see maybe_offer)
     }
 
     # Mode cycle — used by both the prompt-toolkit keybinding (while at the
@@ -898,6 +940,10 @@ def main() -> None:
 
     render_banner(cfg)
     _adopt_orphaned_servers(state)
+    # Update offer, consume point 1: stdin is still canonical here (no
+    # watcher, no prompt_toolkit), so a plain y/n input is safe. Fires when
+    # the cache already knew a newer version or the check landed fast.
+    maybe_offer(update_state, watcher=None)
     watcher.start()  # captures shift+tab whenever prompt_toolkit isn't reading
 
     # Make sure backgrounded servers die with us — even if Python exits via
@@ -925,6 +971,9 @@ def main() -> None:
 
     while True:
         try:
+            # Update offer, consume point 2: if the background check landed
+            # after startup, surface it between turns — never mid-prompt.
+            maybe_offer(update_state, watcher=watcher)
             # cwd separator above the input box. The mode indicator is no
             # longer printed here — it lives in the bottom_toolbar below the
             # prompt, which prompt_toolkit repaints live on shift+tab:
@@ -1129,11 +1178,9 @@ def main() -> None:
             state["session_cost"] += agg_cost
             prompt_t = last_usage.get("prompt_tokens", "?")
             completion_t = last_usage.get("completion_tokens", "?")
-            cost_str = fmt_usd(agg_cost) if agg_cost else "—"
             console.rule(style=BRAND_DIM, characters="─")
             console.print(
-                f"[dim]{last_model}  •  {prompt_t}→{completion_t} tok  •  {cost_str}  •  "
-                f"session {fmt_usd(state['session_cost'])}  •  {last_elapsed:.1f}s[/dim]"
+                f"[dim]{_turn_status_line(last_model, state['cfg'].get('auto_route', False), prompt_t, completion_t, agg_cost, state['session_cost'], last_elapsed)}[/dim]"
             )
             if last_optimize_plan:
                 if last_optimize_plan.get("degraded"):

@@ -4,8 +4,13 @@ Four modes, escalating from "ask for everything" → "auto-approve everything":
 
     default       ask for each tool call (safest — no indicator displayed)
     accept-edits  auto-approve write_file; still ask for shell / start_server
-    auto          auto-approve write_file + run_bash; still ask for start_server
+    auto          auto-approve write_file + run_bash + web_search
     bypass        auto-approve everything (use with care)
+
+web_search rides with run_bash (AUTO+): its only risk is leaking the query
+string off-machine, and run_bash can already `curl` anything anywhere — a
+strictly more powerful channel. DEFAULT/ACCEPT_EDITS confirm every search
+and show the query verbatim.
 
 AUTO_APPROVE drives the dispatch in handle_tool_calls — it's the set of tool
 names that don't go through the y/n confirmation in a given mode. Plan tools
@@ -37,8 +42,9 @@ LABELS = {
 AUTO_APPROVE: dict = {
     Mode.DEFAULT:      set(),
     Mode.ACCEPT_EDITS: {"write_file"},
-    Mode.AUTO:         {"write_file", "run_bash"},
-    Mode.BYPASS:       {"write_file", "run_bash", "read_file", "start_server"},
+    Mode.AUTO:         {"write_file", "run_bash", "web_search"},
+    Mode.BYPASS:       {"write_file", "run_bash", "read_file", "start_server",
+                        "web_search"},
 }
 
 # Modes that warrant a more aggressive footer hint.

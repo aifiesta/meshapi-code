@@ -15,13 +15,18 @@ CREDENTIALS_FILE = CONFIG_DIR / "credentials"
 # Backgrounded server pids/ports, persisted so a crashed meshapi can offer
 # to clean them up on next launch (a hard kill skips atexit/SIGTERM).
 SERVERS_FILE = CONFIG_DIR / "servers.json"
+# Update-check cache: last known PyPI version + timestamp + which version
+# the user declined (so we don't re-nag about the same release every run).
+UPDATE_CHECK_FILE = CONFIG_DIR / "update_check.json"
 
 DEFAULT_CONFIG = {
     "base_url": "https://api.meshapi.ai/v1",
     "api_key": "",
     "model": "anthropic/claude-sonnet-4.5",
     "system": "You are a helpful coding assistant. Be concise.",
-    "route": None,
+    "auto_route": False,        # model:"auto" — gateway Auto Router picks per prompt
+    "fallback_models": [],      # ordered `models` fallback list sent in the payload
+    "reasoning_effort": None,   # high|medium|low|none, or None = not sent
     # Mesh Optimize dial (BETA). 0 = off. 0 to 0.95: how aggressively to
     # cut token spend. See /optimize in the REPL and README for details.
     "optimize": 0.0,
@@ -89,6 +94,10 @@ def load_config() -> dict:
         CONFIG_FILE.write_text(json.dumps(DEFAULT_CONFIG, indent=2))
     secure_file(CONFIG_FILE)
     cfg = {**DEFAULT_CONFIG, **json.loads(CONFIG_FILE.read_text())}
+    # `route` (cheapest/fastest/balanced) never existed gateway-side and was
+    # replaced by auto_route in 0.5.0 — drop the stale key from old configs
+    # (it disappears from disk on the next save_config).
+    cfg.pop("route", None)
     # Resolution order: env > credentials file > legacy hand-edited
     # config.json. MESH_API_KEY kept as fallback for one release.
     file_key = (cfg.get("api_key") or "").strip()
@@ -163,3 +172,32 @@ def clear_servers_file() -> None:
             SERVERS_FILE.unlink()
     except OSError:
         pass
+
+
+def save_update_check(data: dict) -> None:
+    """Persist the update-check cache (`latest`, `checked_at`,
+    `declined_version`). Atomic + 0600 + best-effort, like save_servers."""
+    try:
+        _secure_dir(CONFIG_DIR)
+        persisted = {
+            k: data[k]
+            for k in ("latest", "checked_at", "declined_version")
+            if k in data
+        }
+        tmp = UPDATE_CHECK_FILE.with_suffix(".json.tmp")
+        tmp.write_text(json.dumps(persisted, indent=2))
+        os.replace(tmp, UPDATE_CHECK_FILE)
+        secure_file(UPDATE_CHECK_FILE)
+    except (OSError, TypeError):
+        pass
+
+
+def load_update_check() -> dict:
+    """Read the update-check cache. Returns {} on any failure."""
+    if not UPDATE_CHECK_FILE.exists():
+        return {}
+    try:
+        data = json.loads(UPDATE_CHECK_FILE.read_text())
+    except (OSError, json.JSONDecodeError):
+        return {}
+    return data if isinstance(data, dict) else {}
