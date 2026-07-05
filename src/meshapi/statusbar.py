@@ -138,17 +138,15 @@ def print_line(state: dict) -> None:
         servers = _servers_text(state)
         if servers:
             console.print(Text(servers, style="dim"), justify="right")
-        # Type-ahead + queue visibility between tool batches (no Live active
-        # there — this is where mid-run typing surfaces in scrollback).
-        watcher = state.get("watcher")
-        typeahead = getattr(watcher, "typeahead", "") if watcher is not None else ""
+        # Queue DEPTH only — stable info worth a scrollback line. Partial
+        # type-ahead is deliberately NOT stamped here: print_line fires per
+        # tool batch, so it would litter the transcript with right-aligned
+        # keystroke snapshots (seen live). Partial text renders only in
+        # repaintable surfaces: the streaming footer and the prompt prefill.
         queued = len(state.get("input_queue") or ())
-        if typeahead or queued:
-            line = Text()
-            line.append("› ", style="bold")
-            line.append(typeahead.replace("\n", "⏎")[:120])
-            if queued:
-                line.append(f"  ({queued} queued)", style="dim")
-            console.print(line, justify="right")
+        if queued:
+            console.print(
+                Text(f"({queued} queued)", style="dim"), justify="right"
+            )
     except Exception:
         pass
