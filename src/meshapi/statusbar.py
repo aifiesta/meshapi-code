@@ -75,10 +75,15 @@ def bottom_toolbar(state: dict):
 
     pad = max(0, budget - len(hint))
     return FormattedText([
+        # Leading blank line separates the mode indicator from the input
+        # line, and the trailing blank keeps it off the terminal's bottom
+        # edge — the input no longer sits flush against the bottom of the
+        # screen (3 reserved rows: blank / indicator / blank).
+        ("", "\n"),
         ("", " " * pad),
         (f"{color} bold", body),
         ("ansibrightblack", hint),
-        ("", "\n"),  # bottom padding line under the toggle (per the mockup)
+        ("", "\n"),
     ])
 
 

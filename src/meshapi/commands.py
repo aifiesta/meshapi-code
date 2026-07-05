@@ -520,7 +520,9 @@ def handle_command(cmd: str, state: dict) -> bool:
             "to the gateway's search provider. Don't attach secrets.\n"
             "Mode auto-approvals: accept-edits auto-writes inside cwd; auto adds\n"
             "shell commands + web search; bypass auto-approves everything (still\n"
-            "asks before writing to ~/.ssh, /etc, rm -rf, sudo, curl|sh, etc.).[/dim]",
+            "asks before writing to ~/.ssh, /etc, rm -rf, sudo, curl|sh, etc.).\n"
+            "At any approval prompt, answer 'a' to auto-approve that tool for\n"
+            "the rest of the session. shift+tab works mid-run too.[/dim]",
             title="commands",
             border_style="cyan",
         ))

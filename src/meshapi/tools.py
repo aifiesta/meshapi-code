@@ -194,8 +194,14 @@ TOOLS = [
                 "http.server`, etc. Do NOT use run_bash for these — run_bash "
                 "kills the process at 120s.\n"
                 "We set PORT=<port> in the environment so most dev tools bind "
-                "to it automatically. If your tool needs the port as a CLI "
-                "argument instead, include it explicitly in the command."
+                "to it automatically. If the command itself contains a port "
+                "(`--port 3000`, `-p 3000`, `localhost:8000`, or a trailing "
+                "number like `python3 -m http.server 8080`), the CLI detects "
+                "it and waits on that port — do not also pass the `port` "
+                "argument. A bare `python -m http.server` gets the chosen "
+                "port appended automatically. If the server binds some other "
+                "port anyway, the CLI detects that too and returns the real "
+                "URL."
             ),
             "parameters": {
                 "type": "object",
@@ -206,7 +212,11 @@ TOOLS = [
                     },
                     "port": {
                         "type": "integer",
-                        "description": "Port to bind. Omit to auto-pick a free port starting from 5173.",
+                        "description": (
+                            "Port to bind. Omit to auto-pick a free port "
+                            "starting from 5173. Ignored if the command "
+                            "itself names a port."
+                        ),
                     },
                     "cwd": {
                         "type": "string",

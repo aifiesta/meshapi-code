@@ -352,11 +352,14 @@ def _safe_response_text(resp) -> str:
             return "<response body unavailable>"
 
 
-def confirm_tool_call(name: str, args: dict, watcher=None) -> bool:
+def confirm_tool_call(name: str, args: dict, watcher=None, session_allow=None) -> bool:
     """ASK-mode prompt for a single tool call. Returns True if approved.
 
     `watcher` is the KeyWatcher: paused around `console.input` so the
     terminal is in canonical line-edit mode while reading the y/n answer.
+    `session_allow` is the session allowlist set: answering `a` approves AND
+    adds the tool so it never asks again this session (Claude Code's
+    "don't ask again"). Safety guards still apply to allowlisted tools.
     """
     summary = summarize_call(name, args)
     console.print(f"[bold {BRAND}]⚙ approve tool call?[/bold {BRAND}]  [dim]{summary}[/dim]")
@@ -376,9 +379,15 @@ def confirm_tool_call(name: str, args: dict, watcher=None) -> bool:
         console.print(f"[dim]🔎 {_rich_escape(args.get('query') or '')}[/dim]")
     # Pause the keywatcher so console.input gets canonical-mode stdin.
     paused_ctx = watcher.paused() if watcher is not None else _noop_ctx()
+    allow_hint = (
+        f" / [bold]a[/bold] (always for {name} this session)"
+        if session_allow is not None else ""
+    )
     try:
         with paused_ctx:
-            ans = console.input("[bold]y[/bold] (yes) / [bold]n[/bold] (no)  › ").strip().lower()
+            ans = console.input(
+                f"[bold]y[/bold] (yes){allow_hint} / [bold]n[/bold] (no)  › "
+            ).strip().lower()
     except KeyboardInterrupt:
         # Bubble up so the outer turn handler can abort cleanly.
         raise
@@ -388,6 +397,10 @@ def confirm_tool_call(name: str, args: dict, watcher=None) -> bool:
         # If the input prompt itself blows up (corrupted terminal state, etc.),
         # treat it as a deny and keep the session alive.
         return False
+    if ans in ("a", "always") and session_allow is not None:
+        session_allow.add(name)
+        console.print(f"[dim]  ✓ auto-approving {name} for the rest of this session[/dim]")
+        return True
     return ans in ("y", "yes")
 
 
@@ -420,6 +433,105 @@ def _port_open(port: int, host: str = "127.0.0.1") -> bool:
             return True
     except (OSError, socket.timeout):
         return False
+
+
+# Explicit port in a server command. Rule 1: port flags (`--port 3000`,
+# `-p 8080:80` docker-style keeps the HOST side). Rule 2: host:port token
+# (`php -S localhost:8000`, `gunicorn -b :8000`) — anchored at token start so
+# ports inside URLs (`--open http://localhost:3000`) deliberately DON'T match
+# (the adoption net catches those). Rule 3 (in code): bare pure-digit token
+# 1024..65535 (`python3 -m http.server 8080`) — the floor kills `2>&1`, `-j8`,
+# `sleep 30`, `--max-old-space-size=4096` and friends.
+_FLAG_PORT_RE = re.compile(
+    r"(?:^|\s)(?:--(?:port|server-port|listen-port)|-p)[=\s]+(\d{1,5})(?::\d{1,5})?(?=\s|$)"
+)
+_COLON_PORT_RE = re.compile(r"(?:^|[\s=])[\w.\-*\[\]]*:(\d{1,5})(?=[\s/]|$)")
+
+
+def _extract_command_port(cmd: str) -> "int | None":
+    """Explicit port named in the command itself, or None.
+
+    Biased against false positives — a miss just costs one adoption-scan
+    cycle (~2s), a false positive means prechecking/waiting on the wrong
+    port. Last match wins within each rule; flag > colon > bare token.
+    """
+    for rx in (_FLAG_PORT_RE, _COLON_PORT_RE):
+        hits = [int(m.group(1)) for m in rx.finditer(cmd)]
+        hits = [h for h in hits if 1 <= h <= 65535]
+        if hits:
+            return hits[-1]
+    bare = [int(t) for t in cmd.split() if t.isdigit() and 1024 <= int(t) <= 65535]
+    return bare[-1] if bare else None
+
+
+_HTTP_SERVER_RE = re.compile(
+    r"^\s*\S*python[\d.]*(?:\s+-[a-zA-Z]+)*\s+-m\s+http\.server(?:\s+--?\S+(?:\s+\S+)?)*\s*$"
+)
+
+
+def _maybe_append_port(cmd: str, port: int) -> tuple:
+    """python's http.server ignores the PORT env var (binds 8000 by default),
+    so a bare `python3 -m http.server` can never open the port we wait on.
+    Append the chosen port for exactly that shape. Returns (cmd, appended)."""
+    if _HTTP_SERVER_RE.match(cmd):
+        return f"{cmd.rstrip()} {port}", True
+    return cmd, False
+
+
+def _discover_listen_ports(pgid: int) -> list:
+    """TCP ports the spawned process GROUP is listening on. POSIX best-effort
+    — [] on any failure, never raises (the wait loop must not crash the REPL).
+
+    One `lsof -g <pgid>` call (macOS + most Linux): ~25ms, exit 1 just means
+    "no matches". `-Fn` machine format: parse `n<addr>:<port>` lines.
+    """
+    if os.name != "posix":
+        return []
+    try:
+        out = subprocess.run(
+            ["lsof", "-nP", "-g", str(pgid), "-a", "-iTCP", "-sTCP:LISTEN", "-Fn"],
+            capture_output=True, text=True, timeout=2,  # lsof can hang on dead NFS
+        ).stdout
+    except FileNotFoundError:
+        return _discover_via_ss(pgid)
+    except Exception:
+        return []
+    ports = []
+    for line in out.splitlines():
+        if line.startswith("n") and ":" in line:
+            tail = line.rsplit(":", 1)[1]
+            if tail.isdigit() and int(tail) not in ports:
+                ports.append(int(tail))
+    return sorted(ports)
+
+
+def _discover_via_ss(pgid: int) -> list:
+    """Fallback for lsof-less Linux (minimal containers): ss -tlnp filtered
+    to the group's pids. We spawn with start_new_session=True, so sid ==
+    pgid == the child's pid — `ps -g` selects by group on macOS and by
+    session on Linux procps, and both resolve to the same tree here."""
+    try:
+        pids = set(subprocess.run(
+            ["ps", "-o", "pid=", "-g", str(pgid)],
+            capture_output=True, text=True, timeout=2,
+        ).stdout.split())
+        if not pids:
+            return []
+        out = subprocess.run(
+            ["ss", "-tlnp"], capture_output=True, text=True, timeout=2,
+        ).stdout
+    except Exception:
+        return []
+    ports = []
+    for line in out.splitlines():
+        if not any(f"pid={p}" in line for p in pids):
+            continue
+        fields = line.split()
+        if len(fields) >= 4 and ":" in fields[3]:
+            tail = fields[3].rsplit(":", 1)[1]
+            if tail.isdigit() and int(tail) not in ports:
+                ports.append(int(tail))
+    return sorted(ports)
 
 
 def _kill_server(pid: int) -> None:
@@ -529,19 +641,59 @@ def _handle_start_server(args: dict, state: dict) -> str:
     if not isinstance(cmd, str) or not cmd.strip():
         return "Error: start_server requires a `command` argument."
 
-    port = args.get("port")
-    if port is None:
+    # Port resolution precedence: explicit port in the COMMAND > `port` arg
+    # > auto-pick. The command wins because it's what the server will
+    # actually bind — the live failure mode was waiting on an auto-picked
+    # port while `python3 -m http.server 8080` listened on 8080.
+    arg_port = args.get("port")
+    if arg_port is not None and (
+        not isinstance(arg_port, int) or arg_port < 1 or arg_port > 65535
+    ):
+        return f"Error: invalid port {arg_port!r}; must be an integer in 1..65535."
+    cmd_port = _extract_command_port(cmd)
+    if cmd_port is not None:
+        if arg_port is not None and arg_port != cmd_port:
+            console.print(
+                f"  [dim]command specifies port {cmd_port}; "
+                f"ignoring port arg {arg_port}[/dim]"
+            )
+        port, port_source = cmd_port, "command"
+    elif arg_port is not None:
+        port, port_source = arg_port, "arg"
+    else:
         try:
             port = _find_free_port()
         except RuntimeError as e:
             return f"Error: {e}"
-    elif not isinstance(port, int) or port < 1 or port > 65535:
-        return f"Error: invalid port {port!r}; must be an integer in 1..65535."
-    elif _port_open(port):
+        port_source = "auto"
+
+    if port_source != "auto" and _port_open(port):
+        # Is it OUR server from earlier this session? Then the fix is to not
+        # restart it — this exact loop (restart → port busy → retry) burned
+        # a live session.
+        for srv in state.get("servers", []):
+            if srv.get("port") == port:
+                return (
+                    f"Error: port {port} is YOUR OWN server started earlier "
+                    f"this session — it is already running at {srv['url']} "
+                    f"(pid {srv['pid']}). Do NOT start it again; just tell "
+                    "the user the URL."
+                )
+        if port_source == "command":
+            return (
+                f"Error: your command specifies port {port}, which is "
+                "already in use. Change the port in the command, or stop "
+                f"whatever is listening on {port}."
+            )
         return (
             f"Error: port {port} is already in use. Pick a different port or "
             "omit `port` to auto-pick a free one."
         )
+
+    # python's http.server ignores PORT env — append the port for that shape.
+    appended = False
+    if cmd_port is None:
+        cmd, appended = _maybe_append_port(cmd, port)
 
     wait_seconds = args.get("wait_seconds")
     if not isinstance(wait_seconds, int) or wait_seconds < 1 or wait_seconds > 300:
@@ -560,7 +712,10 @@ def _handle_start_server(args: dict, state: dict) -> str:
     env["BROWSER"] = "none"  # stop CRA / others from auto-opening a browser
 
     console.print(f"  [{CODE}]$[/{CODE}] [{CODE}]{_rich_escape(cmd)}[/{CODE}]")
-    console.print(f"  [dim]port {port}, cwd {cwd}[/dim]")
+    detail = f"port {port} (from {port_source}), cwd {cwd}"
+    if appended:
+        detail += "  — appended port: http.server ignores PORT env"
+    console.print(f"  [dim]{detail}[/dim]")
 
     try:
         proc = subprocess.Popen(
@@ -601,71 +756,152 @@ def _handle_start_server(args: dict, state: dict) -> str:
     drainer = threading.Thread(target=_drain, daemon=True, name=f"server-{proc.pid}-drain")
     drainer.start()
 
-    # Poll the port up to wait_seconds.
-    deadline = time.monotonic() + wait_seconds
     start_t = time.monotonic()
-    while time.monotonic() < deadline:
-        if proc.poll() is not None:
-            with output_lock:
-                tail = "\n".join(output_lines[-30:])
-            return (
-                f"Error: server exited with code {proc.returncode} before "
-                f"opening port {port}.\nOutput:\n{tail or '(no output)'}"
-            )
-        if _port_open(port):
-            elapsed = time.monotonic() - start_t
-            # Give the server a beat to log its banner ("ready in X ms" etc.)
-            time.sleep(0.4)
-            with output_lock:
-                preview = "\n".join(output_lines[:20])
-            url = f"http://localhost:{port}"
-            state.setdefault("servers", []).append({
-                "pid": proc.pid, "port": port, "cmd": cmd, "url": url,
-            })
-            _persist_servers(state)  # survive a hard kill / crash
 
-            # Make the URL big, plain, on its own line — most terminals
-            # auto-detect bare URLs as cmd-clickable, which is more reliable
-            # than rich's OSC-8 `[link=...]` markup that some terminals
-            # (xterm.js, older Terminal.app) strip silently.
-            from rich.panel import Panel
-            console.print(f"  [green]✓ ready in {elapsed:.1f}s[/green]")
-            console.print()
-            console.print(Panel.fit(
-                f"[bold green]{url}[/bold green]\n"
-                f"[dim]server running in the background  ·  pid {proc.pid}  ·  "
-                "⌘-click or paste the URL in your browser[/dim]",
-                title="🌐 ready",
-                border_style="green",
-                padding=(0, 2),
-            ))
-            console.print()
-            if preview.strip():
-                console.print("  [dim]── server output ──[/dim]")
-                for line in preview.split("\n")[:_MAX_BODY_LINES]:
+    def _success(final_port: int) -> str:
+        """Record + announce the server on `final_port` (== expected `port`,
+        or a discovered/adopted one when the command ignored PORT env)."""
+        elapsed = time.monotonic() - start_t
+        # Give the server a beat to log its banner ("ready in X ms" etc.)
+        time.sleep(0.4)
+        with output_lock:
+            preview = "\n".join(output_lines[:20])
+        url = f"http://localhost:{final_port}"
+        state.setdefault("servers", []).append({
+            "pid": proc.pid, "port": final_port, "cmd": cmd, "url": url,
+        })
+        _persist_servers(state)  # survive a hard kill / crash
+
+        # Make the URL big, plain, on its own line — most terminals
+        # auto-detect bare URLs as cmd-clickable, which is more reliable
+        # than rich's OSC-8 `[link=...]` markup that some terminals
+        # (xterm.js, older Terminal.app) strip silently.
+        from rich.panel import Panel
+        console.print(f"  [green]✓ ready in {elapsed:.1f}s[/green]")
+        if final_port != port:
+            console.print(
+                f"  [yellow]note: command ignored PORT={port} and bound "
+                f"{final_port} — using {url}[/yellow]"
+            )
+        console.print()
+        console.print(Panel.fit(
+            f"[bold green]{url}[/bold green]\n"
+            f"[dim]server running in the background  ·  pid {proc.pid}  ·  "
+            "⌘-click or paste the URL in your browser[/dim]",
+            title="🌐 ready",
+            border_style="green",
+            padding=(0, 2),
+        ))
+        console.print()
+        if preview.strip():
+            console.print("  [dim]── server output ──[/dim]")
+            for line in preview.split("\n")[:_MAX_BODY_LINES]:
+                if len(line) > _MAX_LINE_LEN:
+                    line = line[:_MAX_LINE_LEN] + "…"
+                console.print(f"    [dim]{_rich_escape(line)}[/dim]")
+
+        note = ""
+        if final_port != port:
+            note = (
+                f"\nNOTE: your command bound port {final_port}, not the "
+                f"expected {port} — it ignores the PORT env var. Next time "
+                f"put the port in the command or pass port: {final_port}."
+            )
+        return (
+            f"Server up at {url} (pid {proc.pid}, ready in {elapsed:.1f}s).\n"
+            "The user can already see the URL in their terminal — it was "
+            "printed by the CLI. Respond with a SINGLE short text line "
+            "(e.g. 'Server's up at " + url + " — open it in your browser') "
+            "and END THE TURN. Do NOT call any more tools this turn — "
+            "no curl, no read_file, no anything. The server keeps running "
+            "in the background until meshapi exits; the user will interact "
+            "with it through the browser, not through you." + note
+        )
+
+    # Poll for readiness: the expected port, plus a periodic discovery scan
+    # of what the process group ACTUALLY listens on (adopts mismatches in
+    # ~2s instead of timing out), plus a ticker so the wait is never silent.
+    deadline = start_t + wait_seconds
+    next_discovery = start_t + 2.0
+    next_tick = start_t + 5.0
+    exit0_grace = None
+    last_echoed = ""
+    try:
+        while time.monotonic() < deadline:
+            now = time.monotonic()
+            rc = proc.poll()
+            if rc is not None and rc != 0:
+                with output_lock:
+                    tail = "\n".join(output_lines[-30:])
+                return (
+                    f"Error: server exited with code {rc} before "
+                    f"opening port {port}.\nOutput:\n{tail or '(no output)'}"
+                )
+            if rc == 0 and exit0_grace is None:
+                # Shell exited cleanly — it may have backgrounded a daemon
+                # that inherited the pgid. Grace window + immediate scan
+                # instead of misreporting "server exited".
+                exit0_grace = min(deadline, now + 5.0)
+                next_discovery = now
+            if _port_open(port):
+                return _success(port)
+            if now >= next_discovery:
+                next_discovery = now + 2.0
+                # pgid == proc.pid thanks to start_new_session=True.
+                for p in _discover_listen_ports(proc.pid):
+                    if p != port and _port_open(p):
+                        return _success(p)  # adopt what it actually bound
+            if rc == 0 and exit0_grace is not None and now >= exit0_grace:
+                with output_lock:
+                    tail = "\n".join(output_lines[-30:])
+                return (
+                    "Error: the command exited 0 without leaving a listening "
+                    "server behind. If it daemonizes, keep it in the "
+                    f"foreground instead.\nOutput:\n{tail or '(no output)'}"
+                )
+            if now >= next_tick:
+                next_tick = now + 5.0
+                waited = int(now - start_t)
+                console.print(
+                    f"  [dim]… waiting for port {port} "
+                    f"({waited}s/{wait_seconds}s) — ctrl+c to abort[/dim]"
+                )
+                with output_lock:
+                    newest = output_lines[-1] if output_lines else ""
+                if newest and newest != last_echoed:
+                    last_echoed = newest
+                    line = newest
                     if len(line) > _MAX_LINE_LEN:
                         line = line[:_MAX_LINE_LEN] + "…"
-                    console.print(f"    [dim]{_rich_escape(line)}[/dim]")
+                    console.print(f"  [dim]│ {_rich_escape(line)}[/dim]")
+            time.sleep(0.2)
+    except KeyboardInterrupt:
+        # Don't orphan the half-started server: it isn't in state["servers"]
+        # yet, so nothing else would ever kill it.
+        _kill_server(proc.pid)
+        raise
 
-            return (
-                f"Server up at {url} (pid {proc.pid}, ready in {elapsed:.1f}s).\n"
-                "The user can already see the URL in their terminal — it was "
-                "printed by the CLI. Respond with a SINGLE short text line "
-                "(e.g. 'Server's up at " + url + " — open it in your browser') "
-                "and END THE TURN. Do NOT call any more tools this turn — "
-                "no curl, no read_file, no anything. The server keeps running "
-                "in the background until meshapi exits; the user will interact "
-                "with it through the browser, not through you."
-            )
-        time.sleep(0.2)
-
-    # Timeout — kill the whole tree.
+    # Timeout — see what it IS listening on (for the error), then kill.
+    leftover = _discover_listen_ports(proc.pid)
     _kill_server(proc.pid)
     with output_lock:
         tail = "\n".join(output_lines[-30:])
+    if leftover:
+        ports_s = ", ".join(str(p) for p in leftover)
+        return (
+            f"Error: timed out after {wait_seconds}s. The server IS listening "
+            f"on port(s) {ports_s}, but not reachable at "
+            f"http://localhost:{leftover[0]} — it may be bound to a specific "
+            "interface or running inside a container. Killed it. Bind to "
+            f"127.0.0.1 or 0.0.0.0 and retry.\nOutput so far:\n{tail or '(no output)'}"
+        )
     return (
-        f"Error: timed out after {wait_seconds}s waiting for port {port} to "
-        f"open. Killed the server. Output so far:\n{tail or '(no output)'}"
+        f"Error: timed out after {wait_seconds}s — the process never opened "
+        "a TCP port. Killed it. If the command takes a fixed port, put the "
+        "port in the command (it is auto-detected: '--port 3000', "
+        "'localhost:8000', or a trailing number like 'http.server 8080'). "
+        "Note: python -m http.server ignores the PORT env var.\n"
+        f"Output so far:\n{tail or '(no output)'}"
     )
 
 
@@ -822,8 +1058,13 @@ def _log_call_failure(state: dict, p: dict, repaired: bool) -> None:
     })
 
 
-def handle_tool_calls(tool_calls: list, mode: Mode, state: dict) -> None:
+def handle_tool_calls(tool_calls: list, state: dict) -> None:
     """Append assistant tool_calls message + tool result messages to state.
+
+    The permission mode is read from state["mode"] PER CALL, not frozen for
+    the batch — the keywatcher mutates it from its thread on shift+tab, so a
+    cycle during a long tool run applies to the very next call. When it
+    changes mid-batch we print the mode line so the switch is visible.
 
     Calls are classified by _prepare_call first; the assistant history
     message is built from SANITIZED arguments (see _prepare_call docstring)
@@ -851,8 +1092,13 @@ def handle_tool_calls(tool_calls: list, mode: Mode, state: dict) -> None:
             for p in prepared
         ],
     })
+    shown_mode = state.get("mode")
     for p in prepared:
         name, args = p["name"], p["args"]
+        mode = state.get("mode", Mode.DEFAULT)  # live read — see docstring
+        if mode is not shown_mode:
+            statusbar.print_line(state)  # make the mid-batch switch visible
+            shown_mode = mode
 
         # Doomed calls: skip before the approval prompt, feed the precise
         # reason back, and track a per-turn streak so repeated failures
@@ -891,11 +1137,22 @@ def handle_tool_calls(tool_calls: list, mode: Mode, state: dict) -> None:
                 # that fails a safety check, falls back to confirmation —
                 # even in BYPASS we ask before truly dangerous shapes
                 # (sensitive paths, `rm -rf /`, sudo, curl | sh, ...).
+                # Auto-approve via the mode's set OR the session allowlist
+                # (tools the user answered "a — always this session" for).
+                # Safety guards below still run on both paths and can
+                # downgrade back to the y/n prompt. CRITICAL: the guards
+                # no-op in DEFAULT (they assume the caller confirms), so a
+                # session-allowed tool must be safety-checked at AUTO
+                # strictness or `a` in DEFAULT would disarm them entirely.
                 auto_approved = name in AUTO_APPROVE.get(mode, set())
+                safety_mode = mode
+                if not auto_approved and name in state.get("session_allow", set()):
+                    auto_approved = True
+                    safety_mode = Mode.AUTO
                 safety_reason: str = ""
                 if auto_approved and name == "write_file":
                     ok, reason = safety.is_path_safe_for_auto_write(
-                        args.get("path"), mode
+                        args.get("path"), safety_mode
                     )
                     if not ok:
                         auto_approved = False
@@ -905,14 +1162,14 @@ def handle_tool_calls(tool_calls: list, mode: Mode, state: dict) -> None:
                     # paths so the model can't silently leak ~/.ssh/...
                     # to the upstream provider.
                     ok, reason = safety.is_path_safe_for_auto_read(
-                        args.get("path"), mode
+                        args.get("path"), safety_mode
                     )
                     if not ok:
                         auto_approved = False
                         safety_reason = reason or "path safety check failed"
                 elif auto_approved and name in ("run_bash", "start_server"):
                     ok, reason = safety.is_command_safe_for_auto(
-                        args.get("command"), mode
+                        args.get("command"), safety_mode
                     )
                     if not ok:
                         auto_approved = False
@@ -922,7 +1179,9 @@ def handle_tool_calls(tool_calls: list, mode: Mode, state: dict) -> None:
                         f"[yellow]⚠ auto-approval blocked: {safety_reason}[/yellow]"
                     )
                 approved = auto_approved or confirm_tool_call(
-                    name, args, watcher=state.get("watcher")
+                    name, args,
+                    watcher=state.get("watcher"),
+                    session_allow=state.setdefault("session_allow", set()),
                 )
                 if approved:
                     # 1) Action header — purple, "the AI is doing this"
@@ -1034,6 +1293,7 @@ def main() -> None:
         "update": update_state,  # background PyPI check (see maybe_offer)
         "doom_streak": {},       # per-turn consecutive doomed-call counter
         "last_model": cfg["model"],  # resolved model of the last stream (forensics)
+        "session_allow": set(),  # tools approved with "a — always this session"
     }
 
     # Mode cycle — used by both the prompt-toolkit keybinding (while at the
@@ -1327,7 +1587,7 @@ def main() -> None:
                     break
 
                 # Model called tools — execute and loop.
-                handle_tool_calls(tool_calls, state["mode"], state)
+                handle_tool_calls(tool_calls, state)
 
             state["session_cost"] += agg_cost
             prompt_t = last_usage.get("prompt_tokens", "?")
