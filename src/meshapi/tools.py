@@ -280,6 +280,118 @@ def validate_call(name: str, arguments: dict) -> str | None:
     return None
 
 
+def _scan_args(raw: str) -> tuple:
+    """Single pass over a candidate JSON string.
+
+    Returns (comma_insert_positions, in_string_at_eof, escape_pending_at_eof,
+    open_depth, last_significant_char). A "comma insert position" is an
+    out-of-string `\"` whose previous significant char ends a JSON value
+    (`\"`, `}`, `]`, digit, or the tail of true/false/null) — i.e. exactly
+    the missing-comma-between-members shape and nothing else.
+    """
+    positions = []
+    in_string = False
+    escape = False
+    depth = 0
+    last_sig = ""
+    for i, ch in enumerate(raw):
+        if in_string:
+            if escape:
+                escape = False
+            elif ch == "\\":
+                escape = True
+            elif ch == '"':
+                in_string = False
+                last_sig = '"'
+            continue
+        if ch.isspace():
+            continue
+        if ch == '"':
+            if last_sig in '"}]el' or last_sig.isdigit():
+                positions.append(i)
+            in_string = True
+            # last_sig updates when the string closes
+            continue
+        if ch in "{[":
+            depth += 1
+        elif ch in "}]":
+            depth -= 1
+        last_sig = ch
+    return positions, in_string, escape, depth, last_sig
+
+
+def repair_tool_args(raw: str) -> tuple:
+    """Narrow repair for streamed tool-call arguments. Returns
+    (repaired_string, None) on success, else (None, reason).
+
+    Policy (see CLAUDE.md): truncation is checked FIRST and never repaired —
+    fabricating closures could silently write half a file. The only repair
+    performed is inserting missing commas between members; anything else
+    (missing colon, concatenated objects, extra braces) fails the acceptance
+    gate — the repaired string must json-parse to a dict.
+    """
+    positions, in_string, escape, depth, last_sig = _scan_args(raw)
+    if in_string or escape or depth > 0 or last_sig in ":,":
+        return None, "truncated"
+    if not positions:
+        return None, "unrepairable"
+    out = []
+    prev = 0
+    for p in positions:
+        out.append(raw[prev:p])
+        out.append(",")
+        prev = p
+    out.append(raw[prev:])
+    repaired = "".join(out)
+    try:
+        obj = json.loads(repaired, strict=False)
+    except json.JSONDecodeError:
+        return None, "unrepairable"
+    if not isinstance(obj, dict):
+        return None, "unrepairable"
+    return repaired, None
+
+
+def schema_hint(name: str) -> str:
+    """One-line expected-arguments reminder derived from TOOLS (single
+    source of truth), e.g.: write_file expects {"path": "...", "content": "..."}."""
+    for t in TOOLS:
+        fn = t.get("function") or {}
+        if fn.get("name") != name:
+            continue
+        params = fn.get("parameters") or {}
+        props = params.get("properties") or {}
+        required = params.get("required") or []
+        placeholders = {"integer": "123", "number": "1.0", "array": "[...]",
+                        "boolean": "true", "object": "{...}"}
+        pairs = ", ".join(
+            f'"{k}": {placeholders.get((props.get(k) or {}).get("type"), chr(34) + "..." + chr(34))}'
+            for k in required
+        )
+        optional = [k for k in props if k not in required]
+        opt = f" (optional: {', '.join(optional)})" if optional else ""
+        return f"{name} expects {{{pairs}}}{opt}"
+    return ""
+
+
+def parse_error_context(raw: str, pos: int, radius: int = 40) -> str:
+    """±radius chars around a JSONDecodeError position, control chars
+    escaped, the offending char marked with ⟨⟩."""
+    pos = max(0, min(pos, len(raw)))
+    start = max(0, pos - radius)
+    end = min(len(raw), pos + radius)
+
+    def esc(s: str) -> str:
+        return s.replace("\\", "\\\\").replace("\n", "\\n").replace("\r", "\\r").replace("\t", "\\t")
+
+    before = esc(raw[start:pos])
+    at = esc(raw[pos:pos + 1]) or "<end>"
+    after = esc(raw[pos + 1:end])
+    prefix = "…" if start > 0 else ""
+    suffix = "…" if end < len(raw) else ""
+    return f"{prefix}{before}⟨{at}⟩{after}{suffix}"
+
+
 def _truncate(text: str) -> str:
     tail = "...[truncated]" if len(text) > OUTPUT_LIMIT else ""
     return f"{text[:OUTPUT_LIMIT]}{tail}"

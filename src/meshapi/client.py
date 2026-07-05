@@ -44,6 +44,7 @@ class ToolCallAccumulator:
         self._by_index: dict = {}
         self._order: list = []    # buckets in arrival order
         self._current = None      # last bucket touched — target for bare fragments
+        self.dropped = 0          # buckets finalize() had to discard (forensics)
 
     def add(self, tc: dict) -> None:
         idx = tc.get("index")
@@ -82,34 +83,47 @@ class ToolCallAccumulator:
     def finalize(self) -> list:
         """Return completed calls, repairing what can be repaired.
 
-        - An orphan bucket (no name, no id, args only) is an argument stream
-          that arrived under the wrong index: merge it into the nearest
-          earlier named call whose args are still empty/incomplete. Never
-          merge into a call whose args already parse — that would corrupt a
-          good call to rescue a broken one.
-        - Nameless leftovers are dropped (not executable, and replaying them
-          in the assistant message 400s on strict providers).
-        - Missing ids get a deterministic `call_<n>` so the assistant/tool
-          message pairing survives the next hop.
+        Two passes so a donor fragment at a LOWER index than its named call
+        is not lost (the old single-pass walk processed it before any named
+        call existed and silently dropped it — seen live as a named call
+        with 0-char args):
+        1. collect named buckets;
+        2. merge every nameless bucket that carries arguments (id'd or not)
+           into the nearest-by-index named call whose args do NOT already
+           parse. Merge direction is acceptance-driven: try target+donor,
+           then donor+target (lower-index donors may need prepending); if
+           neither parses, append anyway — the cli-layer feedback loop
+           handles what's left. A call whose args already parse is never
+           touched — never corrupt a good call to rescue a broken one.
+
+        Whatever is still discarded is counted in self.dropped (surfaced as
+        meta['accum_dropped'] for forensics). Missing ids get a
+        deterministic `call_<n>` so the assistant/tool pairing survives.
         """
-        calls: list = []
-        for b in sorted(self._order, key=lambda b: b["_idx"]):
-            if not b["name"] and not b["id"] and b["arguments"]:
-                target = next(
-                    (p for p in reversed(calls)
-                     if p["name"] and not _is_complete_json(p["arguments"])),
-                    None,
-                )
-                if target is not None:
-                    target["arguments"] += b["arguments"]
-                continue  # merged, or unrecoverable — never surface alone
-            calls.append(b)
-        calls = [c for c in calls if c["name"]]
-        for n, c in enumerate(calls):
+        buckets = sorted(self._order, key=lambda b: b["_idx"])
+        named = [b for b in buckets if b["name"]]
+        donors = [b for b in buckets if not b["name"] and b["arguments"]]
+        self.dropped = 0
+        for o in donors:
+            candidates = [c for c in named if not _is_complete_json(c["arguments"])]
+            if not candidates:
+                self.dropped += 1
+                continue
+            target = min(candidates, key=lambda c: abs(c["_idx"] - o["_idx"]))
+            if _is_complete_json(target["arguments"] + o["arguments"]):
+                target["arguments"] += o["arguments"]
+            elif _is_complete_json(o["arguments"] + target["arguments"]):
+                target["arguments"] = o["arguments"] + target["arguments"]
+            else:
+                target["arguments"] += o["arguments"]
+        self.dropped += sum(
+            1 for b in buckets if not b["name"] and not b["arguments"] and b["id"]
+        )
+        for n, c in enumerate(named):
             if not c["id"]:
                 c["id"] = f"call_{n}"
             c.pop("_idx", None)
-        return calls
+        return named
 
 
 def build_payload(messages: list, cfg: dict, tools: Optional[list] = None) -> dict:
@@ -177,6 +191,8 @@ def stream_chat(
     last_meta: dict = {}
     last_model: str = ""
     accum = ToolCallAccumulator()
+    dropped_chunks = 0   # SSE data lines that failed to json-parse (forensics —
+    dropped_sample = ""  # nonzero implicates the gateway relay, not the model)
 
     for attempt_index, body in enumerate(attempts):
         is_last_attempt = attempt_index == len(attempts) - 1
@@ -207,6 +223,9 @@ def stream_chat(
                 try:
                     obj = json.loads(data)
                 except json.JSONDecodeError:
+                    dropped_chunks += 1
+                    if not dropped_sample:
+                        dropped_sample = data[:200]
                     continue
 
                 if obj.get("model"):
@@ -231,7 +250,12 @@ def stream_chat(
 
     if last_model:
         last_meta["model"] = last_model
+    if dropped_chunks:
+        last_meta["dropped_chunks"] = dropped_chunks
+        last_meta["dropped_sample"] = dropped_sample
     tool_calls = accum.finalize()
+    if accum.dropped:
+        last_meta["accum_dropped"] = accum.dropped
     if tool_calls:
         last_meta["tool_calls"] = tool_calls
     if plan:

@@ -18,6 +18,11 @@ SERVERS_FILE = CONFIG_DIR / "servers.json"
 # Update-check cache: last known PyPI version + timestamp + which version
 # the user declined (so we don't re-nag about the same release every run).
 UPDATE_CHECK_FILE = CONFIG_DIR / "update_check.json"
+# Tool-call failure forensics: raw arguments of every doomed/repaired call,
+# so corruption can be attributed (model-side vs gateway SSE relay).
+TOOLCALL_FAILURES_FILE = CONFIG_DIR / "toolcall_failures.jsonl"
+FAILURE_LOG_MAX_BYTES = 1_000_000
+_RAW_ARGS_LOG_CAP = 32_768  # bound one pathological record
 
 DEFAULT_CONFIG = {
     "base_url": "https://api.meshapi.ai/v1",
@@ -190,6 +195,41 @@ def save_update_check(data: dict) -> None:
         secure_file(UPDATE_CHECK_FILE)
     except (OSError, TypeError):
         pass
+
+
+def log_toolcall_failure(record: dict) -> None:
+    """Append one JSONL forensics record. Best-effort — never raises.
+
+    0600 from creation (os.open, no readable window). Rotation: when the
+    file exceeds FAILURE_LOG_MAX_BYTES it is renamed to `.jsonl.1`
+    (clobbering the previous rotation) and a fresh file starts — one
+    atomic syscall, keeps a full window of history, no parsing.
+    """
+    try:
+        _secure_dir(CONFIG_DIR)
+        try:
+            if TOOLCALL_FAILURES_FILE.stat().st_size > FAILURE_LOG_MAX_BYTES:
+                os.replace(
+                    TOOLCALL_FAILURES_FILE,
+                    TOOLCALL_FAILURES_FILE.with_suffix(".jsonl.1"),
+                )
+        except OSError:
+            pass  # missing file, racing process — carry on
+        raw = record.get("raw_args")
+        if isinstance(raw, str) and len(raw) > _RAW_ARGS_LOG_CAP:
+            record = {
+                **record,
+                "raw_args": raw[:_RAW_ARGS_LOG_CAP] + f"…[+{len(raw) - _RAW_ARGS_LOG_CAP} chars]",
+            }
+        fd = os.open(
+            TOOLCALL_FAILURES_FILE,
+            os.O_WRONLY | os.O_CREAT | os.O_APPEND,
+            0o600,
+        )
+        with os.fdopen(fd, "a") as f:
+            f.write(json.dumps(record, ensure_ascii=False, default=str) + "\n")
+    except (OSError, TypeError, ValueError):
+        pass  # forensics must never hurt the session
 
 
 def load_update_check() -> dict:

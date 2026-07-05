@@ -27,8 +27,9 @@ from .attachments import AttachmentError, find_image_tokens, load_image
 from .client import stream_chat
 from .commands import handle_command, prompt_for_api_key
 from .config import (
-    CREDENTIALS_FILE, HISTORY_FILE, clear_servers_file,
-    load_config, load_servers, load_update_check, save_servers, secure_file,
+    CREDENTIALS_FILE, HISTORY_FILE, clear_servers_file, load_config,
+    load_servers, load_update_check, log_toolcall_failure, save_servers,
+    secure_file,
 )
 from .keywatcher import KeyWatcher
 from .permissions import AUTO_APPROVE, Mode, from_str, next_mode
@@ -37,7 +38,11 @@ from . import safety
 from .render import (
     BRAND, BRAND_BG, BRAND_BG_FG, BRAND_DIM, CODE, console, fmt_usd, pretty_cwd, render_stream,
 )
-from .tools import PLAN_TOOLS, TOOLS, build_system_prompt, execute as exec_tool, summarize_call, validate_call
+from .tools import (
+    PLAN_TOOLS, TOOLS, build_system_prompt, execute as exec_tool,
+    parse_error_context, repair_tool_args, schema_hint, summarize_call,
+    validate_call,
+)
 from .update import maybe_offer, start_background_check
 
 # Hop caps for the tool-calling loop. A turn without a plan rarely needs many
@@ -694,80 +699,208 @@ def _handle_plan_tool(name: str, args: dict, state: dict) -> str:
     return f"Error: unknown plan tool `{name}`"
 
 
+def _prepare_call(tc: dict) -> dict:
+    """Classify one accumulated tool call — parse, normalize, repair. No I/O.
+
+    Returns {id, name, raw, args, history_args, kind, error, pos} with kind:
+      ok          strict-valid dict, required fields present → execute
+      normalized  parsed only with strict=False (raw control chars) → execute
+      repaired    missing-comma repair succeeded → execute
+      invalid     valid JSON but wrong shape / missing field → skip + feedback
+      truncated   args cut off mid-stream → skip; NEVER fabricate closures
+      unparseable everything else → skip + feedback with error window
+
+    `history_args` is what gets replayed in the assistant message: raw only
+    when it's valid JSON, canonical json.dumps for normalized/repaired, and
+    "{}" for the doomed kinds — the model must never re-read its own
+    malformed JSON (it few-shot-primes itself into repeating the mistake),
+    and strict gateways translating to Anthropic tool_use must always
+    receive parseable input.
+    """
+    raw = tc.get("arguments") or ""
+    p = {"id": tc["id"], "name": tc["name"], "raw": raw, "args": {},
+         "history_args": "{}", "kind": "invalid", "error": "", "pos": None}
+    stripped = raw.strip()
+    if not stripped:
+        p["error"] = validate_call(p["name"], {}) or (
+            f"Error: {p['name']} received empty arguments."
+        )
+        return p
+    try:
+        obj = json.loads(stripped)
+    except json.JSONDecodeError as e:
+        p["pos"], p["error"] = e.pos, str(e)
+        try:
+            lenient = json.loads(stripped, strict=False)
+        except json.JSONDecodeError:
+            lenient = None
+        if isinstance(lenient, dict):
+            p["args"] = lenient
+            p["history_args"] = json.dumps(lenient, ensure_ascii=False)
+            err = validate_call(p["name"], lenient)
+            if err:
+                p["kind"], p["error"] = "invalid", err
+            else:
+                p["kind"], p["error"] = "normalized", ""
+            return p
+        repaired, reason = repair_tool_args(stripped)
+        if repaired is not None:
+            fixed = json.loads(repaired, strict=False)
+            p["args"] = fixed
+            p["history_args"] = json.dumps(fixed, ensure_ascii=False)
+            err = validate_call(p["name"], fixed)
+            if err:
+                p["kind"], p["error"] = "invalid", err
+            else:
+                p["kind"], p["error"] = "repaired", ""
+            return p
+        p["kind"] = "truncated" if reason == "truncated" else "unparseable"
+        return p
+    if not isinstance(obj, dict):
+        p["error"] = (
+            f"Error: {p['name']} arguments must be a single JSON object, "
+            f"got {type(obj).__name__}."
+        )
+        return p
+    p["args"] = obj
+    err = validate_call(p["name"], obj)
+    if err:
+        # Valid JSON, wrong contents — truthful verbatim replay is safe here.
+        p["history_args"], p["error"] = raw, err
+        return p
+    p["kind"], p["history_args"] = "ok", raw
+    return p
+
+
+def _doom_feedback(p: dict, streak: int) -> str:
+    """Prescriptive tool-result message for a skipped call — tells the model
+    exactly what was wrong and how to fix it, so retries converge fast
+    (cheap models especially need the raw-window and schema reminder)."""
+    name = p["name"]
+    hint = schema_hint(name)
+    if p["kind"] == "truncated":
+        msg = (
+            f"Error: the arguments for `{name}` were cut off mid-stream after "
+            f"{len(p['raw'])} characters. The call was NOT executed — no file "
+            f"was written, nothing ran. Re-issue the COMPLETE call. {hint}"
+        )
+    elif p["kind"] == "unparseable":
+        window = parse_error_context(p["raw"], p["pos"] or 0)
+        msg = (
+            f"Error: could not parse the arguments for `{name}` as JSON "
+            f"({p['error']}). The problem is here: {window} — {hint}. Your "
+            "malformed arguments were not preserved in the conversation; do "
+            "not repeat them, emit fresh valid JSON."
+        )
+    else:  # invalid — valid JSON, wrong shape or missing field
+        keys = sorted(p["args"].keys())
+        msg = f"{p['error']} Keys present: {keys}. {hint}."
+    if streak >= 2 and name == "write_file":
+        msg += (
+            f"\n\n(Consecutive failure #{streak} for write_file. Alternatives: "
+            '1) emit the arguments as ONE single-line strict JSON object — a '
+            'comma between "path" and "content", newlines in the content '
+            "escaped as \\n; 2) write the file via run_bash with a quoted "
+            "heredoc: cat > FILE <<'MESH_EOF_x7' … MESH_EOF_x7 — pick a "
+            "delimiter string that does not appear in the content; 3) split "
+            "the content into several smaller files.)"
+        )
+    return msg
+
+
+def _log_call_failure(state: dict, p: dict, repaired: bool) -> None:
+    """Forensics record for a doomed/repaired call (best-effort). Raw args
+    are preserved here even though history gets the sanitized form."""
+    log_toolcall_failure({
+        "ts": time.strftime("%Y-%m-%dT%H:%M:%S"),
+        "model": state.get("last_model") or state["cfg"]["model"],
+        "tool": p["name"],
+        "kind": p["kind"],
+        "error": p["error"],
+        "repaired": repaired,
+        "raw_args": p["raw"],
+    })
+
+
 def handle_tool_calls(tool_calls: list, mode: Mode, state: dict) -> None:
     """Append assistant tool_calls message + tool result messages to state.
+
+    Calls are classified by _prepare_call first; the assistant history
+    message is built from SANITIZED arguments (see _prepare_call docstring)
+    — this severs the doom loop where the model re-reads and repeats its own
+    malformed JSON. Doomed kinds are skipped BEFORE the approval prompt with
+    prescriptive feedback; repaired/normalized kinds go through the FULL
+    approval + safety path. Invariants: the assistant message precedes all
+    results; every tool_call id gets exactly one tool result.
 
     Every tool execution is exception-isolated: if a single tool call blows up
     (unexpected exception, terminal disconnect during approval, etc.), we log
     a clear error, feed it back to the model as the tool result, and move on
     to the next call. The session never crashes from a single bad call.
     """
+    prepared = [_prepare_call(tc) for tc in tool_calls]
     state["messages"].append({
         "role": "assistant",
         "content": None,
         "tool_calls": [
             {
-                "id": tc["id"],
+                "id": p["id"],
                 "type": "function",
-                "function": {"name": tc["name"], "arguments": tc["arguments"]},
+                "function": {"name": p["name"], "arguments": p["history_args"]},
             }
-            for tc in tool_calls
+            for p in prepared
         ],
     })
-    for tc in tool_calls:
-        raw_args = tc.get("arguments") or ""
-        parse_error = None
-        try:
-            args = json.loads(raw_args) if raw_args.strip() else {}
-            if not isinstance(args, dict):
-                args = {}
-        except json.JSONDecodeError as e:
-            args = {}
-            parse_error = str(e)
+    for p in prepared:
+        name, args = p["name"], p["args"]
 
-        # Short-circuit calls that can't run as issued — malformed/empty JSON
-        # arguments, or a missing required field (models occasionally emit a
-        # tool call with truncated or blank arguments). Prompting the user to
-        # approve a doomed call is pointless; feed the precise reason straight
-        # back to the model so it retries with correct arguments. Plan tools
-        # normalize their own args in _handle_plan_tool, so skip them here.
-        if tc["name"] not in PLAN_TOOLS:
-            doomed = (
-                f"Error: could not parse the arguments for `{tc['name']}` as "
-                f"JSON ({parse_error}). Re-issue the call with valid JSON arguments."
-                if parse_error is not None
-                else validate_call(tc["name"], args)
-            )
-            if doomed:
-                console.print(f"[yellow]  → skipped {tc['name']}: {_rich_escape(doomed)}[/yellow]")
-                state["messages"].append({
-                    "role": "tool",
-                    "tool_call_id": tc["id"],
-                    "content": doomed,
-                })
-                continue
+        # Doomed calls: skip before the approval prompt, feed the precise
+        # reason back, and track a per-turn streak so repeated failures
+        # escalate to escape-hatch guidance. Plan tools normalize their own
+        # args in _handle_plan_tool, so they never take this branch.
+        if p["kind"] in ("invalid", "truncated", "unparseable") and name not in PLAN_TOOLS:
+            streaks = state.setdefault("doom_streak", {})
+            streaks[name] = streaks.get(name, 0) + 1
+            result = _doom_feedback(p, streaks[name])
+            first_line = result.splitlines()[0]
+            console.print(f"[yellow]  → skipped {name}: {_rich_escape(first_line)}[/yellow]")
+            _log_call_failure(state, p, repaired=False)
+            state["messages"].append({
+                "role": "tool",
+                "tool_call_id": p["id"],
+                "content": result,
+            })
+            continue
+
+        if p["kind"] == "repaired":
+            console.print("[yellow]⚠ repaired malformed tool arguments (missing comma)[/yellow]")
+            _log_call_failure(state, p, repaired=True)
+        elif p["kind"] == "normalized":
+            console.print("[dim]  normalized control characters in tool arguments[/dim]")
+            _log_call_failure(state, p, repaired=True)
 
         try:
-            if tc["name"] in PLAN_TOOLS:
+            if name in PLAN_TOOLS:
                 # Plan tools are bookkeeping — no filesystem or shell side
                 # effects, so we don't gate them on the approval prompt.
-                result = _handle_plan_tool(tc["name"], args, state)
+                result = _handle_plan_tool(name, args, state)
             else:
+                state.setdefault("doom_streak", {}).pop(name, None)  # reached execution — streak broken
                 # Per-mode auto-approval: each Mode declares which tool names
                 # bypass the y/n prompt. Anything not in the set, OR anything
                 # that fails a safety check, falls back to confirmation —
                 # even in BYPASS we ask before truly dangerous shapes
                 # (sensitive paths, `rm -rf /`, sudo, curl | sh, ...).
-                auto_approved = tc["name"] in AUTO_APPROVE.get(mode, set())
+                auto_approved = name in AUTO_APPROVE.get(mode, set())
                 safety_reason: str = ""
-                if auto_approved and tc["name"] == "write_file":
+                if auto_approved and name == "write_file":
                     ok, reason = safety.is_path_safe_for_auto_write(
                         args.get("path"), mode
                     )
                     if not ok:
                         auto_approved = False
                         safety_reason = reason or "path safety check failed"
-                elif auto_approved and tc["name"] == "read_file":
+                elif auto_approved and name == "read_file":
                     # BYPASS auto-approves reads; we still block sensitive
                     # paths so the model can't silently leak ~/.ssh/...
                     # to the upstream provider.
@@ -777,7 +910,7 @@ def handle_tool_calls(tool_calls: list, mode: Mode, state: dict) -> None:
                     if not ok:
                         auto_approved = False
                         safety_reason = reason or "path safety check failed"
-                elif auto_approved and tc["name"] in ("run_bash", "start_server"):
+                elif auto_approved and name in ("run_bash", "start_server"):
                     ok, reason = safety.is_command_safe_for_auto(
                         args.get("command"), mode
                     )
@@ -789,32 +922,32 @@ def handle_tool_calls(tool_calls: list, mode: Mode, state: dict) -> None:
                         f"[yellow]⚠ auto-approval blocked: {safety_reason}[/yellow]"
                     )
                 approved = auto_approved or confirm_tool_call(
-                    tc["name"], args, watcher=state.get("watcher")
+                    name, args, watcher=state.get("watcher")
                 )
                 if approved:
                     # 1) Action header — purple, "the AI is doing this"
-                    console.print(f"[{BRAND_DIM}]⚙ {summarize_call(tc['name'], args)}[/{BRAND_DIM}]")
+                    console.print(f"[{BRAND_DIM}]⚙ {summarize_call(name, args)}[/{BRAND_DIM}]")
                     # 2) Body BEFORE execution — cyan, "this is the actual
                     #    code/command being run". For write_file we have the
                     #    full content up front; for run_bash we have the
                     #    command (output prints after exec).
-                    if tc["name"] == "start_server":
+                    if name == "start_server":
                         # Header is enough; _handle_start_server prints command,
                         # readiness, URL, and a short output preview itself.
                         result = _handle_start_server(args, state)
                         if result.startswith("Error:"):
                             console.print(f"  [red]✗ {_rich_escape(result)}[/red]")
-                    elif tc["name"] == "write_file":
+                    elif name == "write_file":
                         _print_file_diff(args.get("path") or "", args.get("content") or "")
-                        result = exec_tool(tc["name"], args, state["cfg"])
-                        _render_tool_result(tc["name"], args, result)
-                    elif tc["name"] == "run_bash":
+                        result = exec_tool(name, args, state["cfg"])
+                        _render_tool_result(name, args, result)
+                    elif name == "run_bash":
                         _print_shell_command(args.get("command") or "")
-                        result = exec_tool(tc["name"], args, state["cfg"])
-                        _render_tool_result(tc["name"], args, result)
+                        result = exec_tool(name, args, state["cfg"])
+                        _render_tool_result(name, args, result)
                     else:
-                        result = exec_tool(tc["name"], args, state["cfg"])
-                        _render_tool_result(tc["name"], args, result)
+                        result = exec_tool(name, args, state["cfg"])
+                        _render_tool_result(name, args, result)
                 else:
                     result = "User denied this tool call."
                     console.print("[dim]  → denied by user[/dim]")
@@ -827,7 +960,7 @@ def handle_tool_calls(tool_calls: list, mode: Mode, state: dict) -> None:
 
         state["messages"].append({
             "role": "tool",
-            "tool_call_id": tc["id"],
+            "tool_call_id": p["id"],
             "content": result,
         })
     # Once per batch — keep the mode visible between hops in multi-step turns.
@@ -899,6 +1032,8 @@ def main() -> None:
         # Enforces safety.SESSION_IMAGE_BYTE_CAP across the whole session.
         "session_image_bytes": 0,
         "update": update_state,  # background PyPI check (see maybe_offer)
+        "doom_streak": {},       # per-turn consecutive doomed-call counter
+        "last_model": cfg["model"],  # resolved model of the last stream (forensics)
     }
 
     # Mode cycle — used by both the prompt-toolkit keybinding (while at the
@@ -1079,6 +1214,7 @@ def main() -> None:
         # Tool-calling loop: keep streaming until model returns text without
         # tool_calls or we hit the hop cap. The cap is larger when a plan is
         # active because a legitimate multi-step task may need many hops.
+        state["doom_streak"] = {}  # fresh user turn — failure streaks reset
         agg_cost = 0.0
         last_model = state["cfg"]["model"]
         last_usage: dict = {}
@@ -1148,6 +1284,24 @@ def main() -> None:
                     except (TypeError, ValueError):
                         pass
                 last_model = meta.get("model") or last_model
+                state["last_model"] = last_model
+                # SSE lines the client couldn't parse were dropped — if that
+                # coincides with broken tool args, the gateway relay (not the
+                # model) is the culprit. Surface + log for attribution.
+                if meta.get("dropped_chunks"):
+                    console.print(
+                        f"[dim]⚠ {meta['dropped_chunks']} unparseable SSE "
+                        "chunk(s) dropped this stream (logged)[/dim]"
+                    )
+                    log_toolcall_failure({
+                        "ts": time.strftime("%Y-%m-%dT%H:%M:%S"),
+                        "model": last_model,
+                        "tool": None,
+                        "kind": "sse_dropped_chunks",
+                        "error": f"{meta['dropped_chunks']} chunks",
+                        "repaired": False,
+                        "raw_args": meta.get("dropped_sample", ""),
+                    })
                 last_usage = meta.get("usage") or last_usage
                 last_elapsed += meta.get("elapsed", 0.0)
                 last_optimize_plan = meta.get("optimize_plan") or last_optimize_plan
