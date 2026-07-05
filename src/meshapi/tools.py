@@ -284,8 +284,13 @@ def execute(name: str, arguments: dict) -> str:
                 out, _ = proc.communicate(timeout=BASH_TIMEOUT)
             except subprocess.TimeoutExpired:
                 try:
-                    os.killpg(proc.pid, signal.SIGKILL)
-                except ProcessLookupError:
+                    # os.killpg + signal.SIGKILL are POSIX-only. On Windows
+                    # there's no process group, so kill the child directly.
+                    if hasattr(os, "killpg"):
+                        os.killpg(proc.pid, signal.SIGKILL)
+                    else:
+                        proc.kill()  # Windows: TerminateProcess on the child
+                except (ProcessLookupError, OSError):
                     pass
                 proc.communicate()  # reap zombie
                 return (

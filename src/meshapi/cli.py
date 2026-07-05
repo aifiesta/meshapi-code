@@ -409,7 +409,12 @@ def _port_open(port: int, host: str = "127.0.0.1") -> bool:
 def _kill_server(pid: int) -> None:
     """SIGTERM the entire process group of a tracked server (best-effort)."""
     try:
-        os.killpg(os.getpgid(pid), signal.SIGTERM)
+        # os.killpg/os.getpgid are POSIX-only. On Windows there are no process
+        # groups (start_new_session is a no-op), so kill the single pid.
+        if hasattr(os, "killpg") and hasattr(os, "getpgid"):
+            os.killpg(os.getpgid(pid), signal.SIGTERM)
+        else:
+            os.kill(pid, signal.SIGTERM)  # Windows: TerminateProcess, single pid
     except (ProcessLookupError, PermissionError, OSError):
         pass
 
@@ -874,7 +879,12 @@ def main() -> None:
         signal.signal(signum, signal.SIG_DFL)
         os.kill(os.getpid(), signum)
 
-    for _sig in (signal.SIGTERM, signal.SIGHUP):
+    # SIGHUP is POSIX-only — referencing signal.SIGHUP on Windows raises
+    # AttributeError, so build the list conditionally instead of unconditionally.
+    _signals = [signal.SIGTERM]
+    if hasattr(signal, "SIGHUP"):
+        _signals.append(signal.SIGHUP)
+    for _sig in _signals:
         try:
             signal.signal(_sig, _signal_shutdown)
         except (ValueError, OSError):
