@@ -91,11 +91,12 @@ class _StreamView:
     streamed with zero feedback.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, header: str = "") -> None:
         self.start = time.monotonic()
         self.buf = ""
         self.first_token_at: Optional[float] = None
         self.done = False
+        self.header = header  # static turn context: "model · hop N"
         self.tool_name: Optional[str] = None
         self.tool_chars = 0
         self._spinner = Spinner("dots", style=BRAND)
@@ -121,9 +122,12 @@ class _StreamView:
 
     def __rich_console__(self, console, options):
         if self.done:
+            # Transcript stays clean: the header/spinner are live-only.
             if self.buf:
                 yield Markdown(self.buf)
             return
+        if self.header:
+            yield Text(f"✦ {self.header}", style=BRAND_DIM)
         self._spinner.text = Text(f"{self._label()} · {self.elapsed():.1f}s", style=BRAND_DIM)
         if self.buf:
             yield Markdown(self.buf)
@@ -132,15 +136,17 @@ class _StreamView:
             yield self._spinner
 
 
-def render_stream(events: Iterable) -> tuple[str, dict]:
-    """Live-render streamed content with a meshing-around spinner + timer.
+def render_stream(events: Iterable, header: str = "") -> tuple[str, dict]:
+    """Live-render streamed content with a phase-aware spinner + timer.
 
+    `header` is a static turn-context line ("model · hop 3") shown above
+    the stream while it's live; it does not persist into the transcript.
     Returns (full_text, metadata). Generator yields strings (content deltas)
     and an optional final dict (usage + cost + model from the SSE tail).
     `meta['elapsed']` and `meta['ttft']` (time-to-first-token) are added on
     the way out.
     """
-    view = _StreamView()
+    view = _StreamView(header)
     meta: dict = {}
     with Live(view, console=console, refresh_per_second=12, auto_refresh=True) as live:
         for event in events:

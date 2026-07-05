@@ -15,7 +15,7 @@ from prompt_toolkit.formatted_text import FormattedText
 from rich.text import Text
 
 from .permissions import LABELS, Mode, SHOW_ESC_HINT
-from .render import console
+from .render import BRAND_DIM, console
 
 
 # prompt_toolkit fg colors per mode. Mirrors the rich colors in print_line so
@@ -75,11 +75,13 @@ def bottom_toolbar(state: dict):
 
     pad = max(0, budget - len(hint))
     parts = [
-        # Leading blank line separates the mode indicator from the input
-        # line, and the trailing blank keeps it off the terminal's bottom
-        # edge — the input no longer sits flush against the bottom of the
-        # screen (3 reserved rows: blank / indicator / blank; +1 row when
-        # background servers are listed).
+        # Row 1: full-width border directly under the input line — closes
+        # the "box" whose top edge is the cwd rule printed above the
+        # prompt. Re-evaluated on every repaint, so it tracks terminal
+        # resizes live. Then the mode row, an optional servers row, and a
+        # trailing blank so the input never sits flush against the bottom
+        # edge of the screen.
+        (f"fg:{BRAND_DIM}", "─" * max(0, cols - 1)),
         ("", "\n"),
         ("", " " * pad),
         (f"{color} bold", body),

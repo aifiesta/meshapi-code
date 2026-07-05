@@ -77,9 +77,9 @@ Cheap models declare victory on skeletons ("// Add game logic here" → blank pa
 
 ## Live activity UI
 
+- **Framed input**: the box's top edge is the cwd rule (`──── meshapi-test · main`, right-aligned title, branch via `cli._git_branch()`, 5s cache); the bottom edge is `bottom_toolbar` row 1 — a full-width `─` border re-evaluated on every repaint (tracks resizes live). Under it: the mode row, an optional `● serving localhost:5174 · …` row when `state["servers"]` is non-empty (`print_line` mirrors it), and a trailing blank. No sticky DEC regions — that fight was lost once already (see statusbar.py docstring).
+- **Streaming header**: `render_stream(events, header="model · hop N")` shows a `✦ model · hop 3` line above the live stream (cli passes "auto" when auto-routing; hop only when >1). Live-only — `_StreamView.done` drops it so transcripts stay clean.
 - `render._StreamView` is phase-aware via `{"stream_progress": {tool, chars}}` events yielded by `client.stream_chat` during tool-call delta accumulation (popped by `render_stream`, never merged into meta): "meshing around… 3.1s" → "still meshing · ↓ ~1.2k tok · 8.4s" → "preparing write_file (↓ 3.2k chars) · 12.4s". Before this, an 8KB write_file argument streamed in dead silence.
-- `statusbar.bottom_toolbar` grows a `● serving localhost:5174 · …` row when `state["servers"]` is non-empty (and `print_line` mirrors it) — background servers are always visible from the prompt.
-- The cwd rule above the prompt appends the git branch (`meshapi-test · main`) via `cli._git_branch()` (5s cache, best-effort, silent outside repos / detached HEAD).
 
 `start_server` runs a long-lived process in the background, waits for readiness, and prints the URL. Server records persist to `servers.json`; `_shutdown_servers` (atexit + SIGTERM/SIGHUP handlers) kills them on exit, and `_adopt_orphaned_servers` offers to clean up survivors of a hard kill on next launch.
 

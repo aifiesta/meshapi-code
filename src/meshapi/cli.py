@@ -1635,8 +1635,12 @@ def main() -> None:
                     _extras.append({"role": "system", "content": _fix})
                 if _extras:
                     turn_messages = state["messages"] + _extras
+                _hdr = "auto" if state["cfg"].get("auto_route") else state["cfg"]["model"]
+                if hopped > 1:
+                    _hdr += f" · hop {hopped}"
                 reply, meta = render_stream(
-                    stream_chat(turn_messages, state["cfg"], tools=TOOLS)
+                    stream_chat(turn_messages, state["cfg"], tools=TOOLS),
+                    header=_hdr,
                 )
                 cost = meta.get("cost")
                 if cost is not None:
