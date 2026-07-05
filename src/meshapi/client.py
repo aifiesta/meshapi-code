@@ -193,6 +193,8 @@ def stream_chat(
     accum = ToolCallAccumulator()
     dropped_chunks = 0   # SSE data lines that failed to json-parse (forensics —
     dropped_sample = ""  # nonzero implicates the gateway relay, not the model)
+    progress_tool = ""   # spinner feed: which tool's arguments are streaming
+    progress_chars = 0   # ...and how many argument chars have arrived so far
 
     for attempt_index, body in enumerate(attempts):
         is_last_attempt = attempt_index == len(attempts) - 1
@@ -239,8 +241,21 @@ def stream_chat(
                     if content:
                         yield content
 
-                    for tc in delta.get("tool_calls") or []:
+                    tc_deltas = delta.get("tool_calls") or []
+                    for tc in tc_deltas:
                         accum.add(tc)
+                        fn = tc.get("function") or {}
+                        if fn.get("name"):
+                            progress_tool = fn["name"]
+                        progress_chars += len(fn.get("arguments") or "")
+                    if tc_deltas:
+                        # Spinner feed: an 8KB write_file argument used to
+                        # stream in dead silence. render_stream pops these —
+                        # they never reach the meta dict.
+                        yield {"stream_progress": {
+                            "tool": progress_tool or None,
+                            "chars": progress_chars,
+                        }}
 
                 usage = obj.get("usage")
                 cost = obj.get("cost")

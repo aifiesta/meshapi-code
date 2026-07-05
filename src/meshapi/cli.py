@@ -40,8 +40,8 @@ from .render import (
 )
 from .tools import (
     PLAN_TOOLS, TOOLS, build_system_prompt, execute as exec_tool,
-    parse_error_context, repair_tool_args, schema_hint, summarize_call,
-    validate_call,
+    find_stub_markers, parse_error_context, repair_tool_args, schema_hint,
+    stub_guard_suppressed, summarize_call, validate_call,
 )
 from .update import maybe_offer, start_background_check
 
@@ -407,6 +407,32 @@ def confirm_tool_call(name: str, args: dict, watcher=None, session_allow=None) -
 @contextlib.contextmanager
 def _noop_ctx():
     yield
+
+
+_BRANCH_CACHE = {"t": 0.0, "cwd": None, "branch": None}
+
+
+def _git_branch() -> "str | None":
+    """Current git branch for the prompt rule, or None outside a repo /
+    detached HEAD. Best-effort, cached 5s so the per-prompt cost is one
+    subprocess at most every few turns."""
+    now = time.monotonic()
+    cwd = str(Path.cwd())
+    if _BRANCH_CACHE["cwd"] == cwd and now - _BRANCH_CACHE["t"] < 5.0:
+        return _BRANCH_CACHE["branch"]
+    branch = None
+    try:
+        out = subprocess.run(
+            ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+            capture_output=True, text=True, timeout=1, cwd=cwd,
+        )
+        if out.returncode == 0:
+            b = out.stdout.strip()
+            branch = b if b and b != "HEAD" else None
+    except Exception:
+        branch = None
+    _BRANCH_CACHE.update(t=now, cwd=cwd, branch=branch)
+    return branch
 
 
 _PORT_RANGE = (5173, 5273)  # vite's default + 100 fallback ports
@@ -1046,6 +1072,38 @@ def _doom_feedback(p: dict, streak: int) -> str:
     return msg
 
 
+def _stub_display(path: str) -> str:
+    """Short path for quality-guard messages: relative to cwd, falling back
+    to the basename (Windows raises on cross-drive relpath)."""
+    try:
+        return os.path.relpath(path)
+    except (ValueError, OSError):
+        return os.path.basename(path) or path
+
+
+def _stub_fix_message(stub_files: dict) -> str:
+    """Transient system message for the fix-it hop. Tool-name-free (naming
+    tools in injected prose flips some models into XML tool-use mode),
+    overrides start_server's end-the-turn instruction, and carries the
+    intentional-placeholder escape."""
+    listing = "\n".join(
+        f"  {_stub_display(p)} — {ev[0]}" for p, ev in stub_files.items()
+    )
+    return (
+        "[Quality check — do not end the turn yet. Files written this turn "
+        "still contain placeholder markers instead of working code:\n"
+        f"{listing}\n"
+        "Replace every placeholder with the complete working implementation "
+        "now — real logic, no TODO comments, no empty function bodies. "
+        "Rewrite each file listed in full. It is fine to use tools again "
+        "even if you were told the turn was over after starting a server — "
+        "but do NOT restart the server; it is still running and will serve "
+        "the updated files. If the user explicitly asked for placeholders "
+        "or scaffolding, keep them, tell the user they are intentional, and "
+        "end the turn.]"
+    )
+
+
 def _log_call_failure(state: dict, p: dict, repaired: bool) -> None:
     """Forensics record for a doomed/repaired call (best-effort). Raw args
     are preserved here even though history gets the sanitized form."""
@@ -1202,6 +1260,21 @@ def handle_tool_calls(tool_calls: list, state: dict) -> None:
                         _print_file_diff(args.get("path") or "", args.get("content") or "")
                         result = exec_tool(name, args, state["cfg"])
                         _render_tool_result(name, args, result)
+                        # Quality guard: scan the freshly written content for
+                        # stub markers. Re-scan on every write so a clean
+                        # rewrite CLEARS its entry. Best-effort — a guard bug
+                        # must never break a write.
+                        if not result.startswith("Error:"):
+                            try:
+                                key = str(Path(args.get("path") or "").expanduser().resolve())
+                                ev = find_stub_markers(key, args.get("content") or "")
+                                stubs = state.setdefault("stub_files", {})
+                                if ev:
+                                    stubs[key] = ev
+                                else:
+                                    stubs.pop(key, None)
+                            except Exception:
+                                pass
                     elif name == "run_bash":
                         _print_shell_command(args.get("command") or "")
                         result = exec_tool(name, args, state["cfg"])
@@ -1296,6 +1369,12 @@ def main() -> None:
         "doom_streak": {},       # per-turn consecutive doomed-call counter
         "last_model": cfg["model"],  # resolved model of the last stream (forensics)
         "session_allow": set(),  # tools approved with "a — always this session"
+        # Quality guard (all reset per user turn): flagged writes, one-hop
+        # bound, transient fix-it message, per-turn suppression.
+        "stub_files": {},
+        "quality_hop_fired": False,
+        "quality_fix_msg": None,
+        "stub_guard_off": False,
     }
 
     # Mode cycle — used by both the prompt-toolkit keybinding (while at the
@@ -1377,8 +1456,12 @@ def main() -> None:
             #   ──────────────────────────────────────────── cli_for_meshapi_v1
             #   › ...
             #   ⏵⏵ bypass permissions on  (shift+tab to cycle) · esc to interrupt
+            _rule_title = Path.cwd().name
+            _branch = _git_branch()
+            if _branch:
+                _rule_title += f" · {_branch}"
             console.rule(
-                title=f"[{BRAND_DIM}]{Path.cwd().name}[/{BRAND_DIM}]",
+                title=f"[{BRAND_DIM}]{_rule_title}[/{BRAND_DIM}]",
                 align="right",
                 style=BRAND_DIM,
                 characters="─",
@@ -1477,6 +1560,12 @@ def main() -> None:
         # tool_calls or we hit the hop cap. The cap is larger when a plan is
         # active because a legitimate multi-step task may need many hops.
         state["doom_streak"] = {}  # fresh user turn — failure streaks reset
+        # Quality guard resets: new turn, new deliverables. Suppressed for
+        # the whole turn when the user explicitly asked for scaffolding.
+        state["stub_files"] = {}
+        state["quality_hop_fired"] = False
+        state["quality_fix_msg"] = None
+        state["stub_guard_off"] = stub_guard_suppressed(user_input)
         agg_cost = 0.0
         last_model = state["cfg"]["model"]
         last_usage: dict = {}
@@ -1522,9 +1611,10 @@ def main() -> None:
                 # transiently (not persisted) so it always reflects live state
                 # and history stays clean.
                 turn_messages = state["messages"]
+                _extras = []
                 _plan = state.get("plan")
                 if _plan is not None and not _plan.is_complete():
-                    turn_messages = state["messages"] + [{
+                    _extras.append({
                         "role": "system",
                         "content": (
                             f"[Active plan {_plan.summary()}. Steps still "
@@ -1535,7 +1625,16 @@ def main() -> None:
                             "step above is done. If a step is genuinely "
                             "impossible, mark it blocked and say why.]"
                         ),
-                    }]
+                    })
+                # Quality-guard fix-it message: transient, consume-once, and
+                # LAST (recency dominates for cheap models). A persistent
+                # copy would go stale in history the moment the rewrite
+                # lands — mirror of the plan-reminder pattern above.
+                _fix = state.pop("quality_fix_msg", None)
+                if _fix:
+                    _extras.append({"role": "system", "content": _fix})
+                if _extras:
+                    turn_messages = state["messages"] + _extras
                 reply, meta = render_stream(
                     stream_chat(turn_messages, state["cfg"], tools=TOOLS)
                 )
@@ -1571,6 +1670,28 @@ def main() -> None:
                 tool_calls = meta.get("tool_calls") or []
                 if not tool_calls:
                     state["messages"].append({"role": "assistant", "content": reply})
+                    # Quality guard: the model ended its turn but files it
+                    # wrote still carry stub markers. Spend ONE fix-it hop
+                    # with concrete evidence — cheap models respond to
+                    # "script.js line 3 says 'Add game logic here'" far
+                    # better than to generic scolding. Bounded: once per
+                    # turn, never past the hop cap, suppressed when the
+                    # user asked for scaffolding.
+                    if (state.get("stub_files") and not state.get("quality_hop_fired")
+                            and not state.get("stub_guard_off") and hopped < max_hops):
+                        state["quality_hop_fired"] = True
+                        state["quality_fix_msg"] = _stub_fix_message(state["stub_files"])
+                        _p0, _ev0 = next(iter(state["stub_files"].items()))
+                        _more = (
+                            f" — and {len(state['stub_files']) - 1} more file(s)"
+                            if len(state["stub_files"]) > 1 else ""
+                        )
+                        console.print(
+                            f"[yellow]⚙ quality check: {_stub_display(_p0)} looks "
+                            f"incomplete ({_rich_escape(_ev0[0])}){_more} — asking "
+                            "the model to finish it[/yellow]"
+                        )
+                        continue
                     # Flag premature completion: the model ended its turn with
                     # plan steps still open. Surfaces the gap to the user (and
                     # the breadcrumb above keeps it in context for "continue").
@@ -1590,6 +1711,37 @@ def main() -> None:
 
                 # Model called tools — execute and loop.
                 handle_tool_calls(tool_calls, state)
+
+            # Quality guard, final honesty: the turn is over and flagged
+            # files survived (fix-it hop included, or the hop cap skipped
+            # it). Post-loop so BOTH break paths land here; exception paths
+            # skip it. Warn the user plainly + leave a breadcrumb so a
+            # follow-up "implement fully" gives the model concrete targets.
+            _stubs = state.get("stub_files") or {}
+            if _stubs and not state.get("stub_guard_off"):
+                console.print(
+                    f"[yellow]⚠ quality check: {len(_stubs)} file(s) still "
+                    "look incomplete:[/yellow]"
+                )
+                for _p, _ev in _stubs.items():
+                    console.print(f"[yellow]    {_stub_display(_p)} — {_rich_escape(_ev[0])}[/yellow]")
+                _tips = ["/model anthropic/claude-sonnet-4.5"]
+                if not state["cfg"].get("auto_route"):
+                    _tips.append("/route auto")
+                console.print(
+                    "[dim]  Cheaper models often deliver skeletons. Try "
+                    + " or ".join(_tips)
+                    + ", or reply 'implement the full logic, no placeholders'. "
+                    "If placeholders were intentional, ignore this.[/dim]"
+                )
+                state["messages"].append({"role": "system", "content": (
+                    "[The turn ended with files still containing placeholder "
+                    "markers: "
+                    + "; ".join(f"{_stub_display(p)} ({ev[0]})" for p, ev in _stubs.items())
+                    + ". If the user asks to continue or to implement fully, "
+                    "rewrite these files with complete working code — do not "
+                    "claim they are done.]"
+                )})
 
             state["session_cost"] += agg_cost
             prompt_t = last_usage.get("prompt_tokens", "?")

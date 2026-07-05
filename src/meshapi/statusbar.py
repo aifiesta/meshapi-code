@@ -74,17 +74,35 @@ def bottom_toolbar(state: dict):
         hint = ""
 
     pad = max(0, budget - len(hint))
-    return FormattedText([
+    parts = [
         # Leading blank line separates the mode indicator from the input
         # line, and the trailing blank keeps it off the terminal's bottom
         # edge — the input no longer sits flush against the bottom of the
-        # screen (3 reserved rows: blank / indicator / blank).
+        # screen (3 reserved rows: blank / indicator / blank; +1 row when
+        # background servers are listed).
         ("", "\n"),
         ("", " " * pad),
         (f"{color} bold", body),
         ("ansibrightblack", hint),
-        ("", "\n"),
-    ])
+    ]
+    servers = _servers_text(state)
+    if servers:
+        parts.append(("", "\n"))
+        parts.append(("ansibrightblack", servers[: max(0, cols - 3)]))
+    parts.append(("", "\n"))
+    return FormattedText(parts)
+
+
+def _servers_text(state: dict) -> str:
+    """One-line summary of background servers, '' when none are running.
+    Answers "what's alive in the background?" at a glance from the prompt."""
+    servers = state.get("servers") or []
+    if not servers:
+        return ""
+    hosts = " · ".join(
+        (s.get("url") or "").replace("http://", "") for s in servers if s.get("url")
+    )
+    return f"● serving {hosts}" if hosts else ""
 
 
 def print_line(state: dict) -> None:
@@ -115,5 +133,8 @@ def print_line(state: dict) -> None:
     text.append(hint, style="dim")
     try:
         console.print(text, justify="right")
+        servers = _servers_text(state)
+        if servers:
+            console.print(Text(servers, style="dim"), justify="right")
     except Exception:
         pass

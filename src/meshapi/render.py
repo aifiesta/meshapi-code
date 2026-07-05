@@ -76,26 +76,55 @@ def pretty_cwd() -> str:
         return str(cwd)
 
 
+def _fmt_k(n: int) -> str:
+    return f"{n / 1000:.1f}k" if n >= 1000 else str(n)
+
+
 class _StreamView:
-    """Renderable: meshing-around spinner + elapsed timer above streamed markdown."""
+    """Renderable: phase-aware spinner + elapsed timer above streamed markdown.
+
+    Three phases the user can tell apart at a glance:
+      no output yet      → "meshing around... 3.1s"
+      text streaming     → "still meshing · ↓ ~1.2k tok · 8.4s"
+      tool args streaming→ "preparing write_file (↓ 3.2k chars) · 12.4s"
+    The tool phase used to be dead silence — an 8KB write_file argument
+    streamed with zero feedback.
+    """
 
     def __init__(self) -> None:
         self.start = time.monotonic()
         self.buf = ""
         self.first_token_at: Optional[float] = None
         self.done = False
+        self.tool_name: Optional[str] = None
+        self.tool_chars = 0
         self._spinner = Spinner("dots", style=BRAND)
 
     def elapsed(self) -> float:
         return time.monotonic() - self.start
+
+    def note_progress(self, payload: dict) -> None:
+        """Feed from client.stream_chat's stream_progress events."""
+        if payload.get("tool"):
+            self.tool_name = payload["tool"]
+        if payload.get("chars"):
+            self.tool_chars = payload["chars"]
+
+    def _label(self) -> str:
+        if self.tool_chars:
+            tool = self.tool_name or "tool call"
+            return f"preparing {tool} (↓ {_fmt_k(self.tool_chars)} chars)"
+        if self.buf:
+            # Rough live estimate; the real count arrives with final usage.
+            return f"still meshing · ↓ ~{_fmt_k(max(1, len(self.buf) // 4))} tok"
+        return "meshing around"
 
     def __rich_console__(self, console, options):
         if self.done:
             if self.buf:
                 yield Markdown(self.buf)
             return
-        label = "meshing around" if not self.buf else "still meshing"
-        self._spinner.text = Text(f"{label}... {self.elapsed():.1f}s", style=BRAND_DIM)
+        self._spinner.text = Text(f"{self._label()} · {self.elapsed():.1f}s", style=BRAND_DIM)
         if self.buf:
             yield Markdown(self.buf)
             yield self._spinner
@@ -120,6 +149,10 @@ def render_stream(events: Iterable) -> tuple[str, dict]:
                     view.first_token_at = view.elapsed()
                 view.buf += event
             elif isinstance(event, dict):
+                if "stream_progress" in event:
+                    # Spinner feed only — never merged into meta.
+                    view.note_progress(event["stream_progress"] or {})
+                    continue
                 meta.update(event)
         view.done = True
         live.refresh()
