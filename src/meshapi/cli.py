@@ -810,12 +810,14 @@ def _handle_start_server(args: dict, state: dict) -> str:
         return (
             f"Server up at {url} (pid {proc.pid}, ready in {elapsed:.1f}s).\n"
             "The user can already see the URL in their terminal — it was "
-            "printed by the CLI. Respond with a SINGLE short text line "
-            "(e.g. 'Server's up at " + url + " — open it in your browser') "
-            "and END THE TURN. Do NOT call any more tools this turn — "
-            "no curl, no read_file, no anything. The server keeps running "
-            "in the background until meshapi exits; the user will interact "
-            "with it through the browser, not through you." + note
+            "printed by the CLI. If a plan is active, FIRST call update_step "
+            "to mark every finished step completed (plan bookkeeping is "
+            "still allowed — it runs nothing). Then respond with a SINGLE "
+            "short text line (e.g. 'Server's up at " + url + " — open it in "
+            "your browser') and END THE TURN. Do NOT call any OTHER tools — "
+            "no curl, no read_file, no more servers. The server keeps "
+            "running in the background until meshapi exits; the user will "
+            "interact with it through the browser, not through you." + note
         )
 
     # Poll for readiness: the expected port, plus a periodic discovery scan
