@@ -44,6 +44,7 @@ src/meshapi/
   statusbar.py    # mode indicator: bottom_toolbar (live) + print_line (scrollback)
   keywatcher.py   # daemon thread: shift+tab (CSI Z) while prompt_toolkit isn't reading stdin
   plan.py         # plan state model for create_plan / update_step
+  completer.py    # fuzzy tab-completion: slash commands + model IDs
   update.py       # PyPI version check (daemon thread) + y/n upgrade offer
   render.py       # rich Console singleton, render_stream, fmt_usd
   __main__.py     # python -m meshapi
@@ -139,7 +140,7 @@ The tokenizer is **quote-aware** (`_TOKEN_RE = '...' | "..." | \S+`) — it must
 
 ## Slash commands
 
-`/model` `/models` `/route` (auto|off|preview) `/fallback` `/reasoning` `/file` `/image` `/clear-attach` `/system` `/mode` `/cost` `/optimize` `/login` `/update` `/clear` `/help` `/exit` (`/quit`, `/q`).
+`/model` (fuzzy tab-completion from the catalog — `/model qw` pops every qwen model; `completer.SlashCompleter`, ThreadedCompleter so the lazy silent catalog fetch never blocks a keystroke) `/models` `/route` (auto|off|preview) `/fallback` (also completes model ids) `/reasoning` `/file` `/image` `/clear-attach` `/system` `/mode` `/cost` `/optimize` `/login` `/update` `/clear` `/help` `/exit` (`/quit`, `/q`).
 
 ## Distribution & release
 

@@ -16,6 +16,7 @@ from pathlib import Path
 
 import httpx
 from prompt_toolkit import PromptSession
+from prompt_toolkit.completion import ThreadedCompleter
 from prompt_toolkit.formatted_text import FormattedText
 from prompt_toolkit.history import FileHistory
 from prompt_toolkit.key_binding import KeyBindings
@@ -1476,9 +1477,16 @@ def main() -> None:
     # create it world-readable on first write.
     HISTORY_FILE.touch(mode=0o600, exist_ok=True)
     secure_file(HISTORY_FILE)
+    from .completer import SlashCompleter
     session = PromptSession(
         history=ScrubbedFileHistory(str(HISTORY_FILE)),
         key_bindings=kb,
+        # Fuzzy completion for slash commands + their args ("/model qw" →
+        # every qwen model). Threaded so the one-time catalog fetch inside
+        # the completer never blocks a keystroke; non-slash text yields
+        # nothing, so normal prompts never see a menu.
+        completer=ThreadedCompleter(SlashCompleter(state)),
+        complete_while_typing=True,
     )
 
     render_banner(cfg)

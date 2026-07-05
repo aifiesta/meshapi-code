@@ -69,6 +69,32 @@ def _route_preview(state: dict) -> None:
     console.print(line)
 
 
+def fetch_models_quiet(state: dict) -> "list | None":
+    """Catalog fetch for tab-completion: session-cached, SILENT on every
+    failure (a completion popup must never print errors into the prompt).
+    `_fetch_models` below stays the loud, user-facing variant for /models."""
+    cached = state.get("models_cache")
+    if cached is not None:
+        return cached
+    try:
+        cfg = state["cfg"]
+        r = httpx.get(
+            f"{cfg['base_url']}/models",
+            headers={"Authorization": f"Bearer {cfg['api_key']}"},
+            timeout=10,
+        )
+        if r.status_code >= 400:
+            return None
+        data = r.json()
+        models = data.get("data") if isinstance(data, dict) else data
+        if isinstance(models, list):
+            state["models_cache"] = models
+            return models
+    except Exception:
+        return None
+    return None
+
+
 def _fetch_models(state: dict) -> "list | None":
     """GET /models once per session (cached in state). None on failure,
     with the error already printed."""
