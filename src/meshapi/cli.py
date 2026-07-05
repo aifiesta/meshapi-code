@@ -37,7 +37,7 @@ from . import safety
 from .render import (
     BRAND, BRAND_BG, BRAND_BG_FG, BRAND_DIM, CODE, console, fmt_usd, pretty_cwd, render_stream,
 )
-from .tools import PLAN_TOOLS, TOOLS, build_system_prompt, execute as exec_tool, summarize_call
+from .tools import PLAN_TOOLS, TOOLS, build_system_prompt, execute as exec_tool, summarize_call, validate_call
 
 # Hop caps for the tool-calling loop. A turn without a plan rarely needs many
 # hops; one with a plan may legitimately span dozens of small steps (≈3-4 tool
@@ -704,12 +704,37 @@ def handle_tool_calls(tool_calls: list, mode: Mode, state: dict) -> None:
         ],
     })
     for tc in tool_calls:
+        raw_args = tc.get("arguments") or ""
+        parse_error = None
         try:
-            args = json.loads(tc["arguments"]) if tc["arguments"] else {}
+            args = json.loads(raw_args) if raw_args.strip() else {}
             if not isinstance(args, dict):
                 args = {}
-        except json.JSONDecodeError:
+        except json.JSONDecodeError as e:
             args = {}
+            parse_error = str(e)
+
+        # Short-circuit calls that can't run as issued — malformed/empty JSON
+        # arguments, or a missing required field (models occasionally emit a
+        # tool call with truncated or blank arguments). Prompting the user to
+        # approve a doomed call is pointless; feed the precise reason straight
+        # back to the model so it retries with correct arguments. Plan tools
+        # normalize their own args in _handle_plan_tool, so skip them here.
+        if tc["name"] not in PLAN_TOOLS:
+            doomed = (
+                f"Error: could not parse the arguments for `{tc['name']}` as "
+                f"JSON ({parse_error}). Re-issue the call with valid JSON arguments."
+                if parse_error is not None
+                else validate_call(tc["name"], args)
+            )
+            if doomed:
+                console.print(f"[yellow]  → skipped {tc['name']}: {_rich_escape(doomed)}[/yellow]")
+                state["messages"].append({
+                    "role": "tool",
+                    "tool_call_id": tc["id"],
+                    "content": doomed,
+                })
+                continue
 
         try:
             if tc["name"] in PLAN_TOOLS:

@@ -223,12 +223,38 @@ OUTPUT_LIMIT = 8000
 PLAN_TOOLS = ("create_plan", "update_step")  # meta — auto-approved, no side effects
 
 
+def validate_call(name: str, arguments: dict) -> str | None:
+    """Return an error string if the call can't run as issued, else None.
+
+    Models occasionally emit a tool call with empty or truncated arguments
+    (e.g. `{}` after we fail to parse malformed JSON), so a required field
+    like `path` or `command` is missing. Checking here — the single source
+    of truth for both the executor and the pre-approval short-circuit in
+    cli.py — lets the CLI skip the pointless "approve this?" prompt for a
+    call that can only fail and feed the precise reason back to the model.
+    """
+    if name == "read_file":
+        if not arguments.get("path"):
+            return "Error: read_file requires a `path` argument."
+    elif name == "write_file":
+        if not arguments.get("path"):
+            return "Error: write_file requires a `path` argument."
+        if arguments.get("content") is None:
+            return "Error: write_file requires a `content` argument (use \"\" for an empty file)."
+    elif name in ("run_bash", "start_server"):
+        if not arguments.get("command"):
+            return f"Error: {name} requires a `command` argument."
+    return None
+
+
 def execute(name: str, arguments: dict) -> str:
     """Run a tool locally and return a string result for the model."""
+    err = validate_call(name, arguments)
+    if err:
+        return err
+
     if name == "read_file":
         path = arguments.get("path")
-        if not path:
-            return "Error: read_file requires a `path` argument."
         # Guard against reading a binary image as text — return a helpful
         # message so the model asks the user to include the image instead of
         # looping on a utf-8 decode error. Do NOT mention slash commands here;
@@ -249,10 +275,6 @@ def execute(name: str, arguments: dict) -> str:
     if name == "write_file":
         path = arguments.get("path")
         content = arguments.get("content")
-        if not path:
-            return "Error: write_file requires a `path` argument."
-        if content is None:
-            return "Error: write_file requires a `content` argument (use \"\" for an empty file)."
         try:
             p = Path(path).expanduser()
             p.parent.mkdir(parents=True, exist_ok=True)
@@ -263,8 +285,6 @@ def execute(name: str, arguments: dict) -> str:
 
     if name == "run_bash":
         cmd = arguments.get("command")
-        if not cmd:
-            return "Error: run_bash requires a `command` argument."
         try:
             # start_new_session=True puts the shell + all grandchildren in their
             # own process group so we can SIGKILL the whole tree on timeout.
