@@ -2,6 +2,9 @@
 
 All notable changes to `meshapi-code`. Upgrade with `pipx upgrade meshapi-code`.
 
+## 0.5.3 — 2026-07-06
+- Docs: model count corrected to 1000+ (manually verified against the live catalog).
+
 ## 0.5.2 — 2026-07-06 · "repo memory"
 
 - **The agent remembers your repo.** Every file it writes or reads is
