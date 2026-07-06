@@ -91,6 +91,215 @@ Verify with `meshapi --version`. If it still shows an old version, a second olde
 - **Real cost per turn** — Mesh returns `cost` in the SSE tail; surfaced after every reply and accumulated per session.
 - **Streaming with live status** — markdown rendering, phase-aware spinner (`preparing write_file (↓ 3.2k chars)`), always-visible permission mode, background servers listed under the prompt.
 
+## Features in action
+
+Every feature below shows the actual terminal output you'll see.
+
+### 🚀 First run — guided key setup
+
+```
+╭─────────────────────────────────────────────────────────────────────╮
+│ Connect your Mesh API key                                           │
+│                                                                     │
+│ Grab one at https://app.meshapi.ai → API Keys. Keys start with rsk_ │
+│ Input is hidden — paste the key and press enter. Ctrl+C to cancel.  │
+╰─────────────────────────────────────────────────────────────────────╯
+API key ›
+✓ key saved → ~/.meshapi/credentials (0600)
+```
+
+### ⬆ Built-in update checker
+
+When a new version ships, the CLI offers it — no manual checking:
+
+```
+⬆ meshapi 0.6.0 available (you have 0.5.2)
+upgrade now? y (yes) / n (no)  › y
+✓ upgraded to 0.6.0 — restart meshapi to pick it up.
+```
+
+Declining a version never re-nags. `/update` checks on demand.
+
+### 🤖 Agentic builds — plan → files → server
+
+```
+› create a snake game
+
+⚙ create_plan (4 steps)
+  Plan  (0/4 done)
+    ○  1. create index.html with full game structure
+    ○  2. create style.css with game styling
+    ○  3. create script.js with complete Snake game logic
+    ○  4. start dev server
+
+⚙ write_file: index.html (573 chars)      ✓ OK
+⚙ write_file: style.css (768 chars)       ✓ OK
+⚙ write_file: script.js (2285 chars)      ✓ OK
+⚙ start_server: python3 -m http.server (auto-port)
+  ✓ ready in 0.2s
+
+╭─────────────────── 🌐 ready ────────────────────╮
+│  http://localhost:5174                          │
+│  server running in the background · pid 72403   │
+╰─────────────────────────────────────────────────╯
+```
+
+`start_server` is port-smart: it detects a port written inside your command
+(`http.server 8080`, `--port 3000`), adopts whatever port the server
+*actually* binds, and warns instead of restarting a server you already have.
+
+### 🧠 Repo memory — the agent remembers your project
+
+Teach it once:
+
+```
+› remember that this project uses vanilla JS with no frameworks
+⚙ remember: This project is a browser game built with vanilla JavaScript…
+Noted — vanilla JS, no frameworks.
+```
+
+Days later, a fresh session **in the same folder starts warm** — no re-reading:
+
+```
+› what do you know about this repo?
+
+Based on repo memory, this is a Snake Game — a browser game built with
+vanilla JavaScript, HTML, and CSS (no frameworks or build tools)…
+```
+
+Everything the agent writes or reads is structurally mapped at **zero token
+cost** into `~/.meshapi/context/` (never inside your repo). Inspect with
+`/memory`, read notes with `/memory notes`, wipe with `/memory clear`:
+
+```
+› /memory
+repo memory: on — 3 file(s) mapped, 1 note(s) for this directory
+store: ~/.meshapi/context/a3920654ba91bbf4
+```
+
+### ♻️ Read-dedupe — never pay for the same file twice
+
+Re-reading an unchanged file returns a pointer, not the body:
+
+```
+› it's causing a loop issue
+
+⚙ read_file: script.js
+  → unchanged — content already in context (skipped re-send)
+```
+
+Safety-first: the file is sha256-checked against disk, and if the model
+insists on a second read it always gets the real body.
+
+### 🛡 Quality guard — no more "Server's up!" over a blank page
+
+Cheap models love shipping stubs. The guard catches them:
+
+```
+⚙ quality check: script.js looks incomplete ('// Add game logic here')
+  — asking the model to finish it
+```
+
+One automatic fix-it pass with concrete evidence; if stubs survive:
+
+```
+⚠ quality check: 1 file(s) still look incomplete:
+    script.js — line 3: // Add game logic here
+  Cheaper models often deliver skeletons. Try /model anthropic/claude-sonnet-4.5
+  or /route auto, or reply 'implement the full logic, no placeholders'.
+```
+
+### 🔧 Self-healing tool calls
+
+Models sometimes emit broken JSON arguments (missing commas, truncated
+streams). Instead of burning retries, the CLI repairs them in place:
+
+```
+⚠ repaired malformed tool arguments (missing comma)
+⚙ write_file: game.js (8380 chars)   ✓ OK
+```
+
+…and the model never re-reads its own broken output, which ends the classic
+retry doom-loop on budget models. Unfixable calls get precise feedback
+(`the problem is here: {"path": "game.js" ⟨"⟩content…`) so the retry lands.
+
+### ⌨️ Type while it works — stacked messages, live mode, ESC
+
+Keep typing during a long turn; the input stays live at the bottom edge:
+
+```
+⠹ preparing write_file (↓ 3.2k chars) · 12.4s
+────────────────────────────────────────────────────────
+⏵⏵ bypass permissions on  (shift+tab to cycle · esc to interrupt)
+› also add a high-score board█  (1 queued)
+```
+
+Enter stacks the message — it auto-runs when the turn finishes. **ESC**
+aborts the current turn. **Shift+Tab** switches permission mode mid-run and
+shows instantly. Unfinished text prefills your next prompt.
+
+### 🔍 Fuzzy model picker
+
+```
+› /model qw
+  qwen/qwen-2.5-coder-32b
+  qwen/qwq-32b
+› /model gpt4m        →  openai/gpt-4o-mini
+```
+
+Suggestions pop as you type — every model on Mesh, fuzzy-matched. `/models`
+prints the full catalog with context windows and $/1M pricing.
+
+### 🧭 Auto-routing & failover
+
+```
+› /route auto
+Auto-routing on — each prompt goes to the model the gateway's router picks.
+
+› explain this code
+✦ auto · hop 1
+…
+auto → openai/gpt-5.4-mini  •  942→318 tok  •  $0.000431  •  6.1s
+
+› /route preview
+router would pick: deepseek/deepseek-r1
+```
+
+`/fallback m1 m2` sets an ordered failover list if your primary is down.
+
+### 🌐 Web search
+
+```
+› search the web for the latest vite version
+⚙ web_search: latest Vite version release
+  → web results (1141 chars)
+
+The latest Vite version is 8.1.3 — Vite 8.0 shipped Rolldown as the
+unified bundler with 10–30× faster builds…
+```
+
+### 🔐 Permission modes that don't nag
+
+```
+⚙ approve tool call?  write_file: index.html (573 chars)
+→ /Users/you/project/index.html
+y (yes) / a (always for write_file this session) / n (no)  › a
+  ✓ auto-approving write_file for the rest of this session
+```
+
+Four modes cycled with Shift+Tab — `default` asks everything, `bypass`
+approves everything but **still stops** before `rm -rf`, `sudo`, and writes
+to `~/.ssh`. Answer `a` once per tool and stop being asked.
+
+### 💰 Real cost, every turn
+
+```
+anthropic/claude-opus-4.8  •  10500→258 tok  •  $0.021840  •  session $0.084  •  22.5s
+```
+
+The gateway returns true cost in the stream — no estimates. `/cost` shows
+the session total; the `/optimize` dial (below) cuts it.
+
 ## Tool calling & permission modes
 
 | Tool | What it does |
