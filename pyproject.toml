@@ -30,6 +30,11 @@ dependencies = [
 Homepage = "https://meshapi.ai"
 Documentation = "https://docs.meshapi.ai"
 Repository = "https://github.com/aifiesta/meshapi-code"
+Changelog = "https://github.com/aifiesta/meshapi-code/blob/main/CHANGELOG.md"
+"Release Notes" = "https://github.com/aifiesta/meshapi-code/releases"
+"Upgrade Guide" = "https://github.com/aifiesta/meshapi-code/blob/main/UPGRADE.md"
+"Install Guide" = "https://github.com/aifiesta/meshapi-code/blob/main/INSTALL.md"
+Issues = "https://github.com/aifiesta/meshapi-code/issues"
 
 [project.scripts]
 meshapi = "meshapi.cli:main"

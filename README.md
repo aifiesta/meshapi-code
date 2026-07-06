@@ -2,11 +2,11 @@
 
 [![PyPI](https://img.shields.io/pypi/v/meshapi-code)](https://pypi.org/project/meshapi-code/)
 [![Python](https://img.shields.io/pypi/pyversions/meshapi-code)](https://pypi.org/project/meshapi-code/)
-[![License](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue)](https://github.com/aifiesta/meshapi-code/blob/main/LICENSE)
 
 Agentic terminal CLI for [Mesh API](https://meshapi.ai) — one OpenAI-compatible key, 300+ models. Plans, writes files, runs commands, starts dev servers, searches the web — with streaming markdown, live cost, and permission modes. Modeled on Claude Code.
 
-📚 **Docs:** [Install guide (Windows & macOS)](INSTALL.md) · [Upgrading](UPGRADE.md) · [Changelog](CHANGELOG.md) · [Release notes](https://github.com/aifiesta/meshapi-code/releases)
+📚 **Docs:** [Install guide (Windows & macOS)](https://github.com/aifiesta/meshapi-code/blob/main/INSTALL.md) · [Upgrading](https://github.com/aifiesta/meshapi-code/blob/main/UPGRADE.md) · [Changelog](https://github.com/aifiesta/meshapi-code/blob/main/CHANGELOG.md) · [Release notes](https://github.com/aifiesta/meshapi-code/releases)
 
 ```
 $ meshapi
@@ -65,7 +65,19 @@ $env:MESHAPI_API_KEY = "rsk_your_key_here"
 setx MESHAPI_API_KEY "rsk_your_key_here"
 ```
 
-The CLI also checks PyPI in the background and offers one-key upgrades when a new version ships (`/update` checks on demand).
+## Upgrade
+
+Use whichever tool you installed with — same commands on macOS, Linux, and Windows:
+
+| Installed with | Command |
+|---|---|
+| **pipx** | `pipx upgrade meshapi-code` |
+| **uv** | `uv tool upgrade meshapi-code` |
+| **pip** | `pip install --upgrade meshapi-code` |
+
+From 0.5.1 onward you rarely need these: **the CLI checks PyPI in the background and offers a one-key upgrade** when a new version ships (`/update` checks on demand; declining a version won't re-nag).
+
+Verify with `meshapi --version`. If it still shows an old version, a second older copy is shadowing the new one on your PATH — find every copy with `which -a meshapi` (macOS/Linux) or `where.exe meshapi` (Windows), remove the stray (often an old `pip install --user`: `python3 -m pip uninstall meshapi-code`), then `hash -r` or open a new terminal. Full troubleshooting: [upgrade guide](https://github.com/aifiesta/meshapi-code/blob/main/UPGRADE.md).
 
 ## What it does
 
@@ -194,4 +206,4 @@ Any generic OpenAI-compatible CLI talks to Mesh. `meshapi` adds what a generic o
 
 ## License
 
-[Apache 2.0](LICENSE)
+[Apache 2.0](https://github.com/aifiesta/meshapi-code/blob/main/LICENSE)
