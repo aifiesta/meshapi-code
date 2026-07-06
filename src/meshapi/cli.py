@@ -1663,8 +1663,19 @@ def main() -> None:
         if not user_input:
             continue
         if user_input.startswith("/"):
-            if not handle_command(user_input, state):
-                break
+            # Exception isolation for the command path — the tool loop has
+            # had it forever; commands didn't, so ONE handler bug could
+            # exit the whole REPL (seen in the wild: `/file` with no arg).
+            try:
+                if not handle_command(user_input, state):
+                    break
+            except (KeyboardInterrupt, EOFError):
+                raise  # ctrl+c at an inner prompt (/login) keeps its meaning
+            except Exception as e:
+                console.print(
+                    f"[red]Command error: {type(e).__name__}: {e} — "
+                    "the session is still alive.[/red]"
+                )
             continue
 
         # Auto-detect image paths/URLs in the prompt and attach them. The

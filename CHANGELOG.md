@@ -2,6 +2,10 @@
 
 All notable changes to `meshapi-code`. Upgrade with `pipx upgrade meshapi-code`.
 
+## 0.5.4 — 2026-07-06
+- **Fixed cross-platform crash**: `/file` with no argument (or a directory / binary / >2MB file) killed the whole CLI — PermissionError on Windows, IsADirectoryError on Linux/macOS (external user report). Now prints a friendly message.
+- **Never again**: all slash commands now run inside exception isolation — a command bug can print an error but can no longer exit the session.
+
 ## 0.5.3 — 2026-07-06
 - Docs: model count corrected to 1000+ (manually verified against the live catalog).
 

@@ -434,16 +434,39 @@ def handle_command(cmd: str, state: dict) -> bool:
             )
 
     elif name == "/file":
-        path = Path(arg).expanduser()
-        if path.exists():
-            content = path.read_text()
-            state["messages"].append({
-                "role": "user",
-                "content": f"File: {path.name}\n\n```\n{content}\n```",
-            })
-            console.print(f"[dim]Added {path.name} ({len(content)} chars) to context[/dim]")
+        # Guard every step: `/file` with no arg used to resolve Path("")
+        # to "." (the cwd), pass exists(), and crash the whole CLI on
+        # read_text() — PermissionError on Windows, IsADirectoryError on
+        # Linux/macOS (external user report, cross-platform).
+        if not arg:
+            console.print("[dim]/file <path>  add a text file to context[/dim]")
         else:
-            console.print(f"[red]File not found: {path}[/red]")
+            path = Path(arg).expanduser()
+            if not path.is_file():
+                if path.is_dir():
+                    console.print(f"[red]Not a file (it's a directory): {path}[/red]")
+                else:
+                    console.print(f"[red]File not found: {path}[/red]")
+            else:
+                try:
+                    size = path.stat().st_size
+                    if size > 2_000_000:
+                        console.print(
+                            f"[red]Too large ({size // 1_000_000} MB): /file caps at "
+                            "2 MB — a bigger file would flood the model's context. "
+                            "Ask the model to read the parts it needs instead.[/red]"
+                        )
+                    else:
+                        content = path.read_text()
+                        state["messages"].append({
+                            "role": "user",
+                            "content": f"File: {path.name}\n\n```\n{content}\n```",
+                        })
+                        console.print(
+                            f"[dim]Added {path.name} ({len(content)} chars) to context[/dim]"
+                        )
+                except (OSError, UnicodeDecodeError) as e:
+                    console.print(f"[red]Can't read {path}: {e}[/red]")
 
     elif name == "/image":
         if not arg:
