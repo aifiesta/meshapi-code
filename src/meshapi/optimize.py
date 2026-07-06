@@ -35,6 +35,23 @@ _DEFAULT_CACHE_MINIMUM = 2048
 _KEEP_RECENT_MESSAGES = 4
 _TRUNCATE_TO_CHARS = 400
 
+
+def survives_pruning(content_chars: int, dial: float) -> bool:
+    """True if a `role=="tool"` result of this size is NEVER truncated by
+    the tool_result_pruning lever in prepare() at this dial.
+
+    LOAD-BEARING for memory.dedupe_read: the read-dedupe stub claims "the
+    content is already in your context", which is only honest if pruning
+    can't have removed it from the wire. This helper lives HERE, next to
+    the lever's constants, so a future change to _TRUNCATE_TO_CHARS /
+    _KEEP_RECENT_MESSAGES / the role filter forces revisiting it — see the
+    drift-guard unit test and the CLAUDE.md invariant note. The recency
+    window (_KEEP_RECENT_MESSAGES) deliberately provides no safety: a
+    fresh hop appends messages immediately, pushing any old read out of
+    the window within the same turn.
+    """
+    return dial < 0.2 or content_chars <= 2 * _TRUNCATE_TO_CHARS
+
 _CODE_RE = re.compile(r"```|(?:\bfunction\b|\bclass\b|\bimport\b|\bdef\b)\s")
 _COMPLEX_RE = re.compile(
     r"\b(refactor|implement|debug|architect|migrate|optimi[sz]e|analy[sz]e)\b",

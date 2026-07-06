@@ -30,6 +30,7 @@ DEFAULT_CONFIG = {
     "model": "anthropic/claude-sonnet-4.5",
     "system": "You are a helpful coding assistant. Be concise.",
     "auto_route": False,        # model:"auto" — gateway Auto Router picks per prompt
+    "repo_memory": True,        # warm-start repo map + remember notes (/memory off)
     "fallback_models": [],      # ordered `models` fallback list sent in the payload
     "reasoning_effort": None,   # high|medium|low|none, or None = not sent
     # Mesh Optimize dial (BETA). 0 = off. 0 to 0.95: how aggressively to

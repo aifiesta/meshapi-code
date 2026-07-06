@@ -24,7 +24,7 @@ from prompt_toolkit.styles import Style
 from rich.markup import escape as _rich_escape
 from rich.text import Text
 
-from . import __version__, statusbar
+from . import __version__, memory, statusbar
 from .attachments import AttachmentError, find_image_tokens, load_image
 from .client import stream_chat
 from .commands import handle_command, prompt_for_api_key
@@ -340,6 +340,9 @@ def _drop_in_flight_turn(state: dict) -> None:
         state["messages"].pop()
     if state["messages"] and state["messages"][-1]["role"] == "user":
         state["messages"].pop()
+    # Dedupe entries whose content-bearing message just got rolled back
+    # must die with it — single choke point for ctrl+c/ESC/HTTP errors.
+    memory.invalidate_dropped(state)
 
 
 def _safe_response_text(resp) -> str:
@@ -1183,6 +1186,10 @@ def handle_tool_calls(tool_calls: list, state: dict) -> None:
             for p in prepared
         ],
     })
+    # Index of the assistant tool_calls message just appended — write_file
+    # content rides in it (never pruned by optimize), so it's the
+    # content-bearing message for write-sourced dedupe entries.
+    state["_batch_assistant_idx"] = len(state["messages"]) - 1
     shown_mode = state.get("mode")
     for p in prepared:
         _esc = state.get("esc_interrupt")
@@ -1227,6 +1234,14 @@ def handle_tool_calls(tool_calls: list, state: dict) -> None:
                 # Plan tools are bookkeeping — no filesystem or shell side
                 # effects, so we don't gate them on the approval prompt.
                 result = _handle_plan_tool(name, args, state)
+            elif name == "remember":
+                # Memory bookkeeping — writes only to ~/.meshapi/context/,
+                # never the user's repo; ungated like plan tools. Doomed
+                # (empty-note) calls were already skipped pre-approval.
+                result = memory.append_note(
+                    state["memory_root"], args.get("note") or ""
+                )
+                console.print(f"[{BRAND_DIM}]⚙ {summarize_call(name, args)}[/{BRAND_DIM}]")
             else:
                 state.setdefault("doom_streak", {}).pop(name, None)  # reached execution — streak broken
                 # Per-mode auto-approval: each Mode declares which tool names
@@ -1312,10 +1327,62 @@ def handle_tool_calls(tool_calls: list, state: dict) -> None:
                                     stubs.pop(key, None)
                             except Exception:
                                 pass
+                            # Repo memory: capture structure (zero extra
+                            # tokens — content in hand) + record for
+                            # read-after-write dedupe. Best-effort.
+                            try:
+                                memory.capture(
+                                    state["memory_root"],
+                                    args.get("path") or "",
+                                    args.get("content") or "",
+                                )
+                                memory.record_write(
+                                    state, args.get("path") or "",
+                                    args.get("content") or "",
+                                    msg_index=state.get("_batch_assistant_idx", 0),
+                                )
+                            except Exception:
+                                pass
                     elif name == "run_bash":
                         _print_shell_command(args.get("command") or "")
                         result = exec_tool(name, args, state["cfg"])
                         _render_tool_result(name, args, result)
+                    elif name == "read_file":
+                        # Dedupe AFTER the approval gate (DEFAULT still
+                        # confirms; only the result differs): if this exact
+                        # content is provably in context, answer with a
+                        # short stub instead of re-sending the body.
+                        stub = None
+                        try:
+                            stub = memory.dedupe_read(
+                                state, args.get("path") or "",
+                                float(state["cfg"].get("optimize") or 0),
+                            )
+                        except Exception:
+                            stub = None
+                        if stub is not None:
+                            result = stub
+                            console.print(
+                                "  [green]→[/green] [dim]unchanged — content "
+                                "already in context (skipped re-send)[/dim]"
+                            )
+                        else:
+                            result = exec_tool(name, args, state["cfg"])
+                            _render_tool_result(name, args, result)
+                            if not result.startswith("Error:"):
+                                try:
+                                    # len(messages) == the index this tool
+                                    # result will occupy when appended below.
+                                    memory.record_read(
+                                        state, args.get("path") or "", result,
+                                        msg_index=len(state["messages"]),
+                                    )
+                                    memory.capture(
+                                        state["memory_root"],
+                                        args.get("path") or "", result,
+                                    )
+                                except Exception:
+                                    pass
                     else:
                         result = exec_tool(name, args, state["cfg"])
                         _render_tool_result(name, args, result)
@@ -1418,6 +1485,10 @@ def main() -> None:
         "input_queue": collections.deque(),
         "esc_interrupt": threading.Event(),
         "live_active": False,
+        # Repo memory: per-session read/write tracking for dedupe, and the
+        # repo root frozen at startup (nothing chdirs in-process).
+        "session_reads": {},
+        "memory_root": Path.cwd().resolve(),
     }
 
     # Mode cycle — used by both the prompt-toolkit keybinding (while at the

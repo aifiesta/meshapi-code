@@ -44,6 +44,7 @@ src/meshapi/
   statusbar.py    # mode indicator: bottom_toolbar (live) + print_line (scrollback)
   keywatcher.py   # daemon thread: shift+tab (CSI Z) while prompt_toolkit isn't reading stdin
   plan.py         # plan state model for create_plan / update_step
+  memory.py       # repo memory: warm-start map, remember notes, read-dedupe
   completer.py    # fuzzy tab-completion: slash commands + model IDs
   update.py       # PyPI version check (daemon thread) + y/n upgrade offer
   render.py       # rich Console singleton, render_stream, fmt_usd
@@ -65,6 +66,14 @@ Tools (`tools.py` `TOOLS`): `write_file`, `read_file`, `run_bash`, `start_server
 **Forensics:** every doomed/repaired/normalized call is appended to `~/.meshapi/toolcall_failures.jsonl` (raw args preserved even though history is sanitized; 0600; >1 MB rotates to `.jsonl.1`). `stream_chat` also counts SSE data lines that fail to json-parse (`meta["dropped_chunks"]` + first-sample) — nonzero implicates the gateway relay (routersvc), not the model. This is how to attribute corruption when debugging.
 
 **Known asymmetry (pre-existing):** `run_bash` can write anywhere via shell redirection without `is_path_safe_for_auto_write`'s path checks — the heredoc escape hatch grants nothing new. Optional follow-up: redirect-target check in `safety.is_command_safe_for_auto`.
+
+## Repo memory (`memory.py`)
+
+Per-repo persistent context under `~/.meshapi/context/<sha256(normcase(resolved cwd))[:16]>/` — `repomap.json` (structural map, 0600) + `memory.md` (model-authored notes via the ungated `remember` tool). **Capture is zero-token**: hooks in handle_tool_calls' write/read paths extract symbols (per-language regex, `extract_symbols`) from content already in hand. `build_system_prompt` appends a token-capped (~1.5k) REPO MEMORY block — notes first, then files by recency, `~changed` marks from an mtime+size stat pass (dead files lazily compacted), explicitly framed as DATA not instructions (the store is a self-persisting prompt-injection channel — control chars stripped, lengths clipped, `/memory clear` is the recovery path). `/memory [notes|clear|on|off]`; `cfg["repo_memory"]` gates injection+capture.
+
+**Read-dedupe invariant (LOAD-BEARING):** `dedupe_read` answers a repeat read with a stub ("content already in your context") ONLY when provably true: write-sourced content rides in assistant `tool_calls` messages which optimize NEVER prunes → safe at any dial; read-sourced content is gated by `optimize.survives_pruning(chars, dial)` — that helper lives next to the pruning constants and a drift-guard unit test asserts it against `prepare()`'s real output. **Changing `_TRUNCATE_TO_CHARS`/`_KEEP_RECENT_MESSAGES`/the role filter in optimize.py requires revisiting it.** Other guards: sha256 re-check against disk at dedupe time (ground truth), `stubbed_last` anti-loop (an immediate re-ask returns the body), `msg_index` invalidation in `_drop_in_flight_turn` + `session_reads` reset in `/clear` `/system`, 300-char minimum. Every condition fails toward a normal read — a wrong "already in context" gaslights the model.
+
+Known gap (accepted, documented): `run_bash` heredoc writes are invisible to capture — same asymmetry as the quality guard; the dedupe hash re-check still protects correctness.
 
 ## Quality guard (stub detection + fix-it hop)
 

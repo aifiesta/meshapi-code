@@ -2,6 +2,27 @@
 
 All notable changes to `meshapi-code`. Upgrade with `pipx upgrade meshapi-code`.
 
+## 0.5.2 — 2026-07-06 · "repo memory"
+
+- **The agent remembers your repo.** Every file it writes or reads is
+  structurally captured (symbols, sizes — zero extra tokens, the content is
+  already in hand) into `~/.meshapi/context/` — never inside your repo. The
+  next session in the same directory starts warm: a token-capped repo map +
+  notes ride the system prompt, so the model knows the project without
+  re-reading everything.
+- **`remember` tool**: the model persists durable decisions ("uses pnpm",
+  "tests run with pytest -q") across sessions. `/memory` inspects,
+  `/memory notes` prints them, `/memory clear` deletes this repo's store,
+  `/memory off` disables the feature.
+- **Read-dedupe**: re-reading an unchanged file returns a short "already in
+  your context" pointer instead of the full body — provably safe (sha256
+  re-check against disk, correct against the /optimize pruning lever at any
+  dial, anti-loop: an immediate re-ask returns the body).
+- web_search results now include the actual result text (prod sends
+  `content`, not `snippet` — verified live; was silently dropped).
+- Verified live in prod: `/route preview` (`/v1/router/select`) and the
+  `web_search` tool (`/v1/web/search`) both work against the gateway.
+
 ## 0.5.1 — 2026-07-06 · "the agentic release"
 
 **Getting started**

@@ -26,6 +26,7 @@ COMMANDS = {
     "/system": "set system prompt",
     "/cost": "session spend",
     "/optimize": "token savings dial (beta)",
+    "/memory": "repo memory: notes | clear | on | off",
     "/login": "set or replace the API key",
     "/update": "check PyPI for a newer meshapi",
     "/clear": "reset conversation",
@@ -37,6 +38,7 @@ _ARG_CHOICES = {
     "/route": ("auto", "off", "preview"),
     "/mode": ("default", "accept-edits", "auto", "bypass"),
     "/reasoning": ("high", "medium", "low", "none", "off"),
+    "/memory": ("notes", "clear", "on", "off"),
 }
 
 

@@ -20,7 +20,7 @@ def build_system_prompt(cfg: dict) -> str:
     """
     base = cfg.get("system") or ""
     cwd = str(Path.cwd())
-    return (
+    prompt = (
         f"{base}\n\n"
         f"Working directory: {cwd}\n"
         "Resolve any relative path the user gives against this working "
@@ -28,6 +28,14 @@ def build_system_prompt(cfg: dict) -> str:
         "absolute path, place them inside this working directory. Use "
         "the available tools to inspect and modify the filesystem and "
         "run shell commands — do not ask the user to run commands.\n\n"
+        "MEMORY — this session may start with a REPO MEMORY section of "
+        "notes and known files from earlier sessions in this directory. "
+        "When the user states a lasting preference or you discover a "
+        "durable fact about this project (build tool, test command, "
+        "conventions, architecture decisions), call remember with one "
+        "short factual sentence so future sessions know it. Do not use "
+        "remember for transient task state, file contents, or anything "
+        "secret.\n\n"
         "PLAN BEFORE ACTING. For any request that will need more than ~3 "
         "tool calls (building features, multi-file edits, scaffolding a "
         "project), FIRST call create_plan with a numbered list of small, "
@@ -94,6 +102,16 @@ def build_system_prompt(cfg: dict) -> str:
         "`disown`, `setsid`, or `timeout N npm run dev` — `timeout` doesn't "
         "exist on macOS and backgrounding via shell loses output capture."
     )
+    # Warm start: REPO MEMORY block from previous sessions in this cwd
+    # (best-effort — a memory bug must never break session start).
+    try:
+        from . import memory
+        block = memory.warm_start_block(
+            Path.cwd().resolve(), enabled=bool(cfg.get("repo_memory", True))
+        )
+    except Exception:
+        block = ""
+    return prompt + (("\n\n" + block) if block else "")
 
 # OpenAI-compatible tool spec — Mesh API forwards these to the underlying provider.
 TOOLS = [
@@ -252,6 +270,31 @@ TOOLS = [
     {
         "type": "function",
         "function": {
+            "name": "remember",
+            "description": (
+                "Save a short durable note about THIS project that future "
+                "sessions in this directory will see at startup (stored "
+                "outside the repo). Use for lasting decisions, conventions, "
+                "and gotchas — 'uses pnpm', 'tests run with pytest -q', "
+                "'the API base path is /v2'. One factual sentence per call. "
+                "Do NOT store secrets, file contents, or transient task "
+                "state."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "note": {
+                        "type": "string",
+                        "description": "One short factual sentence to persist.",
+                    }
+                },
+                "required": ["note"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "update_step",
             "description": (
                 "Update a step's status in the current plan. Call with "
@@ -305,6 +348,9 @@ def validate_call(name: str, arguments: dict) -> str | None:
     elif name == "web_search":
         if not arguments.get("query"):
             return "Error: web_search requires a `query` argument."
+    elif name == "remember":
+        if not arguments.get("note"):
+            return "Error: remember requires a `note` argument."
     return None
 
 
@@ -680,6 +726,11 @@ def summarize_call(name: str, arguments: dict) -> str:
         if len(q) > 120:
             q = q[:120] + "…"
         return f"web_search: {q}"
+    if name == "remember":
+        note = arguments.get("note") or "(missing note)"
+        if len(note) > 60:
+            note = note[:60] + "…"
+        return f"remember: {note}"
     if name == "create_plan":
         n = len(arguments.get("steps") or [])
         return f"create_plan ({n} step{'s' if n != 1 else ''})"

@@ -1,9 +1,12 @@
 """Slash command handlers."""
 import contextlib
+import shutil
 from pathlib import Path
 
 import httpx
 from rich.panel import Panel
+
+from . import memory
 
 from .attachments import AttachmentError, load_image
 from .config import CREDENTIALS_FILE, save_api_key, save_config
@@ -275,6 +278,7 @@ def handle_command(cmd: str, state: dict) -> bool:
     if name == "/clear":
         state["messages"] = [{"role": "system", "content": build_system_prompt(state["cfg"])}]
         state["session_cost"] = 0.0
+        state["session_reads"] = {}  # history is gone — dedupe must not lie
         console.print("[dim]Conversation cleared.[/dim]")
 
     elif name == "/model":
@@ -380,6 +384,38 @@ def handle_command(cmd: str, state: dict) -> bool:
                 f"[red]Usage: /reasoning {'|'.join(_REASONING_LEVELS)}|off[/red]"
             )
 
+    elif name == "/memory":
+        root = state.get("memory_root") or Path.cwd().resolve()
+        sub = arg.strip().lower()
+        if not sub:
+            store = memory.load_store(root)
+            notes = memory.load_notes(root)
+            n_files = len((store or {}).get("files", {}))
+            n_notes = len([l for l in notes.splitlines() if l.strip().startswith("-")])
+            enabled = state["cfg"].get("repo_memory", True)
+            console.print(
+                f"[dim]repo memory: {'on' if enabled else 'off'} — "
+                f"{n_files} file(s) mapped, {n_notes} note(s) for this directory\n"
+                f"store: {memory.context_dir(root)}\n"
+                "usage: /memory notes | clear | on | off[/dim]"
+            )
+        elif sub == "notes":
+            notes = memory.load_notes(root).strip()
+            console.print(notes if notes else "[dim]no notes yet[/dim]")
+        elif sub == "clear":
+            shutil.rmtree(memory.context_dir(root), ignore_errors=True)
+            state["session_reads"] = {}
+            console.print("[dim]Repo memory for this directory deleted.[/dim]")
+        elif sub in ("on", "off"):
+            state["cfg"]["repo_memory"] = sub == "on"
+            save_config(state["cfg"])
+            console.print(
+                f"[dim]repo memory {sub} — takes effect on the next "
+                "session or /clear.[/dim]"
+            )
+        else:
+            console.print("[red]Usage: /memory [notes | clear | on | off][/red]")
+
     elif name == "/update":
         from . import __version__
         from .update import fetch_latest, is_newer, offer_update
@@ -461,6 +497,7 @@ def handle_command(cmd: str, state: dict) -> bool:
         if arg:
             state["cfg"]["system"] = arg
             state["messages"] = [{"role": "system", "content": build_system_prompt(state["cfg"])}]
+            state["session_reads"] = {}  # history is gone — dedupe must not lie
             console.print("[dim]System prompt updated and conversation reset.[/dim]")
         else:
             console.print(f"[dim]{state['cfg']['system']}[/dim]")
@@ -534,6 +571,7 @@ def handle_command(cmd: str, state: dict) -> bool:
             "/system <txt>              set system prompt\n"
             "/cost                      show session spend\n"
             "/optimize <dial>           token savings, beta: 0 off, up to 0.95\n"
+            "/memory [notes|clear|on|off]  repo memory: map + notes from past sessions\n"
             "/login                     set or replace your API key\n"
             "/update                    check PyPI for a newer meshapi\n"
             "/help                      show this\n\n"

@@ -12,7 +12,7 @@ Agentic terminal CLI for [Mesh API](https://meshapi.ai) — one OpenAI-compatibl
 $ meshapi
 ███╗   ███╗███████╗███████╗██╗  ██╗
 ████╗ ████║██╔════╝██╔════╝██║  ██║
-██╔████╔██║█████╗  ███████╗███████║   ✦  meshapi 0.5.1
+██╔████╔██║█████╗  ███████╗███████║   ✦  meshapi 0.5.2
 ██║╚██╔╝██║██╔══╝  ╚════██║██╔══██║   cwd:   ~/code/myproj
 ██║ ╚═╝ ██║███████╗███████║██║  ██║   model: anthropic/claude-sonnet-4.5
 ╚═╝     ╚═╝╚══════╝╚══════╝╚═╝  ╚═╝   route: off
@@ -82,6 +82,7 @@ Verify with `meshapi --version`. If it still shows an old version, a second olde
 ## What it does
 
 - **Agentic tool calling** — the model plans multi-step work, reads/writes files, runs shell commands, starts dev servers in the background (with port auto-detection), and searches the web. Every step gated by permission modes.
+- **Repo memory** — the agent remembers your project across sessions: files it touches are structurally mapped (zero extra tokens) into `~/.meshapi/context/` (never your repo), durable decisions persist via a `remember` tool, and re-reads of unchanged files are deduped. Next session starts warm. `/memory` inspects, `/memory clear` deletes, `/memory off` disables.
 - **Quality guard** — stub code (`// Add game logic here`) is caught before the model declares victory: one automatic fix-it pass, then an honest warning naming the files and suggesting a stronger model. No more "Server's up!" over a blank page.
 - **Self-healing tool calls** — malformed arguments are repaired client-side; the model never re-reads its own broken JSON. Ends the retry doom-loop, biggest win on cheaper models.
 - **Type while it works** — the input stays live during streaming; Enter stacks messages that auto-run in order; ESC aborts a turn; unfinished text prefills the next prompt. *(macOS/Linux; on Windows input is available between turns.)*
@@ -100,6 +101,7 @@ Verify with `meshapi --version`. If it still shows an old version, a second olde
 | `start_server` | Long-running dev server in the background — detects the port in your command, adopts what it actually binds, shows progress, killed on exit. |
 | `web_search` | Search the web through the Mesh gateway. |
 | `create_plan` / `update_step` | The model's visible step-by-step plan. |
+| `remember` | Persist a durable project note for future sessions (repo memory). |
 
 Permission modes, cycled live with **Shift+Tab** (works mid-run on macOS/Linux):
 
@@ -129,6 +131,7 @@ meshapi --mode bypass     # start in bypass (macOS/Linux/Windows alike)
 | `/clear-attach` | Drop queued image attachments |
 | `/system <text>` | Replace system prompt and reset chat |
 | `/optimize <dial>` | Token-savings dial (beta), see below |
+| `/memory [notes\|clear\|on\|off]` | Repo memory: map + notes from past sessions |
 | `/login` | Set or replace your API key |
 | `/update` | Check PyPI and upgrade |
 | `/cost` `/clear` `/help` `/exit` | The usual |
@@ -201,7 +204,8 @@ Any generic OpenAI-compatible CLI talks to Mesh. `meshapi` adds what a generic o
 ## Roadmap
 
 - ✅ 0.5.1 — first-run key setup, update checker, auto-routing, fuzzy model picker, web search, quality guard, self-healing tool calls, always-visible input, ESC abort
-- 0.6 — repo memory: context captured while the agent writes code (token-free), warm-start repo maps, optional [graphify](https://github.com/Graphify-Labs/graphify) backend
+- ✅ 0.5.2 — repo memory: zero-token context capture, warm-start repo maps, `remember` notes, read-dedupe
+- 0.6 — something special 👀 (+ optional [graphify](https://github.com/Graphify-Labs/graphify) backend for the memory layer)
 - later — `npm i -g meshapi-code` (Node port), Homebrew tap
 
 ## License
