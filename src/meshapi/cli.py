@@ -1593,6 +1593,22 @@ def main() -> None:
 
     while True:
         try:
+            # Prune server records whose process died out-of-band (e.g. the
+            # model pkill'd it) so the toolbar never advertises dead URLs.
+            # Once per turn, POSIX signal-0 probe; anything but "no such
+            # process" keeps the entry (permission errors mean it's alive).
+            _live = []
+            for _srv in state.get("servers", []):
+                try:
+                    os.kill(_srv["pid"], 0)
+                    _live.append(_srv)
+                except ProcessLookupError:
+                    pass
+                except Exception:
+                    _live.append(_srv)
+            if len(_live) != len(state.get("servers", [])):
+                state["servers"] = _live
+                _persist_servers(state)
             # Queue drain: messages the user stacked mid-run submit in order,
             # each as its own full turn, BEFORE the interactive prompt shows.
             # New type-ahead during drained turns keeps queueing (FIFO).
@@ -1641,7 +1657,10 @@ def main() -> None:
             console.print("\n[dim]bye[/dim]")
             break
 
-        if not user_input.strip():
+        # Strip outer whitespace BEFORE slash detection — a pasted
+        # " /memory clear" must be a command, not a chat message (seen live).
+        user_input = user_input.strip()
+        if not user_input:
             continue
         if user_input.startswith("/"):
             if not handle_command(user_input, state):
