@@ -544,7 +544,14 @@ def _format_search_results(r) -> str:
                 continue
             title = item.get("title") or "(untitled)"
             url = item.get("url") or item.get("link") or ""
-            snippet = item.get("snippet") or item.get("description") or ""
+            # Prod shape (verified live): results carry `content`; keep the
+            # OpenAI-ish fallbacks for schema drift.
+            snippet = (
+                item.get("content") or item.get("snippet")
+                or item.get("description") or ""
+            )
+            if len(snippet) > 700:
+                snippet = snippet[:700] + "…"
             blocks.append("\n".join(x for x in (f"{i}. {title}", url, snippet) if x))
         return _truncate("\n\n".join(blocks))
     return _truncate(json.dumps(data))
