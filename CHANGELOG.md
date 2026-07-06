@@ -2,6 +2,11 @@
 
 All notable changes to `meshapi-code`. Upgrade with `pipx upgrade meshapi-code`.
 
+## 0.5.5 — 2026-07-06
+- `/model <invalid>` is now rejected before persisting (was silently saved to config, breaking every future launch) — unknown ids get top-3 fuzzy "did you mean" suggestions; offline still sets with a warning.
+- `/fallback <invalid>` now rejected when the catalog is reachable (was warn-but-keep — a bogus fallback breaks failover exactly when needed); offline keeps with warning.
+- `--route preview` accepted at launch for parity with /route (explains that preview needs a conversation).
+
 ## 0.5.4 — 2026-07-06
 - **Fixed cross-platform crash**: `/file` with no argument (or a directory / binary / >2MB file) killed the whole CLI — PermissionError on Windows, IsADirectoryError on Linux/macOS (external user report). Now prints a friendly message.
 - **Never again**: all slash commands now run inside exception isolation — a command bug can print an error but can no longer exit the session.
