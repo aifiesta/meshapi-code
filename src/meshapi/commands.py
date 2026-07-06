@@ -17,6 +17,23 @@ from .tools import build_system_prompt
 _REASONING_LEVELS = ("high", "medium", "low", "none")
 
 
+def _known_model_ids(state: dict) -> "set | None":
+    """Catalog ids for validation, or None when unreachable (offline)."""
+    models = fetch_models_quiet(state)
+    if models is None:
+        return None
+    return {m.get("id") for m in models if isinstance(m, dict) and m.get("id")}
+
+
+def _model_suggestions(query: str, known: set, n: int = 3) -> list:
+    """Top-n fuzzy matches for an unknown model id."""
+    from .completer import _ranked  # lazy: completer imports this module
+    try:
+        return _ranked(query, sorted(k for k in known if k))[:n]
+    except Exception:
+        return []
+
+
 def _route_preview(state: dict) -> None:
     """POST /router/select with the conversation so far and show which
     model the Auto Router would pick — without running inference."""
@@ -283,9 +300,24 @@ def handle_command(cmd: str, state: dict) -> bool:
 
     elif name == "/model":
         if arg:
-            state["cfg"]["model"] = arg
-            save_config(state["cfg"])
-            console.print(f"[dim]Model set to {arg}[/dim]")
+            # Validate against the live catalog BEFORE persisting — an
+            # unknown model written to config.json breaks every future
+            # launch, and the error only surfaces on the next prompt
+            # (external tester report). Offline → set with a warning
+            # (can't hard-block users without network).
+            known = _known_model_ids(state)
+            if known is not None and arg not in known:
+                console.print(f"[red]Unknown model: {arg}[/red]")
+                sugg = _model_suggestions(arg, known)
+                if sugg:
+                    console.print(f"[dim]Did you mean: {', '.join(sugg)}?  (/models to browse)[/dim]")
+                else:
+                    console.print("[dim]/models to browse the catalog[/dim]")
+            else:
+                state["cfg"]["model"] = arg
+                save_config(state["cfg"])
+                note = "" if known is not None else " (couldn't verify against the catalog — offline?)"
+                console.print(f"[dim]Model set to {arg}{note}[/dim]")
         else:
             console.print(f"[dim]Current model: {state['cfg']['model']}[/dim]")
 
@@ -354,14 +386,24 @@ def handle_command(cmd: str, state: dict) -> bool:
             console.print("[dim]Fallback models cleared.[/dim]")
         else:
             wanted = arg.replace(",", " ").split()
-            catalog = _fetch_models(state)
-            if catalog:
-                known = {m.get("id") for m in catalog}
-                for miss in [w for w in wanted if w not in known]:
-                    console.print(
-                        f"[yellow]⚠ {miss} isn't in the model catalog — "
-                        "keeping it anyway[/yellow]"
-                    )
+            # Reject unknown models when the catalog is reachable — a
+            # persisted bogus fallback silently breaks failover exactly
+            # when it's needed. Offline → keep with a warning.
+            known = _known_model_ids(state)
+            if known is not None:
+                missing = [w for w in wanted if w not in known]
+                if missing:
+                    console.print(f"[red]Unknown model(s): {', '.join(missing)}[/red]")
+                    sugg = _model_suggestions(missing[0], known)
+                    if sugg:
+                        console.print(f"[dim]Did you mean: {', '.join(sugg)}?  (/models to browse)[/dim]")
+                    console.print("[dim]Fallback list unchanged.[/dim]")
+                    return True
+            else:
+                console.print(
+                    "[yellow]⚠ couldn't verify against the catalog (offline?) "
+                    "— setting anyway[/yellow]"
+                )
             state["cfg"]["fallback_models"] = wanted
             save_config(state["cfg"])
             console.print(f"[dim]Fallback order: {' → '.join(wanted)}[/dim]")

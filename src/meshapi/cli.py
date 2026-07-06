@@ -87,8 +87,10 @@ def parse_args(argv=None) -> argparse.Namespace:
     p.add_argument("--version", action="version", version=f"meshapi {__version__}")
     p.add_argument("--model", help="Override model for this session (e.g. openai/gpt-4o-mini)")
     p.add_argument(
-        "--route", choices=["auto", "off"],
-        help="Auto-routing: 'auto' lets the gateway pick a model per prompt",
+        "--route", choices=["auto", "off", "preview"],
+        help="Auto-routing: 'auto' lets the gateway pick a model per prompt; "
+             "'preview' is meaningful in-session (/route preview) once a "
+             "conversation exists",
     )
     p.add_argument(
         "--mode",
@@ -1440,8 +1442,16 @@ def main() -> None:
 
     if args.model:
         cfg["model"] = args.model
-    if args.route:
+    if args.route in ("auto", "off"):
         cfg["auto_route"] = args.route == "auto"
+    elif args.route == "preview":
+        # Flag/command parity: /route preview needs a conversation to
+        # preview, which doesn't exist at launch — explain instead of
+        # rejecting the flag (external tester report).
+        console.print(
+            "[dim]--route preview: nothing to preview at launch — send a "
+            "message first, then use /route preview in-session.[/dim]"
+        )
 
     if not cfg["api_key"]:
         # First run (or key removed): walk the user through connecting a key
