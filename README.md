@@ -1,6 +1,12 @@
 # meshapi-code
 
+[![PyPI](https://img.shields.io/pypi/v/meshapi-code)](https://pypi.org/project/meshapi-code/)
+[![Python](https://img.shields.io/pypi/pyversions/meshapi-code)](https://pypi.org/project/meshapi-code/)
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
+
 Agentic terminal CLI for [Mesh API](https://meshapi.ai) — one OpenAI-compatible key, 300+ models. Plans, writes files, runs commands, starts dev servers, searches the web — with streaming markdown, live cost, and permission modes. Modeled on Claude Code.
+
+📚 **Docs:** [Install guide (Windows & macOS)](INSTALL.md) · [Upgrading](UPGRADE.md) · [Changelog](CHANGELOG.md) · [Release notes](https://github.com/aifiesta/meshapi-code/releases)
 
 ```
 $ meshapi
@@ -108,11 +114,26 @@ meshapi --mode bypass     # start in bypass (macOS/Linux/Windows alike)
 | `/mode <perm>` | `default`, `accept-edits`, `auto`, `bypass` (Shift+Tab cycles) |
 | `/file <path>` | Inject a text file into the conversation |
 | `/image <path\|url>` | Attach an image (drag-dropped paths auto-attach too) |
+| `/clear-attach` | Drop queued image attachments |
 | `/system <text>` | Replace system prompt and reset chat |
 | `/optimize <dial>` | Token-savings dial (beta), see below |
 | `/login` | Set or replace your API key |
 | `/update` | Check PyPI and upgrade |
 | `/cost` `/clear` `/help` `/exit` | The usual |
+
+## Keyboard & live controls
+
+| Key | When | What it does |
+|---|---|---|
+| **Shift+Tab** | anytime¹ | Cycle permission mode — applies to the *next* tool call, visible live |
+| **type + Enter** | while the model works¹ | Stack a message; it auto-runs when the turn ends (`(N queued)` shows live) |
+| **ESC** | while the model works¹ | Abort the turn (between deltas/hops/tool calls) |
+| **Ctrl+C** | anytime | Abort the turn and discard stacked messages |
+| **`a`** | at any approval prompt | Approve + auto-approve that tool for the rest of the session |
+| **Tab / arrows** | at the prompt | Fuzzy completion menu for commands and model IDs |
+| **↑** | at the prompt | Prompt history (persists across sessions, secrets scrubbed) |
+
+¹ macOS/Linux; on Windows these work at the prompt between turns.
 
 ## Mesh Optimize (beta)
 
