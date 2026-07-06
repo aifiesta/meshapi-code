@@ -4,7 +4,7 @@
 [![Python](https://img.shields.io/pypi/pyversions/meshapi-code)](https://pypi.org/project/meshapi-code/)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue)](https://github.com/aifiesta/meshapi-code/blob/main/LICENSE)
 
-Agentic terminal CLI for [Mesh API](https://meshapi.ai) — one OpenAI-compatible key, 300+ models. Plans, writes files, runs commands, starts dev servers, searches the web — with streaming markdown, live cost, and permission modes. Modeled on Claude Code.
+Agentic terminal CLI for [Mesh API](https://meshapi.ai) — one OpenAI-compatible key, 1000+ models. Plans, writes files, runs commands, starts dev servers, searches the web — with streaming markdown, live cost, and permission modes. Modeled on Claude Code.
 
 📚 **Docs:** [Install guide (Windows & macOS)](https://github.com/aifiesta/meshapi-code/blob/main/INSTALL.md) · [Upgrading](https://github.com/aifiesta/meshapi-code/blob/main/UPGRADE.md) · [Changelog](https://github.com/aifiesta/meshapi-code/blob/main/CHANGELOG.md) · [Release notes](https://github.com/aifiesta/meshapi-code/releases)
 
@@ -395,7 +395,7 @@ Env overrides: `MESHAPI_API_KEY`, `MESHAPI_BASE_URL`.
 
 ## About Mesh API
 
-[Mesh API](https://meshapi.ai) is a unified LLM gateway: one API key, 300+ models from OpenAI, Anthropic, Google, Meta, Mistral, DeepSeek, Alibaba, and more. OpenAI-compatible — change the model name, leave everything else alone.
+[Mesh API](https://meshapi.ai) is a unified LLM gateway: one API key, 1000+ models from OpenAI, Anthropic, Google, Meta, Mistral, DeepSeek, Alibaba, and more. OpenAI-compatible — change the model name, leave everything else alone.
 
 - **Zero platform fees for 12 months.** You only pay for tokens.
 - **Auto-routing.** Send `model: "auto"` and the gateway picks the best model per prompt.
@@ -408,7 +408,7 @@ Built by the founders of [TagMango](https://tagmango.com) (YC W20) and [AI Fiest
 
 ## Why this CLI exists
 
-Any generic OpenAI-compatible CLI talks to Mesh. `meshapi` adds what a generic one can't: the gateway-only `cost` field after every turn, `/route auto` + `/models` driving Mesh's gateway-side selection, an agentic loop hardened for cheap models (argument repair, quality guard), and 300+ models behind one fuzzy picker.
+Any generic OpenAI-compatible CLI talks to Mesh. `meshapi` adds what a generic one can't: the gateway-only `cost` field after every turn, `/route auto` + `/models` driving Mesh's gateway-side selection, an agentic loop hardened for cheap models (argument repair, quality guard), and 1000+ models behind one fuzzy picker.
 
 ## Roadmap
 
