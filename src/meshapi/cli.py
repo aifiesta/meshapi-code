@@ -39,6 +39,7 @@ from .plan import Plan
 from . import safety
 from .render import (
     BRAND, BRAND_BG, BRAND_BG_FG, BRAND_DIM, CODE, console, fmt_usd, pretty_cwd, render_stream,
+    run_with_ticker,
 )
 from .tools import (
     PLAN_TOOLS, TOOLS, build_system_prompt, execute as exec_tool,
@@ -1356,7 +1357,9 @@ def handle_tool_calls(tool_calls: list, state: dict) -> None:
                                 pass
                     elif name == "run_bash":
                         _print_shell_command(args.get("command") or "")
-                        result = exec_tool(name, args, state["cfg"])
+                        result = run_with_ticker(
+                            "running", lambda: exec_tool(name, args, state["cfg"]), state
+                        )
                         _render_tool_result(name, args, result)
                     elif name == "read_file":
                         # Dedupe AFTER the approval gate (DEFAULT still
@@ -1395,7 +1398,9 @@ def handle_tool_calls(tool_calls: list, state: dict) -> None:
                                 except Exception:
                                     pass
                     else:
-                        result = exec_tool(name, args, state["cfg"])
+                        result = run_with_ticker(
+                            name, lambda: exec_tool(name, args, state["cfg"]), state
+                        )
                         _render_tool_result(name, args, result)
                 else:
                     result = "User denied this tool call."

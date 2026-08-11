@@ -252,3 +252,48 @@ def render_stream(events: Iterable, header: str = "", state: Optional[dict] = No
     if view.first_token_at is not None:
         meta["ttft"] = view.first_token_at
     return view.buf, meta
+
+
+class _ToolTicker:
+    """Transient one-line spinner + live elapsed timer shown while a blocking
+    tool (a slow run_bash, a web search) runs, so it never looks frozen.
+    Recomputes elapsed on every refresh — no background thread. Stays blank for
+    the first `delay` seconds so fast calls don't flash a spinner."""
+
+    _FRAMES = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
+
+    def __init__(self, label: str, delay: float = 0.4) -> None:
+        self._label = label
+        self._delay = delay
+        self._start = time.monotonic()
+
+    def __rich_console__(self, console, options):
+        elapsed = time.monotonic() - self._start
+        if elapsed < self._delay:
+            yield Text("")  # nothing yet — no spinner flash on fast tools
+            return
+        frame = self._FRAMES[int(elapsed * 12) % len(self._FRAMES)]
+        line = Text()
+        line.append(f"  {frame} ", style=BRAND)
+        line.append(f"{self._label} · ", style="dim")
+        line.append(f"{elapsed:.0f}s", style=BRAND_DIM)
+        yield line
+
+
+def run_with_ticker(label: str, fn, state: Optional[dict] = None,
+                    delay: float = 0.4):
+    """Run blocking `fn()` while a transient spinner + elapsed timer ticks up,
+    so a long-running tool call gives live assurance it's still working.
+    Returns fn()'s value; exceptions (incl. KeyboardInterrupt) propagate once
+    the ticker is torn down. Sets state["live_active"] so the key-watcher won't
+    print into the Live region (same contract as render_stream)."""
+    ticker = _ToolTicker(label, delay=delay)
+    if state is not None:
+        state["live_active"] = True
+    try:
+        with Live(ticker, console=console, refresh_per_second=12,
+                  auto_refresh=True, transient=True):
+            return fn()
+    finally:
+        if state is not None:
+            state["live_active"] = False
