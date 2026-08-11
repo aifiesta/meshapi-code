@@ -59,10 +59,15 @@ _COMPLEX_RE = re.compile(
 )
 
 _MAX_TOKENS_DEFAULTS = {
-    "routine": 1024,
-    "standard": 1024,
-    "complex": 4096,
-    "agentic": 4096,
+    # Backstop against runaway generation — NOT a hard product cap. Kept high
+    # enough not to truncate a normal long answer: the old 1024 clipped a
+    # ~750-word "routine" reply with finish_reason=length, and there is no
+    # retry on a length-truncated 200. You only pay for tokens actually
+    # generated, so a high ceiling costs nothing when the reply is short.
+    "routine": 4096,
+    "standard": 4096,
+    "complex": 8192,
+    "agentic": 8192,
 }
 
 

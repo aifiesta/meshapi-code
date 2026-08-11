@@ -39,7 +39,12 @@ if (-not (Get-Command uv -ErrorAction SilentlyContinue)) {
 # copy, which hides an older pip copy that still wins in new shells. Scan all.
 $shadowPath = $null
 foreach ($m in @(Get-Command meshapi -All -ErrorAction SilentlyContinue)) {
-  if ($m.Source -notmatch 'uv\\tools|\.local\\bin|\.cargo\\bin') { $shadowPath = $m.Source; break }
+  # Only real executables — Get-Command -All also returns aliases/functions
+  # whose empty .Source would pass the -notmatch and stop the scan early.
+  if ($m.CommandType -eq 'Application' -and $m.Source `
+      -and ($m.Source -notmatch 'uv\\tools|\.local\\bin|\.cargo\\bin')) {
+    $shadowPath = $m.Source; break
+  }
 }
 
 # Install, or upgrade if already present (idempotent).
@@ -64,9 +69,15 @@ Write-Host "OK: $(meshapi --version)" -ForegroundColor Green
 # the POSIX `[ -t 1 ]` guard. [Environment]::UserInteractive is TRUE even in CI,
 # so it can't stand alone: also require a non-redirected stdin and no CI marker,
 # else meshapi's first-run key prompt hits a non-tty and exits 1, failing install.
-$canLaunch = [Environment]::UserInteractive `
-  -and (-not [Console]::IsInputRedirected) `
-  -and (-not $env:CI)
+try {
+  $canLaunch = [Environment]::UserInteractive `
+    -and (-not [Console]::IsInputRedirected) `
+    -and (-not $env:CI)
+} catch {
+  # [Console]::IsInputRedirected can throw with no valid console handle; a
+  # launch-gate probe must never fail an already-successful install.
+  $canLaunch = $false
+}
 if ($shadowPath) {
   # A shadow copy makes 'meshapi' in a new shell run the OLD version, so don't
   # launch into a copy the user can't re-launch — explain the fix instead.

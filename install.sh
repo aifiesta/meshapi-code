@@ -44,9 +44,15 @@ command -v curl >/dev/null 2>&1 || die "curl is required (install it, then re-ru
 ensure_uv_on_path
 if ! command -v uv >/dev/null 2>&1; then
   info "Installing uv (Python bootstrapper)…"
-  # Pinned, HTTPS, its own curl|sh — independent of this script's stdin.
-  curl -fsSL "https://astral.sh/uv/${UV_VERSION}/install.sh" | sh \
-    || die "uv install failed — see https://docs.astral.sh/uv/getting-started/installation/"
+  # Download THEN run — NOT `curl … | sh`. POSIX sh has no pipefail, so a failed
+  # curl in a pipe still exits 0 (`sh` reads nothing, exits 0), the `|| die`
+  # never fires, and the failure gets misdiagnosed as "uv not on PATH" below.
+  uv_installer=$(mktemp) || die "couldn't create a temp file for the uv installer."
+  curl -fsSL "https://astral.sh/uv/${UV_VERSION}/install.sh" -o "$uv_installer" \
+    || { rm -f "$uv_installer"; die "couldn't download uv — check your network. See https://docs.astral.sh/uv/getting-started/installation/"; }
+  sh "$uv_installer" \
+    || { rm -f "$uv_installer"; die "uv install failed — see https://docs.astral.sh/uv/getting-started/installation/"; }
+  rm -f "$uv_installer"
   ensure_uv_on_path
 fi
 command -v uv >/dev/null 2>&1 \

@@ -300,6 +300,19 @@ def handle_command(cmd: str, state: dict) -> bool:
 
     elif name == "/model":
         if arg:
+            if arg.strip().lower() == "auto":
+                # "auto" isn't a catalog id, so the validation below would reject
+                # it with a confusing "Unknown model: auto" — but the user
+                # clearly wants the gateway to pick per prompt, which is
+                # /route auto. Do that instead of rejecting a real directive.
+                state["cfg"]["auto_route"] = True
+                save_config(state["cfg"])
+                console.print(
+                    "[dim]Auto-routing on — the gateway picks a model per prompt "
+                    "(same as [bold]/route auto[/bold]; [bold]/route off[/bold] "
+                    "to pin a specific model again).[/dim]"
+                )
+                return True
             # Validate against the live catalog BEFORE persisting — an
             # unknown model written to config.json breaks every future
             # launch, and the error only surfaces on the next prompt
