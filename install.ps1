@@ -34,14 +34,15 @@ if (-not (Get-Command uv -ErrorAction SilentlyContinue)) {
   throw "uv is installed but not on PATH - open a new PowerShell window and re-run this command."
 }
 
-# Warn if a non-uv meshapi is about to be shadowed.
+# Detect a non-uv meshapi that could shadow ours (warned after install).
 $existing = Get-Command meshapi -ErrorAction SilentlyContinue
-if ($existing -and $existing.Source -notmatch 'uv\\tools|\.local\\bin\\meshapi') {
-  Write-Host "Note: found an existing meshapi at $($existing.Source) (not uv-managed). uv will take over the 'meshapi' command." -ForegroundColor Yellow
+$shadowPath = $null
+if ($existing -and $existing.Source -notmatch 'uv\\tools|\.local\\bin|\.cargo\\bin') {
+  $shadowPath = $existing.Source
 }
 
 # Install, or upgrade if already present (idempotent).
-$installed = (uv tool list 2>$null | Select-String "^$Pkg\s") -ne $null
+$installed = $null -ne (uv tool list 2>$null | Select-String "^$Pkg\s")
 if ($installed) {
   Write-Host "Upgrading $Pkg..." -ForegroundColor Cyan
   uv tool upgrade $Pkg
@@ -58,10 +59,22 @@ if (-not (Get-Command meshapi -ErrorAction SilentlyContinue)) {
 }
 Write-Host "OK: $(meshapi --version)" -ForegroundColor Green
 
-# Launch: unlike POSIX `curl | sh`, `irm | iex` runs this script in-process in
-# the console, so a launched meshapi.exe inherits the real console stdin and
-# the first-run key prompt works — no /dev/tty reconnect needed.
-if ([Environment]::UserInteractive) {
+if ($shadowPath) {
+  Write-Host ""
+  Write-Host "WARNING: another meshapi is installed at $shadowPath and may win in new" -ForegroundColor Yellow
+  Write-Host "  terminals (PATH order). If 'meshapi --version' shows an old version there," -ForegroundColor Yellow
+  Write-Host "  remove it (pip uninstall meshapi-code from the Python that owns it), reopen." -ForegroundColor Yellow
+}
+
+# Launch only when a human is actually at an interactive console — the mirror of
+# the POSIX `[ -t 1 ]` guard. [Environment]::UserInteractive is TRUE even in CI,
+# so it can't stand alone: also require a non-redirected stdin and no CI marker,
+# else meshapi's first-run key prompt hits a non-tty and exits 1, which would
+# fail the whole install. When we can't launch, just say how to start.
+$canLaunch = [Environment]::UserInteractive `
+  -and (-not [Console]::IsInputRedirected) `
+  -and (-not $env:CI)
+if ($canLaunch) {
   Write-Host "Launching meshapi... (first run asks for your rsk_ API key)" -ForegroundColor Cyan
   meshapi
 } else {
