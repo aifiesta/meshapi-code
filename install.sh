@@ -62,7 +62,8 @@ set -f            # PATH components must not glob-expand when we word-split them
 IFS=:
 # shellcheck disable=SC2086  # deliberate word-split of PATH on ':'
 for d in $PATH; do
-  [ -n "$d" ] && [ -x "$d/meshapi" ] || continue
+  [ -n "$d" ] || continue
+  [ -x "$d/meshapi" ] || continue
   case "$d/meshapi" in
     *uv/tools*|*/.local/bin/meshapi|*/.cargo/bin/meshapi) : ;;
     *) shadow_path="$d/meshapi"; break ;;
