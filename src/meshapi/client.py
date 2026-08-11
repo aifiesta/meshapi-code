@@ -158,11 +158,15 @@ def _drop_empty_assistant(messages: list) -> list:
     blocks must be non-empty"), which the user experiences as the CLI silently
     hanging (?→? tok forever). Consecutive user messages ARE accepted by the
     gateway, so dropping these is safe."""
+    def _blank(c) -> bool:
+        # content is normally str or None here; a list (multimodal blocks) is
+        # never "blank" — and calling .strip() on it would crash the stream.
+        return c is None or (isinstance(c, str) and not c.strip())
     return [
         m for m in messages
         if not (
             m.get("role") == "assistant"
-            and not (m.get("content") or "").strip()
+            and _blank(m.get("content"))
             and not m.get("tool_calls")
         )
     ]
@@ -219,6 +223,7 @@ def stream_chat(
 
     for attempt_index, body in enumerate(attempts):
         is_last_attempt = attempt_index == len(attempts) - 1
+        retry_raw = False  # set if an in-band error should degrade to the raw request
         with httpx.stream("POST", url, json=body, headers=headers, timeout=120) as r:
             if r.status_code >= 400:
                 r.read()  # so e.response.text works in the caller
@@ -257,9 +262,19 @@ def stream_chat(
                 # surfacing it is what turns a silent "hang" into a real message.
                 err = obj.get("error")
                 if err:
-                    last_meta["error"] = (
-                        err.get("message") if isinstance(err, dict) else str(err)
-                    )
+                    msg = err.get("message") if isinstance(err, dict) else str(err)
+                    if not is_last_attempt:
+                        # Optimized attempt errored in-band (HTTP 200 + {"error"})
+                        # — degrade to the raw request, same as an HTTP 4xx would.
+                        # The optimize beta must never be the reason a turn fails.
+                        plan = {
+                            "dial": dial,
+                            "levers_applied": [],
+                            "degraded": "gateway in-band error on optimized request, sent raw",
+                        }
+                        retry_raw = True
+                    else:
+                        last_meta["error"] = msg
                     break
 
                 if obj.get("model"):
@@ -293,6 +308,8 @@ def stream_chat(
                 cost = obj.get("cost")
                 if usage or cost:
                     last_meta = {"usage": usage, "cost": cost}
+        if retry_raw:
+            continue  # optimized attempt errored in-band — try the raw request
         break  # this attempt streamed successfully
 
     if last_model:

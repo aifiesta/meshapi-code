@@ -1897,38 +1897,37 @@ def main() -> None:
                 last_optimize_plan = meta.get("optimize_plan") or last_optimize_plan
 
                 tool_calls = meta.get("tool_calls") or []
-                if not tool_calls:
-                    _err = meta.get("error")
-                    if _err or not (reply or "").strip():
-                        # Empty or errored final response. Appending an empty
-                        # assistant message would poison EVERY later turn (the
-                        # backend rejects empty text blocks with 200 + an
-                        # in-band ValidationException — the classic "?→? tok"
-                        # hang). Surface it and end the turn WITHOUT polluting
-                        # history; the user's message stays, and consecutive
-                        # user messages are accepted, so they can resend or
-                        # say "continue".
-                        turn_failed = True
-                        console.rule(style="dim yellow", characters="─")
-                        if _err:
-                            console.print(
-                                "[yellow]⚠ The gateway returned an error instead "
-                                "of a reply:[/yellow]"
-                            )
-                            console.print(f"[dim]  {_rich_escape(str(_err))}[/dim]")
-                        else:
-                            console.print(
-                                "[yellow]⚠ The model returned an empty "
-                                "response.[/yellow]"
-                            )
+                _err = meta.get("error")
+                if _err or (not tool_calls and not (reply or "").strip()):
+                    # Errored (even if tool-call deltas ALSO streamed — don't
+                    # execute likely-broken tools) OR an empty final reply.
+                    # Appending an empty assistant message would poison EVERY
+                    # later turn (the backend rejects empty text blocks with 200
+                    # + an in-band ValidationException — the "?→? tok" hang), so
+                    # surface it and end the turn WITHOUT polluting history. The
+                    # user's message stays; consecutive user messages are
+                    # accepted, so they can resend or say "continue".
+                    turn_failed = True
+                    console.rule(style="dim yellow", characters="─")
+                    if _err:
                         console.print(
-                            "[dim]  Nothing was added to the conversation — "
-                            "resend your message or say 'continue'. If it keeps "
-                            "happening the context may be large or the "
-                            "model/gateway may be rate-limiting: /clear to reset, "
-                            "/optimize to trim, or /model to switch.[/dim]"
+                            "[yellow]⚠ The gateway returned an error instead of a "
+                            "reply:[/yellow]"
                         )
-                        break
+                        console.print(f"[dim]  {_rich_escape(str(_err))}[/dim]")
+                    else:
+                        console.print(
+                            "[yellow]⚠ The model returned an empty response.[/yellow]"
+                        )
+                    console.print(
+                        "[dim]  This turn was discarded (not saved) — resend your "
+                        "message or say 'continue'. If it keeps happening the "
+                        "context may be large or the model/gateway may be "
+                        "rate-limiting: /clear to reset, /optimize to trim, or "
+                        "/model to switch.[/dim]"
+                    )
+                    break
+                if not tool_calls:
                     state["messages"].append({"role": "assistant", "content": reply})
                     # Quality guard: the model ended its turn but files it
                     # wrote still carry stub markers. Spend ONE fix-it hop
