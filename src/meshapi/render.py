@@ -83,6 +83,43 @@ def _fmt_k(n: int) -> str:
     return f"{n / 1000:.1f}k" if n >= 1000 else str(n)
 
 
+def _live_footer(console, state) -> list:
+    """Live-only input footer shared by the streaming view and the tool ticker:
+    a dim rule, the always-visible mode row (read per frame so a mid-run
+    shift+tab shows within one 12fps refresh), and the type-ahead / queue line
+    when the user is typing or has messages queued. Never rendered into a
+    transcript — callers drop it on their final (done) frame."""
+    if state is None:
+        return []
+    width = console.size.width or 80
+    rows = [Text("─" * max(10, width - 1), style=BRAND_DIM)]
+    m = state.get("mode")
+    label = LABELS.get(m, "") if m is not None else ""
+    row = Text()
+    if label:
+        row.append(f"⏵⏵ {label}", style=f"bold {RICH_COLOR.get(m, 'green')}")
+    else:
+        row.append("default mode", style="dim")
+    row.append("  (shift+tab to cycle · esc to interrupt)", style="dim")
+    rows.append(row)
+    watcher = state.get("watcher")
+    typeahead = getattr(watcher, "typeahead", "") if watcher is not None else ""
+    queued = len(state.get("input_queue") or ())
+    if typeahead or queued:
+        line = Text()
+        line.append("› ", style=BRAND)
+        shown = typeahead.replace("\n", "⏎")
+        budget = max(10, width - 18)
+        if len(shown) > budget:
+            shown = "…" + shown[-budget:]
+        line.append(shown)  # Text.append — user text is never markup-parsed
+        line.append("█", style=BRAND)
+        if queued:
+            line.append(f"  ({queued} queued)", style="dim")
+        rows.append(line)
+    return rows
+
+
 class _StreamView:
     """Renderable: phase-aware spinner + elapsed timer above streamed markdown.
 
@@ -125,40 +162,7 @@ class _StreamView:
         return "meshing around"
 
     def _footer(self, console) -> list:
-        """Live-only input footer: dim rule, always-visible mode row (read
-        per frame — a mid-stream shift+tab shows within one 12fps refresh),
-        and the type-ahead line when the user is typing or has queued
-        messages. Never rendered once done — transcripts stay clean."""
-        state = self.state
-        if state is None:
-            return []
-        width = console.size.width or 80
-        rows = [Text("─" * max(10, width - 1), style=BRAND_DIM)]
-        m = state.get("mode")
-        label = LABELS.get(m, "") if m is not None else ""
-        row = Text()
-        if label:
-            row.append(f"⏵⏵ {label}", style=f"bold {RICH_COLOR.get(m, 'green')}")
-        else:
-            row.append("default mode", style="dim")
-        row.append("  (shift+tab to cycle · esc to interrupt)", style="dim")
-        rows.append(row)
-        watcher = state.get("watcher")
-        typeahead = getattr(watcher, "typeahead", "") if watcher is not None else ""
-        queued = len(state.get("input_queue") or ())
-        if typeahead or queued:
-            line = Text()
-            line.append("› ", style=BRAND)
-            shown = typeahead.replace("\n", "⏎")
-            budget = max(10, width - 18)
-            if len(shown) > budget:
-                shown = "…" + shown[-budget:]
-            line.append(shown)  # Text.append — user text is never markup-parsed
-            line.append("█", style=BRAND)
-            if queued:
-                line.append(f"  ({queued} queued)", style="dim")
-            rows.append(line)
-        return rows
+        return _live_footer(console, self.state)
 
     def __rich_console__(self, console, options):
         if self.done:
@@ -255,15 +259,17 @@ def render_stream(events: Iterable, header: str = "", state: Optional[dict] = No
 
 
 class _ToolTicker:
-    """Transient one-line spinner + live elapsed timer shown while a blocking
-    tool (a slow run_bash, a web search) runs, so it never looks frozen.
-    Recomputes elapsed on every refresh — no background thread. Stays blank for
-    the first `delay` seconds so fast calls don't flash a spinner."""
+    """Transient spinner + live elapsed timer (plus the shared mode/queue
+    footer) shown while a blocking tool (a slow run_bash, a web search) runs,
+    so it never looks frozen. Recomputes elapsed on every refresh — no
+    background thread. Stays blank for the first `delay` seconds so fast calls
+    don't flash a spinner."""
 
     _FRAMES = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
 
-    def __init__(self, label: str, delay: float = 0.4) -> None:
+    def __init__(self, label: str, state=None, delay: float = 0.4) -> None:
         self._label = label
+        self._state = state
         self._delay = delay
         self._start = time.monotonic()
 
@@ -278,6 +284,10 @@ class _ToolTicker:
         line.append(f"{self._label} · ", style="dim")
         line.append(f"{elapsed:.0f}s", style=BRAND_DIM)
         yield line
+        # Same mode / type-ahead / queue footer streaming shows, so queuing a
+        # message or cycling the mode during a long tool run behaves identically.
+        for row in _live_footer(console, self._state):
+            yield row
 
 
 def run_with_ticker(label: str, fn, state: Optional[dict] = None,
@@ -287,7 +297,7 @@ def run_with_ticker(label: str, fn, state: Optional[dict] = None,
     Returns fn()'s value; exceptions (incl. KeyboardInterrupt) propagate once
     the ticker is torn down. Sets state["live_active"] so the key-watcher won't
     print into the Live region (same contract as render_stream)."""
-    ticker = _ToolTicker(label, delay=delay)
+    ticker = _ToolTicker(label, state=state, delay=delay)
     if state is not None:
         state["live_active"] = True
     try:
