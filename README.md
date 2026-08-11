@@ -12,7 +12,7 @@ Agentic terminal CLI for [Mesh API](https://meshapi.ai) — one OpenAI-compatibl
 $ meshapi
 ███╗   ███╗███████╗███████╗██╗  ██╗
 ████╗ ████║██╔════╝██╔════╝██║  ██║
-██╔████╔██║█████╗  ███████╗███████║   ✦  meshapi 0.5.6
+██╔████╔██║█████╗  ███████╗███████║   ✦  meshapi 0.5.7
 ██║╚██╔╝██║██╔══╝  ╚════██║██╔══██║   cwd:   ~/code/myproj
 ██║ ╚═╝ ██║███████╗███████║██║  ██║   model: anthropic/claude-sonnet-4.5
 ╚═╝     ╚═╝╚══════╝╚══════╝╚═╝  ╚═╝   route: off
@@ -115,9 +115,9 @@ API key ›
 When a new version ships, the CLI offers it — no manual checking:
 
 ```
-⬆ meshapi 0.5.7 available (you have 0.5.6)
+⬆ meshapi 0.5.8 available (you have 0.5.7)
 upgrade now? y (yes) / n (no)  › y
-✓ upgraded to 0.5.7 — restart meshapi to pick it up.
+✓ upgraded to 0.5.8 — restart meshapi to pick it up.
 ```
 
 Declining a version never re-nags. `/update` checks on demand.

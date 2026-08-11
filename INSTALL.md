@@ -92,7 +92,7 @@ pipx install meshapi-code
 Verify:
 
 ```powershell
-meshapi --version        # -> meshapi 0.5.6
+meshapi --version        # -> meshapi 0.5.7
 ```
 
 If PowerShell says `meshapi` is not recognized, run `pipx ensurepath` again, then close
@@ -121,7 +121,7 @@ API key › ••••••••••••  (hidden as you paste)
 
 ███╗   ███╗███████╗███████╗██╗  ██╗
 ████╗ ████║██╔════╝██╔════╝██║  ██║
-██╔████╔██║█████╗  ███████╗███████║   ✦  meshapi 0.5.6
+██╔████╔██║█████╗  ███████╗███████║   ✦  meshapi 0.5.7
 ██║╚██╔╝██║██╔══╝  ╚════██║██╔══██║   cwd:   C:\Users\you\projects\hello
 ██║ ╚═╝ ██║███████╗███████║██║  ██║   model: anthropic/claude-sonnet-4.5
 ╚═╝     ╚═╝╚══════╝╚══════╝╚═╝  ╚═╝   route: off
@@ -194,7 +194,7 @@ pipx install meshapi-code
 Verify:
 
 ```bash
-meshapi --version          # -> meshapi 0.5.6
+meshapi --version          # -> meshapi 0.5.7
 ```
 
 ## Step 4 — Run it (first launch sets up your key)
@@ -220,7 +220,7 @@ API key › ••••••••••••  (hidden as you paste)
 
 ███╗   ███╗███████╗███████╗██╗  ██╗
 ████╗ ████║██╔════╝██╔════╝██║  ██║
-██╔████╔██║█████╗  ███████╗███████║   ✦  meshapi 0.5.6
+██╔████╔██║█████╗  ███████╗███████║   ✦  meshapi 0.5.7
 ██║╚██╔╝██║██╔══╝  ╚════██║██╔══██║   cwd:   ~/projects/hello
 ██║ ╚═╝ ██║███████╗███████║██║  ██║   model: anthropic/claude-sonnet-4.5
 ╚═╝     ╚═╝╚══════╝╚══════╝╚═╝  ╚═╝   route: off
@@ -254,7 +254,7 @@ The first `meshapi` launch handles the key for you (shown above). After that, a 
 test:
 
 ```
-meshapi --version     # meshapi 0.5.6
+meshapi --version     # meshapi 0.5.7
 meshapi               # launches straight into the REPL
 > hello               # streams a reply, then prints a cost line
 > /model openai/gpt-4o-mini

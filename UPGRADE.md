@@ -1,4 +1,4 @@
-# Upgrading `meshapi` to 0.5.6
+# Upgrading `meshapi` to 0.5.7
 
 **0.5.1 is a major update** — first-run key setup, an update checker, real
 auto-routing, a fuzzy model picker, web search, an agentic quality guard, and
@@ -24,7 +24,7 @@ Not sure how you installed it? Try `pipx list` — if `meshapi-code` shows up, u
 Then **verify**:
 
 ```
-meshapi --version      # -> meshapi 0.5.6
+meshapi --version      # -> meshapi 0.5.7
 ```
 
 If it still shows an old version, jump to [Troubleshooting](#troubleshooting).

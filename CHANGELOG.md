@@ -2,6 +2,13 @@
 
 All notable changes to `meshapi-code`. Upgrade with `pipx upgrade meshapi-code`.
 
+## 0.5.7 — 2026-08-11 · "reliability & hardening"
+- **Fixed the long-session "hang."** After a transient empty response the CLI used to append an empty assistant message, which the backend then rejected on *every* later turn (HTTP 200 + an in-band error that was silently dropped) — the session looked frozen with `?→? tok`. Empty assistant messages are now stripped before sending, in-band errors are surfaced instead of dropped, and an empty/errored turn ends cleanly with a clear message instead of poisoning the conversation.
+- **Live progress during tool calls.** A long-running `run_bash` (or web search) now shows a spinner + elapsed timer (`⠹ running · 12s`) plus the same mode / type-ahead / queued-message footer that streaming shows — no more staring at a static line wondering if it's stuck.
+- **Security & robustness hardening** (from a full pre-release audit): a corrupt `config.json` degrades to defaults instead of bricking launch (and saves are now atomic); the destructive-command guard is case-insensitive and now catches `rm --recursive --force`, `find -delete`, `git clean -f`, `shred`, and redirects to protected paths like `>> ~/.ssh/authorized_keys`; `/image` URL fetches re-validate every redirect hop (SSRF); `base_url` accepts only genuinely-local `http://` hosts.
+- `/model auto` now enables auto-routing instead of erroring "Unknown model: auto"; `/optimize`'s token cap no longer clips long answers; installer failure paths report the real cause; installer PATH-shadow detection is more robust.
+- **First automated test suite** — a 463-test `pytest` suite (`tests/`, `python -m pytest`) with CI on Ubuntu/macOS × Python 3.10/3.13 and a regression test for every fix above.
+
 ## 0.5.6 — 2026-08-06 · "one-line install"
 - **One-command install, any OS, nothing preinstalled.** New `install.sh` (macOS/Linux) and `install.ps1` (Windows) bootstrap [uv](https://astral.sh), which brings its own Python — no manual Python or pipx. `curl -fsSL https://cli.meshapi.ai/install.sh | sh` installs uv (if missing), `uv tool install`s meshapi, fixes PATH, and drops you into the first-run key prompt. Idempotent: re-running upgrades an existing install; a returning user with a key set skips straight to the REPL.
 - **`meshapi upgrade`** — upgrade from the shell without entering the chat. Reuses the same pipx/uv/pip resolution as the in-REPL `/update` (and the same "exit first" guidance on Windows, where the `.exe` is file-locked).
