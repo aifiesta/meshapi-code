@@ -132,20 +132,32 @@ def _looks_like_url(s: str) -> bool:
 
 
 def _fetch_url(url: str) -> tuple[bytes, str, str]:
-    # SSRF guard: refuse loopback/private/link-local before issuing the
-    # request. Imported lazily so attachments.py doesn't pull in safety on
-    # every code path.
+    # SSRF guard: refuse loopback/private/link-local, and RE-VALIDATE every
+    # redirect hop — a public URL can 302 to 169.254.169.254 (cloud metadata)
+    # or 127.0.0.1, and follow_redirects=True would chase it blindly. So we
+    # follow manually and run is_url_safe_for_fetch on each target. Imported
+    # lazily so attachments.py doesn't pull in safety on every code path.
     from .safety import is_url_safe_for_fetch
 
-    ok, reason = is_url_safe_for_fetch(url)
-    if not ok:
-        raise AttachmentError(f"refusing to fetch {url}: {reason}")
+    data = b""
+    mime = ""
     try:
-        with httpx.Client(timeout=30, follow_redirects=True) as client:
-            r = client.get(url)
-            r.raise_for_status()
-            data = r.content
-            mime = r.headers.get("content-type", "").split(";")[0].strip()
+        with httpx.Client(timeout=30, follow_redirects=False) as client:
+            current = url
+            for _hop in range(6):  # bounded redirect chain
+                ok, reason = is_url_safe_for_fetch(current)
+                if not ok:
+                    raise AttachmentError(f"refusing to fetch {current}: {reason}")
+                r = client.get(current)
+                if r.is_redirect and r.headers.get("location"):
+                    current = str(r.url.join(r.headers["location"]))
+                    continue
+                r.raise_for_status()
+                data = r.content
+                mime = r.headers.get("content-type", "").split(";")[0].strip()
+                break
+            else:
+                raise AttachmentError(f"too many redirects fetching {url}")
     except httpx.HTTPError as e:
         raise AttachmentError(f"couldn't fetch {url}: {e}") from None
 

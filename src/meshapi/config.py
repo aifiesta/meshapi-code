@@ -61,11 +61,18 @@ def secure_file(path: Path) -> None:
 
 
 def _validate_base_url(url: str) -> str:
-    u = (url or "").strip().rstrip("/")
+    if not isinstance(url, str):
+        url = str(url or "")  # a hand-edited non-string base_url must not crash
+    u = url.strip().rstrip("/")
     if u.startswith("https://"):
         return u
-    if u.startswith(("http://localhost", "http://127.0.0.1")):
-        return u  # local dev/proxy is the only http:// allowed
+    # http:// is allowed ONLY for a genuinely-local host. Bound the host match
+    # so http://localhost.evil.com / http://127.0.0.1.attacker can't smuggle the
+    # bearer key to an external host in cleartext.
+    if u.startswith("http://"):
+        host = u[len("http://"):].split("/", 1)[0].split(":", 1)[0]
+        if host in ("localhost", "127.0.0.1", "[::1]", "::1"):
+            return u
     print(
         f"meshapi: refusing to use base_url {url!r} — must be https:// "
         "(or http://localhost for local dev). The Authorization header "
@@ -99,7 +106,21 @@ def load_config() -> dict:
     if not CONFIG_FILE.exists():
         CONFIG_FILE.write_text(json.dumps(DEFAULT_CONFIG, indent=2))
     secure_file(CONFIG_FILE)
-    cfg = {**DEFAULT_CONFIG, **json.loads(CONFIG_FILE.read_text())}
+    # A corrupt/non-object config.json must NEVER brick launch (a truncated
+    # write, a bad hand-edit). Every other loader here already degrades to a
+    # default — load_config used to be the exception and would crash the CLI.
+    try:
+        loaded = json.loads(CONFIG_FILE.read_text())
+        if not isinstance(loaded, dict):
+            raise ValueError("config.json is not a JSON object")
+    except (json.JSONDecodeError, ValueError, OSError) as e:
+        print(
+            f"meshapi: ~/.meshapi/config.json is unreadable ({e}); using "
+            "defaults. Fix or delete it to silence this.",
+            file=sys.stderr,
+        )
+        loaded = {}
+    cfg = {**DEFAULT_CONFIG, **loaded}
     # `route` (cheapest/fastest/balanced) never existed gateway-side and was
     # replaced by auto_route in 0.5.0 — drop the stale key from old configs
     # (it disappears from disk on the next save_config).
@@ -129,8 +150,13 @@ def load_config() -> dict:
 def save_config(cfg: dict) -> None:
     _secure_dir(CONFIG_DIR)
     persisted = {k: v for k, v in cfg.items() if k != "api_key"}
-    CONFIG_FILE.write_text(json.dumps(persisted, indent=2))
-    secure_file(CONFIG_FILE)
+    # Atomic write (temp + os.replace) like save_servers/save_update_check — a
+    # bare write_text truncates first, so an interrupt mid-save leaves a
+    # corrupt config.json that (before the load guard above) bricked launch.
+    tmp = CONFIG_FILE.with_name(CONFIG_FILE.name + ".tmp")
+    tmp.write_text(json.dumps(persisted, indent=2))
+    secure_file(tmp)  # 0600 before it becomes config.json — no readable window
+    os.replace(tmp, CONFIG_FILE)
 
 
 def save_servers(servers: list) -> None:

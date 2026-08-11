@@ -62,32 +62,63 @@ _SENSITIVE_EXT_PATTERN = re.compile(
     r"\.(pem|key|p12|pfx|crt|cer|der|asc|gpg|kdbx)$", re.IGNORECASE
 )
 
-# Destructive / exfiltration shell patterns. Pattern → human-readable reason.
-# Tuned to catch shapes that are almost never intentional in an agentic dev
-# loop; legitimate uses still work via the y/n confirm path.
-_DANGEROUS_BASH_PATTERNS: tuple = (
-    (re.compile(r"\brm\s+(-[a-zA-Z]+\s+)*[/~]"),       "rm targeting / or ~"),
-    (re.compile(r"\brm\s+-[rRfF]"),                     "rm -rf / -fr"),
-    (re.compile(r"\bsudo\b"),                           "sudo (privilege escalation)"),
-    (re.compile(r"(?:curl|wget|fetch)\s[^|]*\|\s*(sh|bash|zsh|python|node|perl|ruby)\b"),
+# Destructive / exfiltration shell patterns as (regex, reason), compiled
+# case-INSENSITIVELY below — `RM -RF` / `SUDO` still resolve to /bin/rm and
+# /usr/bin/sudo on a case-insensitive filesystem (macOS default). Tuned to catch
+# shapes almost never intentional in an agentic dev loop; legitimate uses still
+# work via the y/n confirm path (a false positive is only an extra prompt).
+_DANGEROUS_BASH_SPECS: tuple = (
+    (r"\brm\s+(-\S+\s+)*[/~]",                          "rm targeting / or ~"),
+    (r"\brm\s+-[a-z]*[rf]",                             "rm -rf / -fr"),
+    (r"\brm\b[^\n;|]*\s--(recursive|force|no-preserve-root)\b", "rm with --recursive/--force"),
+    (r"\bfind\b[^\n;|]*\s-delete\b",                    "find -delete (recursive deletion)"),
+    (r"\bfind\b[^\n;|]*-exec\s+rm\b",                   "find -exec rm"),
+    (r"\bgit\s+clean\b[^\n;|]*(?:-\w*f|--force)",       "git clean -f (deletes untracked files)"),
+    (r"\bshred\b",                                      "shred (secure delete)"),
+    (r"\btruncate\b[^\n]*-s\s*0\b",                     "truncate -s 0 (empties a file)"),
+    (r"\bsudo\b",                                       "sudo (privilege escalation)"),
+    (r"(?:curl|wget|fetch)\s[^|]*\|\s*(sh|bash|zsh|python|node|perl|ruby)\b",
                                                         "piping a download into a shell"),
-    (re.compile(r"\bdd\s+if="),                         "dd (raw block I/O)"),
-    (re.compile(r"\bmkfs(\.[A-Za-z0-9]+)?\b"),          "mkfs (filesystem format)"),
-    (re.compile(r"\bchmod\s+(-R\s+)?[+\-=0-7]+\s+[/~]"),"recursive chmod on / or ~"),
-    (re.compile(r"\bchown\s+(-R\s+)?\S+\s+[/~]"),       "chown on / or ~"),
-    (re.compile(r":\(\)\s*\{\s*:\|:&\s*\};:"),          "fork bomb"),
-    (re.compile(r">\s*/dev/(sd[a-z]|nvme|disk|hd[a-z])"),"writing to raw block device"),
-    (re.compile(r"\bnc(?:at)?\b[^\n]*-[lL]\b"),         "netcat listener (possible reverse shell)"),
-    (re.compile(r"\b(env|printenv|history)\b[^\n]*\|[^\n]*\b(curl|wget|nc|ncat|xh|http)\b"),
+    (r"\bdd\s+if=",                                     "dd (raw block I/O)"),
+    (r"\bmkfs(\.[A-Za-z0-9]+)?\b",                      "mkfs (filesystem format)"),
+    (r"\bchmod\s+(-R\s+)?[+\-=0-7]+\s+[/~]",            "recursive chmod on / or ~"),
+    (r"\bchown\s+(-R\s+)?\S+\s+[/~]",                   "chown on / or ~"),
+    (r":\(\)\s*\{\s*:\|:&\s*\};:",                      "fork bomb"),
+    (r">\s*/dev/(sd[a-z]|nvme|disk|hd[a-z])",           "writing to raw block device"),
+    (r"\bnc(?:at)?\b[^\n]*-[lL]\b",                     "netcat listener (possible reverse shell)"),
+    (r"\b(env|printenv|history)\b[^\n]*\|[^\n]*\b(curl|wget|nc|ncat|xh|http)\b",
                                                         "exfiltrating env/history over the network"),
-    (re.compile(r"\bcat\s+/etc/(passwd|shadow|sudoers|hostname|hosts)\b"),
-                                                        "reading sensitive system files"),
-    (re.compile(r"\b(cat|head|tail|less|more)\s+~?/?\.(ssh|aws|gnupg|netrc)\b"),
-                                                        "reading a credential directory"),
-    (re.compile(r"\bssh-keygen\b[^\n]*\s-f\s+[^/\s]"),  "writing an ssh key to an implicit location"),
-    (re.compile(r"\beval\s+[\"'`]?\$\(.*curl"),         "eval of a downloaded payload"),
-    (re.compile(r"\b(shutdown|reboot|halt|poweroff)\b"),"system shutdown / reboot"),
+    (r"\bcat\s+/etc/(passwd|shadow|sudoers|hostname|hosts)\b", "reading sensitive system files"),
+    (r"\b(cat|head|tail|less|more)\s+~?/?\.(ssh|aws|gnupg|netrc)\b", "reading a credential directory"),
+    (r"\bssh-keygen\b[^\n]*\s-f\s+[^/\s]",              "writing an ssh key to an implicit location"),
+    (r"\beval\s+[\"'`]?\$\(.*curl",                     "eval of a downloaded payload"),
+    (r"\b(shutdown|reboot|halt|poweroff)\b",            "system shutdown / reboot"),
 )
+_DANGEROUS_BASH_PATTERNS: tuple = tuple(
+    (re.compile(rx, re.IGNORECASE), reason) for rx, reason in _DANGEROUS_BASH_SPECS
+)
+
+# Output-redirect / write targets, so a redirect to a denylisted path
+# (>> ~/.ssh/authorized_keys, > /etc/passwd, curl -o ~/.bashrc, tee, dd of=) is
+# caught even though run_bash never calls is_path_safe_for_auto_write itself.
+_REDIRECT_TARGET_PATTERNS: tuple = (
+    re.compile(r">>?\s*([^\s;|&()<>]+)"),
+    re.compile(r"(?:^|\s)-o\s+([^\s;|&()<>]+)"),
+    re.compile(r"--output(?:=|\s+)([^\s;|&()<>]+)"),
+    re.compile(r"\btee\s+(?:-a\s+)?([^\s;|&()<>-][^\s;|&()<>]*)", re.IGNORECASE),
+    re.compile(r"\bof=([^\s;|&()<>]+)"),
+)
+
+
+def _redirect_targets(cmd: str) -> list:
+    """Best-effort paths a command writes to via redirection/-o/tee/dd."""
+    targets: list = []
+    for pat in _REDIRECT_TARGET_PATTERNS:
+        for m in pat.findall(cmd):
+            t = m if isinstance(m, str) else (m[0] if m else "")
+            if t and not t.startswith(("/dev/", "&")):
+                targets.append(t)
+    return targets
 
 
 def is_path_safe_for_auto_write(
@@ -177,6 +208,13 @@ def is_command_safe_for_auto(
         for pattern, reason in _DANGEROUS_BASH_PATTERNS:
             if pattern.search(cmd):
                 return False, reason
+        # A redirect/-o/tee/dd whose target is a denylisted path (checked at
+        # BYPASS strictness = denylist only, so ordinary writes to cwd or /tmp
+        # still auto-approve). Closes the `>> ~/.ssh/authorized_keys` hole.
+        for target in _redirect_targets(cmd):
+            allowed, reason = is_path_safe_for_auto_write(target, Mode.BYPASS)
+            if not allowed:
+                return False, f"redirect writes to a protected path ({reason})"
     return True, None
 
 
