@@ -1,0 +1,29 @@
+name: tests
+
+# Unit + mocked-integration test suite. No network/gateway calls — the client
+# is exercised via httpx MockTransport — so this is deterministic and offline.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  pytest:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        python-version: ["3.10", "3.13"]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install package + test deps
+        run: python -m pip install -e ".[test]"
+      - name: Run tests
+        run: python -m pytest

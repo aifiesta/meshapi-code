@@ -4,6 +4,7 @@ import os
 import stat
 import sys
 from pathlib import Path
+from urllib.parse import urlparse
 
 CONFIG_DIR = Path.home() / ".meshapi"
 CONFIG_FILE = CONFIG_DIR / "config.json"
@@ -69,9 +70,17 @@ def _validate_base_url(url: str) -> str:
     # http:// is allowed ONLY for a genuinely-local host. Bound the host match
     # so http://localhost.evil.com / http://127.0.0.1.attacker can't smuggle the
     # bearer key to an external host in cleartext.
+    # http:// allowed ONLY for a genuinely-local host. Use the URL parser's
+    # host extraction — the same host the HTTP client actually connects to —
+    # so http://localhost.evil.com and http://127.0.0.1.evil.com resolve to
+    # their real external hostnames and are rejected, not smuggled as "local"
+    # (a prefix check let them through; a hand-split broke IPv6 [::1]).
     if u.startswith("http://"):
-        host = u[len("http://"):].split("/", 1)[0].split(":", 1)[0]
-        if host in ("localhost", "127.0.0.1", "[::1]", "::1"):
+        try:
+            host = (urlparse(u).hostname or "").lower()
+        except ValueError:
+            host = ""
+        if host in ("localhost", "127.0.0.1", "::1"):
             return u
     print(
         f"meshapi: refusing to use base_url {url!r} — must be https:// "
