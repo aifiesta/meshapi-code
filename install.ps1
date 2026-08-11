@@ -34,11 +34,12 @@ if (-not (Get-Command uv -ErrorAction SilentlyContinue)) {
   throw "uv is installed but not on PATH - open a new PowerShell window and re-run this command."
 }
 
-# Detect a non-uv meshapi that could shadow ours (warned after install).
-$existing = Get-Command meshapi -ErrorAction SilentlyContinue
+# Detect a non-uv meshapi ANYWHERE on PATH (warned after install). Get-Command
+# without -All returns only the first match — on an upgrade that's our own uv
+# copy, which hides an older pip copy that still wins in new shells. Scan all.
 $shadowPath = $null
-if ($existing -and $existing.Source -notmatch 'uv\\tools|\.local\\bin|\.cargo\\bin') {
-  $shadowPath = $existing.Source
+foreach ($m in @(Get-Command meshapi -All -ErrorAction SilentlyContinue)) {
+  if ($m.Source -notmatch 'uv\\tools|\.local\\bin|\.cargo\\bin') { $shadowPath = $m.Source; break }
 }
 
 # Install, or upgrade if already present (idempotent).
@@ -59,22 +60,23 @@ if (-not (Get-Command meshapi -ErrorAction SilentlyContinue)) {
 }
 Write-Host "OK: $(meshapi --version)" -ForegroundColor Green
 
-if ($shadowPath) {
-  Write-Host ""
-  Write-Host "WARNING: another meshapi is installed at $shadowPath and may win in new" -ForegroundColor Yellow
-  Write-Host "  terminals (PATH order). If 'meshapi --version' shows an old version there," -ForegroundColor Yellow
-  Write-Host "  remove it (pip uninstall meshapi-code from the Python that owns it), reopen." -ForegroundColor Yellow
-}
-
 # Launch only when a human is actually at an interactive console — the mirror of
 # the POSIX `[ -t 1 ]` guard. [Environment]::UserInteractive is TRUE even in CI,
 # so it can't stand alone: also require a non-redirected stdin and no CI marker,
-# else meshapi's first-run key prompt hits a non-tty and exits 1, which would
-# fail the whole install. When we can't launch, just say how to start.
+# else meshapi's first-run key prompt hits a non-tty and exits 1, failing install.
 $canLaunch = [Environment]::UserInteractive `
   -and (-not [Console]::IsInputRedirected) `
   -and (-not $env:CI)
-if ($canLaunch) {
+if ($shadowPath) {
+  # A shadow copy makes 'meshapi' in a new shell run the OLD version, so don't
+  # launch into a copy the user can't re-launch — explain the fix instead.
+  Write-Host ""
+  Write-Host "WARNING: another meshapi is EARLIER on your PATH and will win:" -ForegroundColor Yellow
+  Write-Host "    $shadowPath" -ForegroundColor Yellow
+  Write-Host "  Your 'meshapi' command runs that OLD copy (symptom: 'No API key found')." -ForegroundColor Yellow
+  Write-Host "  Remove it (pip uninstall meshapi-code from the Python that owns it)," -ForegroundColor Yellow
+  Write-Host "  reopen PowerShell, then run:  meshapi" -ForegroundColor Yellow
+} elseif ($canLaunch) {
   Write-Host "Launching meshapi... (first run asks for your rsk_ API key)" -ForegroundColor Cyan
   meshapi
 } else {

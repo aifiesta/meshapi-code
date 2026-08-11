@@ -52,15 +52,24 @@ fi
 command -v uv >/dev/null 2>&1 \
   || die "uv is installed but not on PATH — open a new terminal and re-run this command."
 
-# --- detect a non-uv meshapi that could shadow ours (warned after install) -
+# --- detect a non-uv meshapi ANYWHERE on PATH that could shadow ours -------
+# `command -v` returns only the FIRST match — on an upgrade that's our own
+# freshly-prepended uv copy, which hides an OLDER copy (e.g. a python.org
+# framework `pip install`) still sitting earlier on PATH for NEW shells. Scan
+# every PATH entry, skipping our own dirs.
 shadow_path=""
-if command -v meshapi >/dev/null 2>&1; then
-  cur=$(command -v meshapi)
-  case "$cur" in
-    *"uv/tools"*|*"/.local/bin/meshapi"|*"/.cargo/bin/meshapi") : ;;  # ours
-    *) shadow_path="$cur" ;;
+set -f            # PATH components must not glob-expand when we word-split them
+IFS=:
+# shellcheck disable=SC2086  # deliberate word-split of PATH on ':'
+for d in $PATH; do
+  [ -n "$d" ] && [ -x "$d/meshapi" ] || continue
+  case "$d/meshapi" in
+    *uv/tools*|*/.local/bin/meshapi|*/.cargo/bin/meshapi) : ;;
+    *) shadow_path="$d/meshapi"; break ;;
   esac
-fi
+done
+unset IFS         # restore default word-splitting for the rest of the script
+set +f
 
 # --- install, or upgrade if already present (idempotent) ------------------
 if uv tool list 2>/dev/null | grep -q "^${PKG} "; then
@@ -81,23 +90,24 @@ info "✓ $(meshapi --version 2>/dev/null || echo "${PKG} installed")"
 
 # A prior `pip install meshapi-code` (often a python.org framework build) can
 # sit EARLIER on PATH than uv's dir, so in a NEW terminal `meshapi` runs the
-# stale copy and dies with "No API key found … edit config.json" even though
-# this install succeeded. Surface it loudly, with the exact removal command.
+# STALE copy and dies with "No API key found … edit config.json" even though
+# this install succeeded — the single most confusing failure mode. When we
+# detect that, DON'T launch into a copy the user can't re-launch (that reads as
+# "it worked once, then broke"); explain the fix and how to start instead.
 if [ -n "$shadow_path" ]; then
   warn ""
-  warn "⚠ Heads up: another meshapi is installed at"
+  warn "⚠ Installed — but another meshapi is EARLIER on your PATH and will win:"
   warn "    $shadow_path"
-  warn "  It may take priority in NEW terminals (PATH order). If 'meshapi --version'"
-  warn "  there shows an old version, remove that copy and reopen your terminal:"
+  warn "  Your 'meshapi' command runs that OLD copy (symptom: 'No API key found')."
+  warn "  Remove it, then open a new terminal:"
   warn "    \"${shadow_path%/meshapi}/python3\" -m pip uninstall meshapi-code"
-fi
-
-# --- launch on the controlling terminal, else print how to start ----------
+  warn "  After that, just run:  meshapi"
+# --- otherwise launch on the controlling terminal, else print how to start -
 # In `curl … | sh`, this script's stdin is the pipe (not a TTY), so meshapi's
 # first-run key prompt would exit immediately. Reconnect stdin to the real
 # terminal, gated on an interactive session ([ -t 1 ] => a human is watching).
 # `exec` as the last statement means sh never reads more of the piped script.
-if [ -t 1 ] && [ -r /dev/tty ]; then
+elif [ -t 1 ] && [ -r /dev/tty ]; then
   info "Launching meshapi… (first run asks for your rsk_ API key)"
   exec meshapi </dev/tty
 else
