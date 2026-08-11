@@ -45,7 +45,7 @@ from .tools import (
     find_stub_markers, parse_error_context, repair_tool_args, schema_hint,
     stub_guard_suppressed, summarize_call, validate_call,
 )
-from .update import maybe_offer, start_background_check
+from .update import maybe_offer, run_upgrade, start_background_check
 
 # Hop caps for the tool-calling loop. A turn without a plan rarely needs many
 # hops; one with a plan may legitimately span dozens of small steps (≈3-4 tool
@@ -97,6 +97,15 @@ def parse_args(argv=None) -> argparse.Namespace:
         choices=[m.value for m in Mode],
         default="default",
         help="Tool permission mode (default: ask each tool). Cycle in-session with shift+tab.",
+    )
+    # Subcommands are optional — a bare `meshapi` (with or without the flags
+    # above) still launches the REPL (command == None). `meshapi upgrade`
+    # upgrades in place without entering the REPL.
+    sub = p.add_subparsers(dest="command")
+    sub.add_parser(
+        "upgrade",
+        help="Upgrade meshapi to the latest release (pipx/uv/pip, matching how "
+             "it was installed) without entering the chat.",
     )
     return p.parse_args(argv)
 
@@ -1424,6 +1433,20 @@ def _turn_status_line(model: str, auto_routed: bool, prompt_t, completion_t,
 
 def main() -> None:
     args = parse_args()
+
+    # `meshapi upgrade`: upgrade in place and exit, no key or REPL needed.
+    # run_upgrade() reuses detect_upgrade_command() so this resolves to the
+    # same pipx/uv/pip command the in-REPL /update uses, and prints the
+    # "exit first" guidance on Windows (the .exe is file-locked).
+    if getattr(args, "command", None) == "upgrade":
+        ok = run_upgrade()
+        if ok:
+            console.print(
+                "[green]✓ meshapi upgraded — relaunch to use the new "
+                "version.[/green]"
+            )
+        sys.exit(0 if ok else 1)
+
     cfg = load_config()
 
     # Kick off the PyPI version check immediately (daemon thread, never

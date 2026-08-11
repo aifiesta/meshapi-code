@@ -12,7 +12,7 @@ Agentic terminal CLI for [Mesh API](https://meshapi.ai) — one OpenAI-compatibl
 $ meshapi
 ███╗   ███╗███████╗███████╗██╗  ██╗
 ████╗ ████║██╔════╝██╔════╝██║  ██║
-██╔████╔██║█████╗  ███████╗███████║   ✦  meshapi 0.5.2
+██╔████╔██║█████╗  ███████╗███████║   ✦  meshapi 0.5.6
 ██║╚██╔╝██║██╔══╝  ╚════██║██╔══██║   cwd:   ~/code/myproj
 ██║ ╚═╝ ██║███████╗███████║██║  ██║   model: anthropic/claude-sonnet-4.5
 ╚═╝     ╚═╝╚══════╝╚══════╝╚═╝  ╚═╝   route: off
@@ -31,51 +31,53 @@ type /help for commands, /exit to quit
 
 ## Install
 
-**macOS / Linux (Terminal):**
+**One command. macOS, Linux, or Windows — no Python, no pipx, nothing to set up first.**
+
+macOS / Linux (Terminal):
 
 ```bash
-brew install pipx && pipx ensurepath   # if you don't have pipx yet
-pipx install meshapi-code
-meshapi
+curl -fsSL https://cli.meshapi.ai/install.sh | sh
 ```
 
-**Windows (PowerShell):**
+Windows (PowerShell):
 
 ```powershell
-py -m pip install --user pipx
-py -m pipx ensurepath                  # then open a NEW PowerShell window
-pipx install meshapi-code
-meshapi
+powershell -ExecutionPolicy ByPass -c "irm https://cli.meshapi.ai/install.ps1 | iex"
 ```
 
-Alternatives on any OS: `uv tool install meshapi-code` or `pip install meshapi-code`.
+It installs [uv](https://astral.sh) (a single binary that brings its own Python), installs `meshapi`, puts it on your `PATH`, and launches it. Re-run the same command any time to upgrade. Prefer to read before you pipe? The scripts are short and inspectable: [`install.sh`](https://github.com/aifiesta/meshapi-code/blob/main/install.sh) · [`install.ps1`](https://github.com/aifiesta/meshapi-code/blob/main/install.ps1).
+
+<details>
+<summary><b>Manual install</b> (pipx / uv / pip — for offline or locked-down machines)</summary>
+
+```bash
+pipx install meshapi-code       # brew install pipx && pipx ensurepath first, if needed
+# or:  uv tool install meshapi-code
+# or:  pip install meshapi-code
+```
+
+On Windows, install Python, then `py -m pip install --user pipx && py -m pipx ensurepath` (open a new PowerShell), then `pipx install meshapi-code`. Full per-OS walkthrough: [INSTALL.md](https://github.com/aifiesta/meshapi-code/blob/main/INSTALL.md).
+</details>
+
 PyPI package is `meshapi-code`; the command on your `$PATH` is `meshapi` (same split Claude Code uses: `@anthropic-ai/claude-code` → `claude`).
 
-**First run asks for your API key** (get one at [app.meshapi.ai](https://app.meshapi.ai)) — hidden input, verified live, saved to `~/.meshapi/credentials`. No environment variable needed. To set one anyway (CI, scripts):
-
-```bash
-# macOS / Linux
-export MESHAPI_API_KEY=rsk_your_key_here
-```
-
-```powershell
-# Windows (PowerShell) — current session:
-$env:MESHAPI_API_KEY = "rsk_your_key_here"
-# persistent:
-setx MESHAPI_API_KEY "rsk_your_key_here"
-```
+**First run asks for your API key** (get one at [app.meshapi.ai](https://app.meshapi.ai)) — hidden input, verified live, saved to `~/.meshapi/credentials`. No environment variable, no config file to edit: run `meshapi`, paste the key once, and you're in. `/login` replaces it later. Running in CI or another non-interactive shell (no prompt to answer)? Provide the key with the `MESHAPI_API_KEY` env var instead — see [INSTALL.md](https://github.com/aifiesta/meshapi-code/blob/main/INSTALL.md).
 
 ## Upgrade
 
-Use whichever tool you installed with — same commands on macOS, Linux, and Windows:
+Re-run the install one-liner, or from any shell:
+
+```bash
+meshapi upgrade
+```
+
+`meshapi upgrade` uses however you installed it (uv/pipx/pip — auto-detected). The CLI also checks PyPI in the background and offers a one-key upgrade when a new version ships (`/update` checks on demand; declining a version won't re-nag). Manual equivalents if you prefer:
 
 | Installed with | Command |
 |---|---|
+| **installer / uv** | `uv tool upgrade meshapi-code` |
 | **pipx** | `pipx upgrade meshapi-code` |
-| **uv** | `uv tool upgrade meshapi-code` |
 | **pip** | `pip install --upgrade meshapi-code` |
-
-From 0.5.1 onward you rarely need these: **the CLI checks PyPI in the background and offers a one-key upgrade** when a new version ships (`/update` checks on demand; declining a version won't re-nag).
 
 Verify with `meshapi --version`. If it still shows an old version, a second older copy is shadowing the new one on your PATH — find every copy with `which -a meshapi` (macOS/Linux) or `where.exe meshapi` (Windows), remove the stray (often an old `pip install --user`: `python3 -m pip uninstall meshapi-code`), then `hash -r` or open a new terminal. Full troubleshooting: [upgrade guide](https://github.com/aifiesta/meshapi-code/blob/main/UPGRADE.md).
 
@@ -113,9 +115,9 @@ API key ›
 When a new version ships, the CLI offers it — no manual checking:
 
 ```
-⬆ meshapi 0.6.0 available (you have 0.5.2)
+⬆ meshapi 0.5.7 available (you have 0.5.6)
 upgrade now? y (yes) / n (no)  › y
-✓ upgraded to 0.6.0 — restart meshapi to pick it up.
+✓ upgraded to 0.5.7 — restart meshapi to pick it up.
 ```
 
 Declining a version never re-nags. `/update` checks on demand.
@@ -265,6 +267,18 @@ auto → openai/gpt-5.4-mini  •  942→318 tok  •  $0.000431  •  6.1s
 router would pick: deepseek/deepseek-r1
 ```
 
+**Model vs. route.** While `route: auto` is on, the gateway picks a model per
+prompt and your `/model` pin is *inactive* — setting a model doesn't change what
+runs until you `/route off`. The CLI says so instead of silently sending
+`"auto"`:
+
+```
+› /model anthropic/claude-fable-5
+Model set to anthropic/claude-fable-5
+⚠ auto-routing is on — prompts still go to the model the gateway picks per
+  prompt, not anthropic/claude-fable-5. Run /route off to actually pin it.
+```
+
 `/fallback m1 m2` sets an ordered failover list if your primary is down.
 
 ### 🌐 Web search
@@ -329,9 +343,9 @@ meshapi --mode bypass     # start in bypass (macOS/Linux/Windows alike)
 
 | Command | What it does |
 |---|---|
-| `/model <name>` | Switch model — **fuzzy tab-completion** from the live catalog |
+| `/model <name>` | Switch model — **fuzzy tab-completion** from the live catalog (inactive while `/route auto` is on; the CLI warns) |
 | `/models [free\|query]` | Browse the catalog: context, capabilities, $/1M pricing |
-| `/route auto\|off\|preview` | Gateway auto-routing; `preview` shows the pick without running |
+| `/route auto\|off\|preview` | Gateway picks per prompt (`auto`) vs. use your pinned `/model` (`off`); `preview` shows the pick without running |
 | `/fallback <m1> <m2>\|off` | Ordered fallback models if the primary fails |
 | `/reasoning <level>` | `high`/`medium`/`low`/`none`/`off` reasoning effort |
 | `/mode <perm>` | `default`, `accept-edits`, `auto`, `bypass` (Shift+Tab cycles) |
@@ -412,10 +426,15 @@ Any generic OpenAI-compatible CLI talks to Mesh. `meshapi` adds what a generic o
 
 ## Roadmap
 
-- ✅ 0.5.1 — first-run key setup, update checker, auto-routing, fuzzy model picker, web search, quality guard, self-healing tool calls, always-visible input, ESC abort
-- ✅ 0.5.2 — repo memory: zero-token context capture, warm-start repo maps, `remember` notes, read-dedupe
-- 0.6 — something special 👀 (+ optional [graphify](https://github.com/Graphify-Labs/graphify) backend for the memory layer)
-- later — `npm i -g meshapi-code` (Node port), Homebrew tap
+**Shipped** — first-run key setup, update checker, auto-routing, fuzzy model
+picker, web search, quality guard, self-healing tool calls, always-visible
+input, repo memory, one-line cross-platform installer, `meshapi upgrade`. Full
+per-version history in the [changelog](https://github.com/aifiesta/meshapi-code/blob/main/CHANGELOG.md).
+
+**Next**
+
+- **0.6** — something special 👀 (+ optional [graphify](https://github.com/Graphify-Labs/graphify) backend for the memory layer)
+- **later** — `npm i -g meshapi-code` (Node port), Homebrew tap
 
 ## License
 

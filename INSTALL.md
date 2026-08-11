@@ -1,22 +1,55 @@
 # Installing `meshapi` — complete guide (Windows & macOS)
 
-This walks you from **nothing installed** to a working `meshapi` command, on both
-Windows and macOS. It covers installing Python, installing the installer (`pipx`),
-installing the CLI, and adding your Mesh API key.
+This walks you from **nothing installed** to a working `meshapi` command.
 
 > **Package name:** `meshapi-code` (on PyPI) → **command:** `meshapi`
 > (same split as Claude Code: package `@anthropic-ai/claude-code`, command `claude`.)
+
+## Quick install (recommended)
+
+One command installs everything — **no Python, no pipx, no per-OS setup.** It installs
+[uv](https://astral.sh) (a single binary that brings its own Python), installs `meshapi`,
+puts it on your `PATH`, and launches it. Re-run it any time to upgrade.
+
+**macOS / Linux (Terminal):**
+
+```bash
+curl -fsSL https://cli.meshapi.ai/install.sh | sh
+```
+
+**Windows (PowerShell):**
+
+```powershell
+powershell -ExecutionPolicy ByPass -c "irm https://cli.meshapi.ai/install.ps1 | iex"
+```
+
+On first launch you'll be asked for your Mesh API key (starts with `rsk_`, from
+<https://app.meshapi.ai>) — hidden input, verified live, saved to `~/.meshapi/credentials`.
+
+That's it. **The rest of this guide is the manual install** — use it only for offline or
+locked-down machines, or if you'd rather not run a `curl … | sh` one-liner. The scripts are
+short and inspectable:
+[`install.sh`](https://github.com/aifiesta/meshapi-code/blob/main/install.sh) ·
+[`install.ps1`](https://github.com/aifiesta/meshapi-code/blob/main/install.ps1).
+
+---
+
+# Manual install
+
+The per-OS walkthrough below installs Python → pipx → meshapi by hand.
 
 ## What you need
 
 | Requirement | Notes |
 |---|---|
 | **Python 3.10 or newer** | 3.10 – 3.13 supported. We install this in Step 1. |
-| **A Mesh API key** | Starts with `rsk_`. Get one at <https://app.meshapi.ai>. Step 4. |
 | **pipx** | Recommended installer — isolates the CLI in its own environment. Step 2. |
+| **A Mesh API key** | Starts with `rsk_`. Get one at <https://app.meshapi.ai>. You don't set this up by hand — **meshapi asks for it on the first run** (Step 4). |
 
 The CLI's Python dependencies (`httpx`, `rich`, `prompt-toolkit`) install
 automatically — you don't install those by hand.
+
+Jump to your OS: [🪟 Windows](#-windows) · [🍎 macOS](#-macos).
 
 ---
 
@@ -59,30 +92,60 @@ pipx install meshapi-code
 Verify:
 
 ```powershell
-meshapi --version        # -> meshapi 0.5.1
+meshapi --version        # -> meshapi 0.5.6
 ```
 
 If PowerShell says `meshapi` is not recognized, run `pipx ensurepath` again, then close
 and reopen the window.
 
-## Step 4 — Add your Mesh API key
-
-Get a key (starts with `rsk_`) from <https://app.meshapi.ai>, then set it **persistently**:
-
-```powershell
-setx MESHAPI_API_KEY "rsk_your_key_here"
-```
-
-`setx` only affects **new** terminals — **close and reopen PowerShell** afterward.
-(To use it in the *current* window without reopening: `$env:MESHAPI_API_KEY = "rsk_your_key_here"`.)
-
-## Step 5 — Run it
+## Step 4 — Run it (first launch sets up your key)
 
 ```powershell
 meshapi
 ```
 
-You should see the MESH banner and a `›` prompt. Type `/help` for commands, `/exit` to quit.
+There's **nothing to configure first.** On the very first run, meshapi asks for your Mesh
+API key, verifies it live, and saves it — then drops you at the prompt. Here's exactly what
+you'll see:
+
+```
+PS C:\Users\you> meshapi
+╭─────────────────────────────────────────────────────────────────────╮
+│ Connect your Mesh API key                                           │
+│                                                                     │
+│ Grab one at https://app.meshapi.ai → API Keys. Keys start with rsk_ │
+│ Input is hidden — paste the key and press enter. Ctrl+C to cancel.  │
+╰─────────────────────────────────────────────────────────────────────╯
+API key › ••••••••••••  (hidden as you paste)
+✓ key saved → C:\Users\you\.meshapi\credentials
+
+███╗   ███╗███████╗███████╗██╗  ██╗
+████╗ ████║██╔════╝██╔════╝██║  ██║
+██╔████╔██║█████╗  ███████╗███████║   ✦  meshapi 0.5.6
+██║╚██╔╝██║██╔══╝  ╚════██║██╔══██║   cwd:   C:\Users\you\projects\hello
+██║ ╚═╝ ██║███████╗███████║██║  ██║   model: anthropic/claude-sonnet-4.5
+╚═╝     ╚═╝╚══════╝╚══════╝╚═╝  ╚═╝   route: off
+
+type /help for commands, /exit to quit
+›
+```
+
+Type `/help` for commands, `/exit` to quit. To change the key later, run `/login` inside
+the REPL. **No environment variable needed.**
+
+<details>
+<summary><b>Prefer an environment variable?</b> (CI, scripts, shared machines)</summary>
+
+A non-interactive shell (a CI job, a piped command) can't show the key prompt, so pass the
+key with the `MESHAPI_API_KEY` env var instead:
+
+```powershell
+setx MESHAPI_API_KEY "rsk_your_key_here"      # persistent — reopen PowerShell afterward
+$env:MESHAPI_API_KEY = "rsk_your_key_here"    # current window only
+```
+
+When set, the env var takes precedence over the saved credentials file.
+</details>
 
 ---
 
@@ -131,44 +194,76 @@ pipx install meshapi-code
 Verify:
 
 ```bash
-meshapi --version          # -> meshapi 0.5.1
+meshapi --version          # -> meshapi 0.5.6
 ```
 
-## Step 4 — Add your Mesh API key
-
-Get a key (starts with `rsk_`) from <https://app.meshapi.ai>, then add it to your shell
-profile so it's set in every terminal:
-
-```bash
-echo 'export MESHAPI_API_KEY="rsk_your_key_here"' >> ~/.zshrc
-source ~/.zshrc
-```
-
-(Just this session, no profile edit: `export MESHAPI_API_KEY="rsk_your_key_here"`.)
-
-## Step 5 — Run it
+## Step 4 — Run it (first launch sets up your key)
 
 ```bash
 meshapi
 ```
 
-You should see the MESH banner and a `›` prompt. Type `/help` for commands, `/exit` to quit.
+There's **nothing to configure first.** On the very first run, meshapi asks for your Mesh
+API key, verifies it live, and saves it — then drops you at the prompt. Here's exactly what
+you'll see:
+
+```
+$ meshapi
+╭─────────────────────────────────────────────────────────────────────╮
+│ Connect your Mesh API key                                           │
+│                                                                     │
+│ Grab one at https://app.meshapi.ai → API Keys. Keys start with rsk_ │
+│ Input is hidden — paste the key and press enter. Ctrl+C to cancel.  │
+╰─────────────────────────────────────────────────────────────────────╯
+API key › ••••••••••••  (hidden as you paste)
+✓ key saved → ~/.meshapi/credentials (0600)
+
+███╗   ███╗███████╗███████╗██╗  ██╗
+████╗ ████║██╔════╝██╔════╝██║  ██║
+██╔████╔██║█████╗  ███████╗███████║   ✦  meshapi 0.5.6
+██║╚██╔╝██║██╔══╝  ╚════██║██╔══██║   cwd:   ~/projects/hello
+██║ ╚═╝ ██║███████╗███████║██║  ██║   model: anthropic/claude-sonnet-4.5
+╚═╝     ╚═╝╚══════╝╚══════╝╚═╝  ╚═╝   route: off
+
+type /help for commands, /exit to quit
+›
+```
+
+Type `/help` for commands, `/exit` to quit. To change the key later, run `/login` inside
+the REPL. **No environment variable needed.**
+
+<details>
+<summary><b>Prefer an environment variable?</b> (CI, scripts, shared machines)</summary>
+
+A non-interactive shell (a CI job, a piped command) can't show the key prompt, so pass the
+key with the `MESHAPI_API_KEY` env var instead:
+
+```bash
+echo 'export MESHAPI_API_KEY="rsk_your_key_here"' >> ~/.zshrc && source ~/.zshrc  # persistent
+export MESHAPI_API_KEY="rsk_your_key_here"                                        # this session only
+```
+
+When set, the env var takes precedence over the saved credentials file.
+</details>
 
 ---
 
 ## First-run check (both platforms)
 
+The first `meshapi` launch handles the key for you (shown above). After that, a quick smoke
+test:
+
 ```
-meshapi --version     # meshapi 0.5.1
-meshapi               # launches the REPL
+meshapi --version     # meshapi 0.5.6
+meshapi               # launches straight into the REPL
 > hello               # streams a reply, then prints a cost line
 > /model openai/gpt-4o-mini
 > /exit
 ```
 
-If you see **`No API key found`**, your `MESHAPI_API_KEY` isn't set in *this* terminal —
-revisit Step 4 and reopen the terminal (env vars only apply to terminals opened after
-they're set).
+Need to change the key later? Run `/login` in the REPL. Only if you're on a
+**non-interactive** shell (CI) where meshapi can't prompt will you see `No API key found` —
+set `MESHAPI_API_KEY` (see the env-var note under Step 4) and reopen the terminal.
 
 ---
 
@@ -190,11 +285,11 @@ packages — prefer `pipx` or `uv` unless you're installing inside a dedicated v
 
 | Env var | Purpose |
 |---|---|
-| `MESHAPI_API_KEY` | Your `rsk_…` data-plane key (**required**). |
+| `MESHAPI_API_KEY` | Your `rsk_…` data-plane key. **Optional** — the first run saves it to `~/.meshapi/credentials` for you; set this only for CI/scripts. Overrides the saved key when present. |
 | `MESHAPI_BASE_URL` | Override the gateway URL. Default `https://api.meshapi.ai/v1`. |
 
-State lives under `~/.meshapi/` (`config.json` for settings — never your key — plus input
-history), all written with `0600` permissions.
+State lives under `~/.meshapi/` (`credentials` for the key, `config.json` for settings —
+never the key — plus input history), all written with `0600` permissions.
 
 ---
 
@@ -228,17 +323,22 @@ The **first** path wins. Remove the stray older copy (often an old `pip install 
 with `pip uninstall meshapi-code` run by the Python that owns it, then reopen your terminal
 (or `hash -r` on macOS/Linux).
 
-### `No API key found. Set MESHAPI_API_KEY …`
-The key isn't set in the current terminal. Redo Step 4 and open a **new** terminal — env
-vars only apply to sessions started after they were set.
+### `No API key found …`
+On a normal terminal you never hit this — meshapi *asks* for the key on first run. You'll
+only see it on a **non-interactive** shell (a CI job, a piped command, or an IDE terminal
+that isn't a real TTY) where it can't prompt. Fix it either way:
+
+- Run `meshapi` once in a normal terminal to save the key to `~/.meshapi/credentials`, or
+- Set the `MESHAPI_API_KEY` env var (see the note under Step 4) and open a **new** terminal.
 
 ---
 
 ## Upgrading & uninstalling
 
-- **Upgrade:** `pipx upgrade meshapi-code` (or `uv tool upgrade` / `pip install -U`).
-  See [UPGRADE.md](UPGRADE.md) for details and the 0.5.1 notes.
-- **Uninstall:** `pipx uninstall meshapi-code`.
+- **Upgrade:** re-run the install one-liner, or `meshapi upgrade` (auto-detects uv/pipx/pip).
+  Manual: `uv tool upgrade meshapi-code` / `pipx upgrade meshapi-code` / `pip install -U meshapi-code`.
+  See [UPGRADE.md](UPGRADE.md) for details.
+- **Uninstall:** `uv tool uninstall meshapi-code` (installer/uv) or `pipx uninstall meshapi-code`.
 
 ---
 

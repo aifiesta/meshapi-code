@@ -318,8 +318,27 @@ def handle_command(cmd: str, state: dict) -> bool:
                 save_config(state["cfg"])
                 note = "" if known is not None else " (couldn't verify against the catalog — offline?)"
                 console.print(f"[dim]Model set to {arg}{note}[/dim]")
+                # A pinned model is inert while auto-routing is on — the gateway
+                # still picks per prompt (client sends model:"auto"). Setting a
+                # model then silently getting a different one is the single most
+                # confusing state in the CLI, so say so loudly right here.
+                if state["cfg"].get("auto_route"):
+                    console.print(
+                        f"[yellow]⚠ auto-routing is on — prompts still go to the "
+                        f"model the gateway picks per prompt, not {arg}. Run "
+                        f"[bold]/route off[/bold] to actually pin {arg}.[/yellow]"
+                    )
         else:
-            console.print(f"[dim]Current model: {state['cfg']['model']}[/dim]")
+            # No arg = show the current pin, and flag when it isn't the model
+            # actually being used because auto-routing overrides it.
+            if state["cfg"].get("auto_route"):
+                console.print(
+                    f"[dim]Current model: {state['cfg']['model']} "
+                    "[yellow](inactive — auto-routing is on; /route off to use "
+                    "it)[/yellow][/dim]"
+                )
+            else:
+                console.print(f"[dim]Current model: {state['cfg']['model']}[/dim]")
 
     elif name == "/route":
         sub = arg.strip().lower()

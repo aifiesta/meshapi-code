@@ -2,6 +2,12 @@
 
 All notable changes to `meshapi-code`. Upgrade with `pipx upgrade meshapi-code`.
 
+## 0.5.6 — 2026-08-06 · "one-line install"
+- **One-command install, any OS, nothing preinstalled.** New `install.sh` (macOS/Linux) and `install.ps1` (Windows) bootstrap [uv](https://astral.sh), which brings its own Python — no manual Python or pipx. `curl -fsSL https://cli.meshapi.ai/install.sh | sh` installs uv (if missing), `uv tool install`s meshapi, fixes PATH, and drops you into the first-run key prompt. Idempotent: re-running upgrades an existing install; a returning user with a key set skips straight to the REPL.
+- **`meshapi upgrade`** — upgrade from the shell without entering the chat. Reuses the same pipx/uv/pip resolution as the in-REPL `/update` (and the same "exit first" guidance on Windows, where the `.exe` is file-locked).
+- **`/model` no longer misleads under auto-routing.** Setting a model (or running `/model` with no argument) while `/route auto` is on now warns that the pin is *inactive* until `/route off` — the gateway still picks per prompt, so a pinned model was silently ignored before. Display-only; routing behavior unchanged.
+- Docs lead with the one-liner; the manual pipx/uv/pip walkthrough stays as a fallback for air-gapped/locked-down environments.
+
 ## 0.5.5 — 2026-07-06
 - `/model <invalid>` is now rejected before persisting (was silently saved to config, breaking every future launch) — unknown ids get top-3 fuzzy "did you mean" suggestions; offline still sets with a warning.
 - `/fallback <invalid>` now rejected when the catalog is reachable (was warn-but-keep — a bogus fallback breaks failover exactly when needed); offline keeps with warning.

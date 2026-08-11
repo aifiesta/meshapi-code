@@ -1,0 +1,91 @@
+name: installer
+
+# Lints and end-to-end tests the one-line installers. Deliberately decoupled
+# from publish.yml (trusted publishing) — this never touches PyPI. The e2e jobs
+# run the checked-out ./install.sh|.ps1 (not the hosted cli.meshapi.ai URL) and
+# install the currently-published meshapi-code from PyPI, so they validate the
+# script mechanics on every change without needing a release.
+
+on:
+  push:
+    branches: [main]
+    paths: ["install.sh", "install.ps1", ".github/workflows/installer.yml"]
+  pull_request:
+    paths: ["install.sh", "install.ps1", ".github/workflows/installer.yml"]
+  workflow_dispatch:
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: shellcheck install.sh
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq shellcheck
+          shellcheck -s sh install.sh
+      - name: PSScriptAnalyzer install.ps1
+        shell: pwsh
+        run: |
+          Install-Module PSScriptAnalyzer -Force -Scope CurrentUser
+          $r = Invoke-ScriptAnalyzer -Path install.ps1 -Severity Warning,Error
+          $r | Format-Table -AutoSize
+          if (($r | Where-Object Severity -eq 'Error')) { throw "PSScriptAnalyzer found errors" }
+
+  e2e-posix:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run installer (non-interactive => installs and exits, no launch)
+        run: sh ./install.sh
+      - name: Assert
+        run: |
+          export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"
+          [ -f "$HOME/.local/bin/env" ] && . "$HOME/.local/bin/env" || true
+          meshapi --version
+          uv tool list | grep meshapi-code
+
+  e2e-no-python:
+    # The headline claim: works with NO system Python. debian:stable-slim ships
+    # none; uv provisions its own.
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    container: debian:stable-slim
+    steps:
+      - name: Prep (curl, CA certs, git for checkout)
+        run: |
+          apt-get update -qq
+          apt-get install -y -qq curl ca-certificates git
+      - name: Confirm no system python
+        run: |
+          if command -v python3 >/dev/null 2>&1; then echo "unexpected: python3 present"; python3 --version; else echo "ok: no python3"; fi
+      - uses: actions/checkout@v4
+      - name: Run installer
+        run: sh ./install.sh
+      - name: Assert
+        run: |
+          export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"
+          [ -f "$HOME/.local/bin/env" ] && . "$HOME/.local/bin/env" || true
+          meshapi --version
+          uv tool list | grep meshapi-code
+
+  e2e-windows:
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run installer (non-interactive => installs and exits, no launch)
+        shell: pwsh
+        run: ./install.ps1
+      - name: Assert
+        shell: pwsh
+        run: |
+          $env:Path = "$env:USERPROFILE\.local\bin;$env:USERPROFILE\.cargo\bin;$env:Path"
+          meshapi --version
+          if (-not (uv tool list | Select-String 'meshapi-code')) { throw 'meshapi-code not in uv tool list' }
