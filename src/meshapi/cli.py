@@ -1792,6 +1792,7 @@ def main() -> None:
         last_usage: dict = {}
         last_optimize_plan = {}
         last_elapsed = 0.0
+        turn_failed = False  # empty/errored response — skip the cosmetic cost line
         try:
             # While-loop so the cap can be promoted dynamically the moment the
             # model creates a plan (a for-loop's range is frozen at construction
@@ -1897,6 +1898,37 @@ def main() -> None:
 
                 tool_calls = meta.get("tool_calls") or []
                 if not tool_calls:
+                    _err = meta.get("error")
+                    if _err or not (reply or "").strip():
+                        # Empty or errored final response. Appending an empty
+                        # assistant message would poison EVERY later turn (the
+                        # backend rejects empty text blocks with 200 + an
+                        # in-band ValidationException — the classic "?→? tok"
+                        # hang). Surface it and end the turn WITHOUT polluting
+                        # history; the user's message stays, and consecutive
+                        # user messages are accepted, so they can resend or
+                        # say "continue".
+                        turn_failed = True
+                        console.rule(style="dim yellow", characters="─")
+                        if _err:
+                            console.print(
+                                "[yellow]⚠ The gateway returned an error instead "
+                                "of a reply:[/yellow]"
+                            )
+                            console.print(f"[dim]  {_rich_escape(str(_err))}[/dim]")
+                        else:
+                            console.print(
+                                "[yellow]⚠ The model returned an empty "
+                                "response.[/yellow]"
+                            )
+                        console.print(
+                            "[dim]  Nothing was added to the conversation — "
+                            "resend your message or say 'continue'. If it keeps "
+                            "happening the context may be large or the "
+                            "model/gateway may be rate-limiting: /clear to reset, "
+                            "/optimize to trim, or /model to switch.[/dim]"
+                        )
+                        break
                     state["messages"].append({"role": "assistant", "content": reply})
                     # Quality guard: the model ended its turn but files it
                     # wrote still carry stub markers. Spend ONE fix-it hop
@@ -1974,10 +2006,11 @@ def main() -> None:
             state["session_cost"] += agg_cost
             prompt_t = last_usage.get("prompt_tokens", "?")
             completion_t = last_usage.get("completion_tokens", "?")
-            console.rule(style=BRAND_DIM, characters="─")
-            console.print(
-                f"[dim]{_turn_status_line(last_model, state['cfg'].get('auto_route', False), prompt_t, completion_t, agg_cost, state['session_cost'], last_elapsed)}[/dim]"
-            )
+            if not turn_failed:
+                console.rule(style=BRAND_DIM, characters="─")
+                console.print(
+                    f"[dim]{_turn_status_line(last_model, state['cfg'].get('auto_route', False), prompt_t, completion_t, agg_cost, state['session_cost'], last_elapsed)}[/dim]"
+                )
             if last_optimize_plan:
                 if last_optimize_plan.get("degraded"):
                     console.print(

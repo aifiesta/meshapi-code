@@ -150,6 +150,24 @@ def build_payload(messages: list, cfg: dict, tools: Optional[list] = None) -> di
     return payload
 
 
+def _drop_empty_assistant(messages: list) -> list:
+    """Remove assistant messages that carry neither text nor tool_calls. One
+    such message — appended after an earlier empty/failed response — otherwise
+    POISONS every later turn: the Bedrock/Anthropic backend rejects an empty
+    text block with HTTP 200 + an in-band ValidationException ("text content
+    blocks must be non-empty"), which the user experiences as the CLI silently
+    hanging (?→? tok forever). Consecutive user messages ARE accepted by the
+    gateway, so dropping these is safe."""
+    return [
+        m for m in messages
+        if not (
+            m.get("role") == "assistant"
+            and not (m.get("content") or "").strip()
+            and not m.get("tool_calls")
+        )
+    ]
+
+
 def stream_chat(
     messages: list,
     cfg: dict,
@@ -173,6 +191,9 @@ def stream_chat(
         "Authorization": f"Bearer {cfg['api_key']}",
         "Content-Type": "application/json",
     }
+    # Strip any empty assistant message BEFORE both the raw payload and the
+    # optimize path — one poisons every subsequent turn (see the helper).
+    messages = _drop_empty_assistant(messages)
     payload = build_payload(messages, cfg, tools)
 
     plan: dict = {}
@@ -229,6 +250,17 @@ def stream_chat(
                     if not dropped_sample:
                         dropped_sample = data[:200]
                     continue
+
+                # In-band error: the gateway can return HTTP 200 and then stream
+                # an {"error": …} chunk (validation / context / rate-limit). It
+                # has no `choices`/`usage`, so it used to be silently dropped —
+                # surfacing it is what turns a silent "hang" into a real message.
+                err = obj.get("error")
+                if err:
+                    last_meta["error"] = (
+                        err.get("message") if isinstance(err, dict) else str(err)
+                    )
+                    break
 
                 if obj.get("model"):
                     last_model = obj["model"]
