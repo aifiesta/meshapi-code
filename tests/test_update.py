@@ -117,3 +117,33 @@ def test_detect_upgrade_command_windows_path_normalized(monkeypatch):
     label, argv = update.detect_upgrade_command()
     assert label == "pipx"
     assert argv == ["pipx", "upgrade", update.PACKAGE]
+
+
+# --- _resolve_tool: uv/pipx path resolution (regression for the [Errno 2] bug
+#     where a uv-installed meshapi runs with a PATH that omits uv's bin dir) ---
+
+def test_resolve_tool_returns_abspath_when_found(monkeypatch):
+    monkeypatch.setattr(update.shutil, "which", lambda name, path=None: "/abs/bin/uv")
+    assert update._resolve_tool("uv") == "/abs/bin/uv"
+
+
+def test_resolve_tool_searches_common_bin_dirs(monkeypatch):
+    seen = {}
+
+    def fake_which(name, path=None):
+        seen["path"] = path or ""
+        return None  # simulate not-on-PATH so we can inspect the search path
+
+    monkeypatch.setattr(update.shutil, "which", fake_which)
+    # bare name returned when nothing is found (caller then errors clearly)
+    assert update._resolve_tool("uv") == "uv"
+    # ...but the search path was augmented with the usual uv/pipx locations
+    assert "/.local/bin" in seen["path"]
+    assert "/.cargo/bin" in seen["path"]
+    assert "/opt/homebrew/bin" in seen["path"]
+
+
+def test_resolve_tool_survives_empty_path(monkeypatch):
+    monkeypatch.setenv("PATH", "")
+    # must not raise even with no PATH; falls back to the fixed dirs
+    assert isinstance(update._resolve_tool("uv"), str)

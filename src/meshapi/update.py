@@ -13,7 +13,9 @@ would fail with WinError 5; we print the command and tell the user to exit
 first instead.
 """
 import contextlib
+import glob
 import os
+import shutil
 import subprocess
 import sys
 import threading
@@ -94,6 +96,24 @@ def start_background_check(update_state: dict) -> None:
     ).start()
 
 
+def _resolve_tool(name: str) -> str:
+    """Absolute path to `name` (uv/pipx), searching PATH plus the dirs those
+    tools commonly live in. A uv-installed meshapi frequently runs with a PATH
+    that omits ~/.local/bin (and, on macOS, the pip --user ~/Library/Python/*/
+    bin where uv may sit), so a bare subprocess(['uv', …]) hits [Errno 2] even
+    though `uv` works fine in the user's interactive shell. Returns the bare
+    name unchanged if nothing is found (the caller then errors clearly)."""
+    home = os.path.expanduser("~")
+    dirs = os.environ.get("PATH", "").split(os.pathsep) + [
+        os.path.join(home, ".local", "bin"),
+        os.path.join(home, ".cargo", "bin"),
+        "/opt/homebrew/bin",
+        "/usr/local/bin",
+    ]
+    dirs += glob.glob(os.path.join(home, "Library", "Python", "*", "bin"))  # macOS pip --user
+    return shutil.which(name, path=os.pathsep.join(d for d in dirs if d)) or name
+
+
 def detect_upgrade_command() -> tuple:
     """(label, argv) for the upgrade command matching how meshapi was
     installed. Normalizes sys.prefix so Windows backslash/mixed-case paths
@@ -123,8 +143,11 @@ def run_upgrade() -> bool:
         )
         return False
     console.print(f"[dim]$ {cmd_str}[/dim]")
+    # Resolve uv/pipx to an absolute path so a PATH that omits their bin dir
+    # doesn't turn a working upgrade into "[Errno 2] No such file or directory".
+    run_argv = [_resolve_tool(argv[0]), *argv[1:]] if argv[0] in ("uv", "pipx") else argv
     try:
-        proc = subprocess.run(argv)
+        proc = subprocess.run(run_argv)
     except (FileNotFoundError, OSError) as e:
         console.print(
             f"[red]Couldn't run {label} ({e}). Upgrade manually:[/red]\n"
