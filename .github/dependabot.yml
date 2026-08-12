@@ -1,0 +1,21 @@
+# Keeps SHA-pinned GitHub Actions current (MESH-349). Dependabot bumps the pinned
+# commit SHA when the upstream tag moves and updates the trailing `# vX` comment,
+# so pinning to a SHA no longer means going stale on security patches.
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    # Wait 7 days after a release before opening an update PR — a freshly published
+    # version can be malicious or unstable (supply-chain hardening; satisfies the
+    # dependabot-missing-cooldown SAST gate).
+    cooldown:
+      default-days: 7
+    commit-message:
+      prefix: "ci"
+    # One grouped PR per run instead of one per action — less review noise.
+    groups:
+      github-actions:
+        patterns:
+          - "*"
