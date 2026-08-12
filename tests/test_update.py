@@ -147,3 +147,33 @@ def test_resolve_tool_survives_empty_path(monkeypatch):
     monkeypatch.setenv("PATH", "")
     # must not raise even with no PATH; falls back to the fixed dirs
     assert isinstance(update._resolve_tool("uv"), str)
+
+
+# --- run_upgrade: resolves uv/pipx and never dead-ends (foolproof fallback) ---
+
+class _Proc:
+    returncode = 0
+
+
+def test_run_upgrade_runs_resolved_abspath(monkeypatch):
+    monkeypatch.setattr(update, "detect_upgrade_command",
+                        lambda: ("uv", ["uv", "tool", "upgrade", "meshapi-code"]))
+    monkeypatch.setattr(update, "_resolve_tool", lambda name: "/abs/bin/uv")
+    monkeypatch.setattr(update.os, "name", "posix")
+    ran = {}
+    monkeypatch.setattr(update.subprocess, "run",
+                        lambda argv, *a, **k: ran.__setitem__("argv", argv) or _Proc())
+    assert update.run_upgrade() is True
+    assert ran["argv"][0] == "/abs/bin/uv"   # ran the resolved absolute path, not bare 'uv'
+
+
+def test_run_upgrade_foolproof_hint_when_tool_missing(monkeypatch):
+    monkeypatch.setattr(update, "detect_upgrade_command",
+                        lambda: ("uv", ["uv", "tool", "upgrade", "meshapi-code"]))
+    monkeypatch.setattr(update, "_resolve_tool", lambda name: name)  # simulate not found anywhere
+    monkeypatch.setattr(update.os, "name", "posix")
+    ran = {"called": False}
+    monkeypatch.setattr(update.subprocess, "run",
+                        lambda *a, **k: ran.__setitem__("called", True) or _Proc())
+    assert update.run_upgrade() is False       # doesn't claim success
+    assert ran["called"] is False              # never tries to run the missing tool (no [Errno 2])

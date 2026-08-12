@@ -126,6 +126,18 @@ def detect_upgrade_command() -> tuple:
     return "pip", [sys.executable, "-m", "pip", "install", "--upgrade", PACKAGE]
 
 
+def _print_reinstall_hint(tool: str) -> None:
+    """Foolproof recovery when the tool binary (uv/pipx) is genuinely missing —
+    a bare `uv tool upgrade` would fail the same way, so point at the
+    self-contained one-liner, which reinstalls the CLI *and* uv."""
+    console.print(
+        f"[yellow]Couldn't find {tool} to run the upgrade.[/yellow] This "
+        "one-liner reinstalls meshapi (and sets up uv), which upgrades it too:\n"
+        "  [bold]curl -fsSL https://cli.meshapi.ai/install.sh | sh[/bold]\n"
+        "  [dim]Windows (PowerShell): irm https://cli.meshapi.ai/install.ps1 | iex[/dim]"
+    )
+
+
 def run_upgrade() -> bool:
     """Run the detected upgrade command. Returns True on success.
 
@@ -145,14 +157,23 @@ def run_upgrade() -> bool:
     console.print(f"[dim]$ {cmd_str}[/dim]")
     # Resolve uv/pipx to an absolute path so a PATH that omits their bin dir
     # doesn't turn a working upgrade into "[Errno 2] No such file or directory".
-    run_argv = [_resolve_tool(argv[0]), *argv[1:]] if argv[0] in ("uv", "pipx") else argv
+    run_argv = argv
+    if argv[0] in ("uv", "pipx"):
+        resolved = _resolve_tool(argv[0])
+        if resolved == argv[0]:  # not found anywhere we know to look
+            _print_reinstall_hint(argv[0])
+            return False
+        run_argv = [resolved, *argv[1:]]
     try:
         proc = subprocess.run(run_argv)
     except (FileNotFoundError, OSError) as e:
-        console.print(
-            f"[red]Couldn't run {label} ({e}). Upgrade manually:[/red]\n"
-            f"  [bold]{cmd_str}[/bold]"
-        )
+        if argv[0] in ("uv", "pipx"):
+            _print_reinstall_hint(argv[0])
+        else:
+            console.print(
+                f"[red]Couldn't run {label} ({e}). Upgrade manually:[/red]\n"
+                f"  [bold]{cmd_str}[/bold]"
+            )
         return False
     if proc.returncode != 0:
         hint = (
