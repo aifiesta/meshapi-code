@@ -19,7 +19,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
       - name: shellcheck install.sh
         run: |
           sudo apt-get update -qq
@@ -41,7 +41,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
       - name: Run installer (non-interactive => installs and exits, no launch)
         run: sh ./install.sh
       - name: Assert
@@ -65,7 +65,7 @@ jobs:
       - name: Confirm no system python
         run: |
           if command -v python3 >/dev/null 2>&1; then echo "unexpected: python3 present"; python3 --version; else echo "ok: no python3"; fi
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
       - name: Run installer
         run: sh ./install.sh
       - name: Assert
@@ -79,7 +79,7 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
       - name: Run installer (non-interactive => installs and exits, no launch)
         shell: pwsh
         run: ./install.ps1
