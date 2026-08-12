@@ -2,6 +2,9 @@
 
 All notable changes to `meshapi-code`. Upgrade with `pipx upgrade meshapi-code`.
 
+## 0.5.8 — 2026-08-12
+- **Fixed self-upgrade `[Errno 2] No such file or directory: 'uv'`.** A uv-installed meshapi can run with a `PATH` that omits uv's bin directory, so `meshapi upgrade` (and the in-app "upgrade now?" prompt) couldn't find `uv` even though it works fine in your shell. The upgrade now resolves `uv`/`pipx` to their absolute path (searching the usual install locations) before running it.
+
 ## 0.5.7 — 2026-08-11 · "reliability & hardening"
 - **Fixed the long-session "hang."** After a transient empty response the CLI used to append an empty assistant message, which the backend then rejected on *every* later turn (HTTP 200 + an in-band error that was silently dropped) — the session looked frozen with `?→? tok`. Empty assistant messages are now stripped before sending, in-band errors are surfaced instead of dropped, and an empty/errored turn ends cleanly with a clear message instead of poisoning the conversation.
 - **Live progress during tool calls.** A long-running `run_bash` (or web search) now shows a spinner + elapsed timer (`⠹ running · 12s`) plus the same mode / type-ahead / queued-message footer that streaming shows — no more staring at a static line wondering if it's stuck.
