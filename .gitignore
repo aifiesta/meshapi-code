@@ -21,3 +21,6 @@ output.txt
 
 # Internal pre-release test plan (not shipped)
 TESTING.md
+
+# Private routing lab — trade secret, never shipped (has its own local git)
+meshroute-lab/
