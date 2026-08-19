@@ -36,6 +36,16 @@ def build_system_prompt(cfg: dict) -> str:
         "short factual sentence so future sessions know it. Do not use "
         "remember for transient task state, file contents, or anything "
         "secret.\n\n"
+        "ASK WHEN GENUINELY FORKED. If a request has two or more "
+        "defensible interpretations that would lead to materially different "
+        "work — which stack, which of several designs, how big a scope — "
+        "present the choice with the interactive question tool instead of "
+        "guessing or writing a paragraph of options. Ask EARLY, before "
+        "building on the assumption. Ask once, with 2-4 sharp options. Do "
+        "not ask about things you can decide yourself, things the request "
+        "already answers, or permission to run a tool. If the user "
+        "dismisses the picker, choose the most reasonable option, say which "
+        "and why, and keep going.\n\n"
         "PLAN BEFORE ACTING. For any request that will need more than ~3 "
         "tool calls (building features, multi-file edits, scaffolding a "
         "project), FIRST call create_plan with a numbered list of small, "
@@ -156,12 +166,21 @@ TOOLS = [
                 "stdout+stderr plus exit code. stdin is /dev/null, so commands that "
                 "prompt for input will hang and time out — always pass non-interactive "
                 "flags (e.g. `--yes`, `-y`, `--no-input`) or pipe answers in. "
-                f"Times out at {BASH_TIMEOUT}s."
+                f"Times out at {BASH_TIMEOUT}s by default; pass `timeout` for "
+                "known-slow commands (builds, test suites)."
             ),
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "command": {"type": "string", "description": "The shell command to run"}
+                    "command": {"type": "string", "description": "The shell command to run"},
+                    "timeout": {
+                        "type": "integer",
+                        "description": (
+                            "Optional timeout in seconds for this command "
+                            f"(default {BASH_TIMEOUT}, max 600). Use for "
+                            "known-slow builds or test suites."
+                        ),
+                    },
                 },
                 "required": ["command"],
             },
@@ -186,6 +205,70 @@ TOOLS = [
                     }
                 },
                 "required": ["query"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "ask_user",
+            "description": (
+                "Ask the user to CHOOSE between concrete options, mid-task, "
+                "with an arrow-key picker. Use this at a real fork where the "
+                "answer changes what you build and you cannot decide from "
+                "the request or the code — e.g. which framework, which of "
+                "two designs, which scope. Do NOT use it for questions you "
+                "can answer yourself, for permission to run a tool (that is "
+                "already handled), or to confirm work you just did. Prefer "
+                "2-4 sharp options with short descriptions; the user always "
+                "also gets a free-text choice. You may ask up to 4 related "
+                "questions in one call."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "questions": {
+                        "type": "array",
+                        "description": "1-4 questions to ask together.",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "question": {
+                                    "type": "string",
+                                    "description": "The full question, ending in '?'",
+                                },
+                                "header": {
+                                    "type": "string",
+                                    "description": "Very short tab label, max ~15 chars",
+                                },
+                                "multi_select": {
+                                    "type": "boolean",
+                                    "description": "Allow picking several options",
+                                },
+                                "options": {
+                                    "type": "array",
+                                    "description": "2-5 distinct choices",
+                                    "items": {
+                                        "type": "object",
+                                        "properties": {
+                                            "label": {
+                                                "type": "string",
+                                                "description": "Short choice text (1-5 words)",
+                                            },
+                                            "description": {
+                                                "type": "string",
+                                                "description": "One line on what this choice means",
+                                            },
+                                        },
+                                        "required": ["label"],
+                                    },
+                                },
+                            },
+                            "required": ["question", "options"],
+                        },
+                    }
+                },
+                "required": ["questions"],
             },
         },
     },
@@ -321,7 +404,16 @@ TOOLS = [
 ]
 
 OUTPUT_LIMIT = 8000
+# read_file cap: an uncapped read (a 2 MB bundle, a log file) lands whole in
+# history INSIDE the compactor's keep-recent window, where nothing can trim
+# it — one such read makes a context-length error unrecoverable. 80k chars
+# (~20k tokens) is plenty for any file a model should read in one piece.
+READ_LIMIT = 80_000
+MAX_BASH_TIMEOUT = 600  # model-requested run_bash timeout ceiling (seconds)
 PLAN_TOOLS = ("create_plan", "update_step")  # meta — auto-approved, no side effects
+# Asking the user a question has no side effects and is answered by the user
+# in person — gating it behind a y/n approval would be absurd.
+INTERACTIVE_TOOLS = ("ask_user",)
 
 
 def validate_call(name: str, arguments: dict) -> str | None:
@@ -345,12 +437,35 @@ def validate_call(name: str, arguments: dict) -> str | None:
     elif name in ("run_bash", "start_server"):
         if not arguments.get("command"):
             return f"Error: {name} requires a `command` argument."
+        if name == "run_bash" and arguments.get("timeout") is not None:
+            try:
+                int(float(arguments["timeout"]))
+            except (TypeError, ValueError):
+                return "Error: run_bash `timeout` must be an integer number of seconds."
     elif name == "web_search":
         if not arguments.get("query"):
             return "Error: web_search requires a `query` argument."
     elif name == "remember":
         if not arguments.get("note"):
             return "Error: remember requires a `note` argument."
+    elif name == "ask_user":
+        qs = arguments.get("questions")
+        if not isinstance(qs, list) or not qs:
+            return ("Error: ask_user requires a non-empty `questions` array, "
+                    "each with `question` and `options`.")
+        if len(qs) > 4:
+            return "Error: ask_user accepts at most 4 questions per call."
+        for q in qs:
+            if not isinstance(q, dict) or not q.get("question"):
+                return "Error: every ask_user question needs a `question` string."
+            opts = q.get("options")
+            if not isinstance(opts, list) or len(opts) < 2:
+                return (f"Error: question {q.get('question','')[:40]!r} needs at "
+                        "least 2 `options` (the user always gets a free-text "
+                        "choice in addition).")
+            for o in opts:
+                if not isinstance(o, dict) or not o.get("label"):
+                    return "Error: every ask_user option needs a `label` string."
     return None
 
 
@@ -649,9 +764,21 @@ def execute(name: str, arguments: dict, cfg: "dict | None" = None) -> str:
                 "message — the CLI will attach it automatically."
             )
         try:
-            return Path(path).expanduser().read_text()
+            content = Path(path).expanduser().read_text()
         except Exception as e:
             return f"Error: {e}"
+        if len(content) > READ_LIMIT:
+            # Cap huge reads — see READ_LIMIT above. The truncation notice is
+            # prescriptive so the model reaches for a ranged read instead of
+            # retrying the same call. Dedupe stays safe: the recorded stub's
+            # sha never matches the file on disk, so a re-read runs normally.
+            return (
+                content[:READ_LIMIT]
+                + f"\n[truncated — file is {len(content)} chars; this returned "
+                f"the first {READ_LIMIT}. Read specific sections with a ranged "
+                "shell command instead.]"
+            )
+        return content
 
     if name == "write_file":
         path = arguments.get("path")
@@ -666,6 +793,11 @@ def execute(name: str, arguments: dict, cfg: "dict | None" = None) -> str:
 
     if name == "run_bash":
         cmd = arguments.get("command")
+        try:
+            t = int(float(arguments.get("timeout") or BASH_TIMEOUT))
+        except (TypeError, ValueError):
+            t = BASH_TIMEOUT
+        t = max(5, min(t, MAX_BASH_TIMEOUT))
         try:
             # start_new_session=True puts the shell + all grandchildren in their
             # own process group so we can SIGKILL the whole tree on timeout.
@@ -682,7 +814,7 @@ def execute(name: str, arguments: dict, cfg: "dict | None" = None) -> str:
                 start_new_session=True,
             )
             try:
-                out, _ = proc.communicate(timeout=BASH_TIMEOUT)
+                out, _ = proc.communicate(timeout=t)
             except subprocess.TimeoutExpired:
                 try:
                     # os.killpg + signal.SIGKILL are POSIX-only. On Windows
@@ -695,10 +827,11 @@ def execute(name: str, arguments: dict, cfg: "dict | None" = None) -> str:
                     pass
                 proc.communicate()  # reap zombie
                 return (
-                    f"Error: command timed out after {BASH_TIMEOUT}s. The command may "
+                    f"Error: command timed out after {t}s. The command may "
                     "be waiting on stdin (stdin is /dev/null) or be genuinely slow. "
                     "Re-run with a non-interactive flag (--yes / -y / --no-input), "
-                    "or break the work into smaller commands."
+                    "pass a larger `timeout` (max 600s), or break the work into "
+                    "smaller commands."
                 )
             tail = "...[truncated]" if len(out) > OUTPUT_LIMIT else ""
             return f"{out[:OUTPUT_LIMIT]}{tail}\n[exit {proc.returncode}]"
@@ -710,6 +843,11 @@ def execute(name: str, arguments: dict, cfg: "dict | None" = None) -> str:
 
 def summarize_call(name: str, arguments: dict) -> str:
     """One-line summary used in the approval prompt and progress log."""
+    if name == "ask_user":
+        qs = arguments.get("questions") or []
+        first = (qs[0].get("question") if qs and isinstance(qs[0], dict) else "") or ""
+        more = f" (+{len(qs) - 1} more)" if len(qs) > 1 else ""
+        return f"ask_user: {first[:60]}{more}"
     if name == "read_file":
         return f"read_file: {arguments.get('path') or '(missing path)'}"
     if name == "write_file":

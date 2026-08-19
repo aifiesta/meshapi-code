@@ -64,3 +64,12 @@ def test_completer_never_raises_on_empty_state():
     comp = SlashCompleter({})
     # non-fetching path: command-name completion still works
     assert any(c.text == "/help" for c in comp.get_completions(Document("/hel"), None))
+
+
+def test_loop_control_commands_complete():
+    from meshapi.completer import COMMANDS, _ARG_CHOICES
+    for cmd in ("/hops", "/compact", "/stall"):
+        assert cmd in COMMANDS
+    assert "off" in _ARG_CHOICES["/hops"]
+    assert "now" in _ARG_CHOICES["/compact"]
+    assert "keep-going" in _ARG_CHOICES["/stall"]

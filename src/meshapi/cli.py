@@ -21,13 +21,14 @@ from prompt_toolkit.formatted_text import FormattedText
 from prompt_toolkit.history import FileHistory
 from prompt_toolkit.key_binding import KeyBindings
 from prompt_toolkit.styles import Style
+from rich.markdown import Markdown
 from rich.markup import escape as _rich_escape
 from rich.text import Text
 
-from . import __version__, memory, statusbar
+from . import __version__, askui, compact, loopguard, memory, pricing, statusbar
 from .attachments import AttachmentError, find_image_tokens, load_image
-from .client import stream_chat
-from .commands import handle_command, prompt_for_api_key
+from .client import complete_chat, stream_chat
+from .commands import fetch_models_quiet, handle_command, prompt_for_api_key
 from .config import (
     CREDENTIALS_FILE, HISTORY_FILE, clear_servers_file, load_config,
     load_servers, load_update_check, log_toolcall_failure, save_servers,
@@ -42,17 +43,11 @@ from .render import (
     run_with_ticker,
 )
 from .tools import (
-    PLAN_TOOLS, TOOLS, build_system_prompt, execute as exec_tool,
+    INTERACTIVE_TOOLS, PLAN_TOOLS, TOOLS, build_system_prompt, execute as exec_tool,
     find_stub_markers, parse_error_context, repair_tool_args, schema_hint,
     stub_guard_suppressed, summarize_call, validate_call,
 )
 from .update import maybe_offer, run_upgrade, start_background_check
-
-# Hop caps for the tool-calling loop. A turn without a plan rarely needs many
-# hops; one with a plan may legitimately span dozens of small steps (≈3-4 tool
-# calls per step × 15 steps).
-MAX_HOPS_NO_PLAN = 8
-MAX_HOPS_WITH_PLAN = 60
 
 # ANSI Shadow figlet font
 MESH_LOGO_LINES = [
@@ -341,20 +336,426 @@ def _render_tool_result(name: str, args: dict, result: str) -> None:
     console.print(f"  [dim]→ {_rich_escape(preview)}{tail}[/dim]")
 
 
-def _drop_in_flight_turn(state: dict) -> None:
-    """Roll messages back to just before the current user turn.
+def _finalize_interrupted_turn(state: dict, reason: str = "abort") -> int:
+    """Keep completed work in history after an interrupt or error.
 
-    Called from every error path so the next prompt starts on a clean message
-    list — no dangling assistant/tool messages from a half-finished hop, no
-    orphaned user turn the model would have to apologize for.
+    An hours-long turn used to be rolled back WHOLE on any exception — every
+    completed hop's tokens wasted. Now: seal a half-answered trailing tool
+    batch with stub results (strict Anthropic-translating gateways 400 on a
+    tool_use id with no tool_result, and popping the assistant message would
+    erase actions whose side effects already happened), then keep everything
+    with a resume breadcrumb. Only when NOTHING happened (no tool results, no
+    assistant text since the user message) does the old clean-slate rollback
+    run — an unanswered user message would otherwise read as ignored.
+    Returns the number of completed tool actions kept (0 = rolled back).
     """
-    while state["messages"] and state["messages"][-1]["role"] != "user":
-        state["messages"].pop()
-    if state["messages"] and state["messages"][-1]["role"] == "user":
-        state["messages"].pop()
-    # Dedupe entries whose content-bearing message just got rolled back
-    # must die with it — single choke point for ctrl+c/ESC/HTTP errors.
+    msgs = state["messages"]
+    n = loopguard.completed_actions_since_user(msgs)
+    has_assistant = False
+    for m in reversed(msgs):
+        if m.get("role") == "user":
+            break
+        if m.get("role") == "assistant":
+            has_assistant = True
+            break
+    if n == 0 and not has_assistant:
+        # Nothing was accomplished — clean slate, exactly the old behavior.
+        while msgs and msgs[-1]["role"] != "user":
+            msgs.pop()
+        if msgs and msgs[-1]["role"] == "user":
+            msgs.pop()
+        memory.invalidate_dropped(state)
+        return 0
+    loopguard.seal_partial_batch(msgs)
+    cause = (
+        "The user interrupted this turn" if reason == "abort"
+        else "This turn was cut short by a connection or gateway error"
+    )
+    msgs.append({"role": "system", "content": (
+        f"[{cause} after {n} completed tool action(s). The results above are "
+        "real — files written and commands run did happen. Wait for the "
+        "user's next instruction; when asked to continue, resume from where "
+        "you left off — do not redo completed work.]"
+    )})
     memory.invalidate_dropped(state)
+    return n
+
+
+def _pause_breadcrumb(state: dict, hopped: int) -> None:
+    """Record a pause in history so a "continue" turn resumes correctly.
+
+    Appended on every deliberate pause (hop limit, stall stop) — without it
+    the model reconstructs (or hallucinates) progress from buried tool
+    history and tends to redo work or falsely claim completion.
+    """
+    _plan = state.get("plan")
+    plan_part = ""
+    if _plan is not None and not _plan.is_complete():
+        plan_part = (
+            f" The plan is incomplete {_plan.summary()}. "
+            f"Remaining steps:\n{_plan.reminder_text()}\n"
+        )
+    state["messages"].append({"role": "system", "content": (
+        f"[Execution was paused after {hopped} tool hops.{plan_part} "
+        "Progress so far is recorded above. When the user asks to continue, "
+        "resume from where you left off — do not redo completed work and do "
+        "not claim the task is finished until it is.]"
+    )})
+
+
+# Stall nudges: short, prescriptive, tool-name-free (the XML-mode trap applies
+# to injected messages too). Injected transiently — consume-once, LAST in
+# _extras, same mechanism as the quality fix-it message.
+_STALL_NUDGE = (
+    "[You have repeated the same action with identical inputs several times; "
+    "it is not making progress. Do something different this time: change the "
+    "input, try another method, or re-read the last result carefully. If you "
+    "are genuinely blocked, stop and tell the user exactly what is blocking "
+    "you.]"
+)
+_STALL_RENUDGE = (
+    "[You are still repeating the same action with identical inputs. This is "
+    "the second reminder: change your approach now — different input, "
+    "different method, or explain to the user exactly what is blocking you. "
+    "If the next attempts are identical again, execution will pause.]"
+)
+
+
+def _retry_wait(state: dict, attempt: int, reason: str,
+                delay: "float | None" = None) -> None:
+    """Visible backoff between stream retries; ESC aborts the wait.
+
+    `delay` overrides the exponential guess — used for a server-sent
+    Retry-After, which knows the real capacity window better than we do.
+    """
+    if delay is None:
+        delay = loopguard.backoff_delay(attempt)
+    console.print(
+        f"[yellow]⚠ {reason} — retrying in {delay:.1f}s "
+        f"(attempt {attempt + 1}/{loopguard.MAX_STREAM_ATTEMPTS})[/yellow]"
+    )
+    end = time.monotonic() + delay
+    while time.monotonic() < end:
+        if state["esc_interrupt"].is_set():
+            raise KeyboardInterrupt
+        time.sleep(0.2)
+
+
+# Slash commands that are safe and useful to apply MID-RUN, between hops,
+# instead of queuing as a whole new turn. These only mutate session config
+# that the next hop re-reads (model, routing, effort, budget, permissions),
+# so applying them immediately is the behavior the user expects when they
+# type "/model X" while watching a long run go sideways.
+LIVE_CONTROL_COMMANDS = (
+    "/model", "/reasoning", "/route", "/fallback", "/mode", "/hops",
+    "/stall", "/optimize", "/compact",
+)
+
+
+def is_live_control(text: str) -> bool:
+    """True if `text` is a slash command applicable mid-run."""
+    t = (text or "").strip()
+    if not t.startswith("/"):
+        return False
+    return t.split()[0].lower() in LIVE_CONTROL_COMMANDS
+
+
+def _drain_live_controls(state: dict) -> bool:
+    """Apply any queued mid-run control commands. True if something changed.
+
+    Called at the top of each hop: the model/effort/mode for the NEXT hop is
+    read fresh from cfg, so a switch takes effect on the very next request
+    without ending the turn. Non-control messages stay queued as full turns.
+    """
+    queue = state.get("input_queue")
+    if not queue:
+        return False
+    remaining = collections.deque()
+    applied = False
+    while queue:
+        item = queue.popleft()
+        if is_live_control(item):
+            console.print(f"[{BRAND_DIM}]⚙ applying mid-run: {item.strip()}[/{BRAND_DIM}]")
+            try:
+                handle_command(item.strip(), state)
+            except Exception as e:  # never let a command kill the turn
+                console.print(f"[red]  command failed: {e}[/red]")
+            applied = True
+        else:
+            remaining.append(item)
+    queue.extend(remaining)
+    return applied
+
+
+def _handle_ask_user(args: dict, state: dict) -> str:
+    """Run the interactive picker and return the user's choices as a result.
+
+    Ungated (no y/n): the "approval" IS the user answering. The watcher is
+    paused so prompt_toolkit owns termios cleanly, exactly like the main
+    prompt. Cancelling or a headless terminal returns a plain instruction to
+    ask in prose instead — the model must never be stuck waiting on a UI
+    that cannot render.
+    """
+    questions = args.get("questions") or []
+    watcher = state.get("watcher")
+    ctx = watcher.paused() if watcher is not None else contextlib.nullcontext()
+    try:
+        with ctx:
+            answers = askui.ask(questions)
+    except Exception as e:  # a broken TTY must not kill the turn
+        return (f"Error: couldn't show the interactive picker ({e}). Ask the "
+                "user your question in plain text instead.")
+    if answers is None:
+        console.print(f"[{BRAND_DIM}]✕ question picker dismissed — the model "
+                      f"will decide and continue[/{BRAND_DIM}]")
+        return ("The user dismissed the question picker without answering "
+                "(or the terminal can't display it). Do NOT call ask_user "
+                "again for this — ask in plain text, or make a reasonable "
+                "choice yourself and say which you made and why.")
+    # The picker erased itself on exit — print the transcript-worthy record
+    # in its place: what was asked, what was chosen.
+    n = len(answers)
+    console.print(
+        f"[green]✔[/green] [bold]answered {n} question{'s' if n != 1 else ''}[/bold]"
+    )
+    lines = []
+    for q, a in zip(questions, answers):
+        shown = ", ".join(a) if isinstance(a, list) else str(a)
+        lines.append(f"Q: {q.get('question')}\nA: {shown}")
+        label = q.get("header") or (q.get("question") or "answer")[:30]
+        console.print(
+            f"    [{BRAND_DIM}]{_rich_escape(label)}[/{BRAND_DIM}] → "
+            f"[bold]{_rich_escape(shown)}[/bold]"
+        )
+    return ("The user answered:\n" + "\n".join(lines)
+            + "\n\nProceed on these answers without re-asking.")
+
+
+def _maybe_drop_reasoning(state: dict, message: str) -> bool:
+    """True if `message` is the upstream rejecting reasoning_effort.
+
+    Sets the per-turn latch so the retry omits the field. Must be checked on
+    BOTH failure shapes: a non-streaming call surfaces this as HTTP 400, but
+    a STREAMING call returns HTTP 200 and an in-band {"error": …} chunk —
+    the in-band shape is what real turns hit, and missing it made the guard
+    useless in practice.
+    """
+    if state.get("_drop_reasoning") or not state["cfg"].get("reasoning_effort"):
+        return False
+    if "reasoning_effort" not in (message or ""):
+        return False
+    state["_drop_reasoning"] = True
+    # Remember it: later turns on this model skip the field (and the retry)
+    # entirely, without ever guessing from an unreliable catalog flag.
+    state.setdefault("_reasoning_rejected", set()).add(state["cfg"].get("model"))
+    console.print(
+        "[yellow]⚠ this model rejected the reasoning-effort setting — "
+        "retrying without it (your setting is kept for models that support "
+        "it)[/yellow]"
+    )
+    return True
+
+
+def _effective_cfg(state: dict) -> dict:
+    """cfg for this hop, minus settings this model has proven it can't take.
+
+    We deliberately do NOT gate `reasoning_effort` on the catalog's
+    `supports_thinking` flag: it is False for gpt-5.4, sonnet-4.6, opus-4.8
+    and haiku-4.5, yet the gateway accepts the field on them (verified live,
+    HTTP 200). Trusting the flag would silently disable reasoning on exactly
+    the models people want it for.
+
+    So the rule is evidence-based: send it, and if a provider actually
+    rejects it, remember that model for the session and stop sending it.
+    Costs one retry per model, once — and never disables a feature that
+    works.
+    """
+    cfg = state["cfg"]
+    if not cfg.get("reasoning_effort"):
+        return cfg
+    rejected = state.get("_reasoning_rejected") or set()
+    model_id = cfg.get("model")
+    if state.get("_drop_reasoning") or (model_id in rejected and not cfg.get("auto_route")):
+        return {**cfg, "reasoning_effort": None}
+    return cfg
+
+
+def _utc_now_iso() -> str:
+    """UTC timestamp for the usage-API `since` filter."""
+    import datetime as _dt
+    return (_dt.datetime.now(_dt.timezone.utc) - _dt.timedelta(seconds=5)).isoformat()
+
+
+def _compact_and_report(state: dict, why: str) -> bool:
+    """Aggressively compact history mid-hop; True if it actually freed room.
+
+    Returning False (nothing left to compact) is what stops a compact→retry
+    →compact thrash loop: the caller then surfaces the error instead of
+    spinning. Claude Code guards the same way, via its
+    `willRetriggerNextTurn` / "made no progress" checks.
+    """
+    rep = compact.compact_history(
+        state, limit=state.get("_ctx_limit"), aggressive=True
+    )
+    if not rep:
+        return False
+    console.print(
+        f"[dim]⚙ {why} — compacted history "
+        f"~{rep['before_tok'] // 1000}k → ~{rep['after_tok'] // 1000}k tok "
+        "(est), retrying[/dim]"
+    )
+    return True
+
+
+def _try_non_streaming(state: dict, turn_messages: list):
+    """Last-resort blocking request when streaming keeps failing.
+
+    Mesh's server-side retry and provider fallback are documented to apply
+    to non-streaming chat completions ONLY — a streaming-only client gets
+    none of it. One blocking attempt therefore has a genuinely different
+    failure profile than a sixth stream, and it is the same escape hatch
+    Claude Code uses (`didFallBackToNonStreaming`).
+
+    Returns (reply, meta) on success, or None to let the caller re-raise.
+    """
+    console.print(
+        "[yellow]⚠ streaming keeps failing — retrying once without "
+        "streaming (this also enables the gateway's own retry/fallback)"
+        "[/yellow]"
+    )
+    _cfg = _effective_cfg(state)
+    try:
+        reply, meta = complete_chat(
+            turn_messages, _cfg, tools=TOOLS,
+            max_tokens=state.get("_max_tokens_shrunk"),
+        )
+    except KeyboardInterrupt:
+        raise
+    except Exception as e:
+        console.print(f"[dim]  non-streaming attempt also failed: {e}[/dim]")
+        return None
+    if reply:
+        console.print(Markdown(reply))
+    return reply, meta
+
+
+def _stream_hop_with_retry(state: dict, extras: list, hdr: str):
+    """One model round-trip with bounded retry — the per-hop resilience the
+    gateway can't provide (its retry/fallback applies only to non-streaming
+    requests, and this CLI is streaming-only).
+
+    Retries with exponential backoff + jitter on network errors, retryable
+    HTTP statuses (429/5xx), transient in-band errors, and (twice) on an
+    empty response. An in-band CONTEXT error compacts history aggressively
+    and retries once — the recovery that makes day-long turns survivable.
+    Fatal errors are returned via meta for the caller's error path; hard
+    failures re-raise only after MAX_STREAM_ATTEMPTS. A mid-stream retry
+    re-renders from scratch; the partial text above the retry line is
+    cosmetic scrollback — it never entered history.
+    """
+    compacted_for_context = False
+    empty_retries = 0
+    tried_non_streaming = False
+    attempt = 0
+    while True:
+        attempt += 1
+        # Rebuilt each attempt so a compaction between attempts is picked up.
+        turn_messages = state["messages"] + extras if extras else state["messages"]
+        # A shrunk output budget (from a max_tokens/context 400) must ride the
+        # RETRY too, not just the non-streaming fallback — otherwise the same
+        # request is re-sent and rejected identically.
+        _cfg = _effective_cfg(state)
+        if state.get("_max_tokens_shrunk"):
+            _cfg = {**_cfg, "max_tokens": state["_max_tokens_shrunk"]}
+        try:
+            reply, meta = render_stream(
+                stream_chat(turn_messages, _cfg, tools=TOOLS),
+                header=hdr,
+                state=state,
+            )
+        except KeyboardInterrupt:
+            raise
+        except httpx.HTTPStatusError as e:
+            code = e.response.status_code
+            # A max_tokens/context arithmetic 400 is recoverable without
+            # dropping any history — ask for fewer output tokens instead.
+            _body = _safe_response_text(e.response)
+            # Reactive safety net for the case the catalog couldn't predict
+            # (auto-routing, a stale/offline catalog): the upstream names
+            # reasoning_effort as unacceptable — drop it and retry so the
+            # turn proceeds instead of dying on a preference.
+            if _maybe_drop_reasoning(state, _body):
+                continue
+            _ovf = loopguard.parse_max_tokens_overflow(_body)
+            if _ovf is not None and not state.get("_max_tokens_shrunk"):
+                _new = loopguard.adjusted_max_tokens(_ovf)
+                if _new:
+                    state["_max_tokens_shrunk"] = _new
+                    console.print(
+                        "[dim]⚙ output budget exceeded the context window — "
+                        f"retrying with max_tokens={_new}[/dim]"
+                    )
+                    continue
+                # No room left for output: this is really a context problem.
+                if not compacted_for_context and state["cfg"].get("auto_compact", True):
+                    compacted_for_context = True
+                    if _compact_and_report(state, "context limit reached"):
+                        continue
+            if attempt < loopguard.MAX_STREAM_ATTEMPTS and loopguard.is_retryable_status(code):
+                # The server's own Retry-After beats our exponential guess.
+                _ra = loopguard.retry_after_seconds(e.response)
+                _reason = f"gateway returned {code}"
+                if _ra is None and e.response.headers.get("retry-after"):
+                    console.print(
+                        "[yellow]⚠ gateway asked for a wait longer than "
+                        f"{loopguard.RETRY_AFTER_MAX:.0f}s — not blocking on "
+                        "it[/yellow]"
+                    )
+                    raise
+                _retry_wait(state, attempt, _reason, delay=_ra)
+                continue
+            # Streaming keeps failing — try ONE non-streaming request. Mesh's
+            # server-side retry + provider fallback only covers non-streaming
+            # requests, so this is the CLI's last real chance to recover.
+            if not tried_non_streaming and loopguard.is_retryable_status(code):
+                tried_non_streaming = True
+                _r = _try_non_streaming(state, turn_messages)
+                if _r is not None:
+                    return _r
+            raise
+        except httpx.RequestError as e:
+            if attempt < loopguard.MAX_STREAM_ATTEMPTS:
+                _retry_wait(state, attempt, f"network error ({type(e).__name__})")
+                continue
+            if not tried_non_streaming:
+                tried_non_streaming = True
+                _r = _try_non_streaming(state, turn_messages)
+                if _r is not None:
+                    return _r
+            raise
+        err = meta.get("error")
+        if err:
+            # Streaming reports an unacceptable request as HTTP 200 + an
+            # in-band error, so this is where a rejected reasoning_effort
+            # actually lands.
+            if _maybe_drop_reasoning(state, str(err)):
+                continue
+            kind = loopguard.classify_inband_error(str(err))
+            if kind == "transient" and attempt < loopguard.MAX_STREAM_ATTEMPTS:
+                _retry_wait(state, attempt, "gateway is rate-limiting or overloaded")
+                continue
+            if (kind == "context" and not compacted_for_context
+                    and state["cfg"].get("auto_compact", True)):
+                compacted_for_context = True
+                if _compact_and_report(state, "context limit hit"):
+                    continue
+            return reply, meta  # fatal — the caller's error path handles it
+        if (not meta.get("tool_calls") and not (reply or "").strip()
+                and empty_retries < 2 and attempt < loopguard.MAX_STREAM_ATTEMPTS):
+            empty_retries += 1
+            _retry_wait(state, attempt, "empty response from the model")
+            continue
+        return reply, meta
 
 
 def _safe_response_text(resp) -> str:
@@ -1164,8 +1565,12 @@ def _log_call_failure(state: dict, p: dict, repaired: bool) -> None:
     })
 
 
-def handle_tool_calls(tool_calls: list, state: dict) -> None:
+def handle_tool_calls(tool_calls: list, state: dict) -> dict:
     """Append assistant tool_calls message + tool result messages to state.
+
+    Returns {"total": n, "doomed": k} so the caller's stall detector can
+    tell an all-doomed hop (malformed args — counts toward the doom wall)
+    from a productive one.
 
     The permission mode is read from state["mode"] PER CALL, not frozen for
     the batch — the keywatcher mutates it from its thread on shift+tab, so a
@@ -1203,12 +1608,13 @@ def handle_tool_calls(tool_calls: list, state: dict) -> None:
     # content-bearing message for write-sourced dedupe entries.
     state["_batch_assistant_idx"] = len(state["messages"]) - 1
     shown_mode = state.get("mode")
+    doomed_n = 0
     for p in prepared:
         _esc = state.get("esc_interrupt")
         if _esc is not None and _esc.is_set():
-            # ESC pressed — abort between tool calls. _drop_in_flight_turn
-            # rolls history past the half-batch, preserving the one-result-
-            # per-id invariant the same way ctrl+c does.
+            # ESC pressed — abort between tool calls. The interrupt handler
+            # seals the half-batch with stub results (one result per id) and
+            # keeps completed work, same as ctrl+c.
             raise KeyboardInterrupt
         name, args = p["name"], p["args"]
         mode = state.get("mode", Mode.DEFAULT)  # live read — see docstring
@@ -1221,6 +1627,7 @@ def handle_tool_calls(tool_calls: list, state: dict) -> None:
         # escalate to escape-hatch guidance. Plan tools normalize their own
         # args in _handle_plan_tool, so they never take this branch.
         if p["kind"] in ("invalid", "truncated", "unparseable") and name not in PLAN_TOOLS:
+            doomed_n += 1
             streaks = state.setdefault("doom_streak", {})
             streaks[name] = streaks.get(name, 0) + 1
             result = _doom_feedback(p, streaks[name])
@@ -1246,6 +1653,10 @@ def handle_tool_calls(tool_calls: list, state: dict) -> None:
                 # Plan tools are bookkeeping — no filesystem or shell side
                 # effects, so we don't gate them on the approval prompt.
                 result = _handle_plan_tool(name, args, state)
+            elif name in INTERACTIVE_TOOLS:
+                # The user answers it in person — an approval prompt on top
+                # of a question prompt would be nonsense.
+                result = _handle_ask_user(args, state)
             elif name == "remember":
                 # Memory bookkeeping — writes only to ~/.meshapi/context/,
                 # never the user's repo; ungated like plan tools. Doomed
@@ -1419,19 +1830,23 @@ def handle_tool_calls(tool_calls: list, state: dict) -> None:
         })
     # Once per batch — keep the mode visible between hops in multi-step turns.
     statusbar.print_line(state)
+    return {"total": len(prepared), "doomed": doomed_n}
 
 
 def _turn_status_line(model: str, auto_routed: bool, prompt_t, completion_t,
-                      agg_cost: float, session_cost: float, elapsed: float) -> str:
-    """The dim per-turn summary. Cost segments are omitted when the gateway
-    returned no cost this turn (it's best-effort on some paths) — no
-    dangling '—'. When auto-routed, show which model the router picked."""
+                      agg_cost: float, session_cost: float, elapsed: float,
+                      estimated: bool = False) -> str:
+    """The dim per-turn summary. Cost segments are omitted when neither the
+    gateway nor the catalog could price the turn — no dangling '—'. A "~"
+    marks a client-computed cost (usage × catalog rates), since the gateway
+    returns no cost of its own. When auto-routed, show the picked model."""
     display_model = f"auto → {model}" if auto_routed else model
     segments = [display_model, f"{prompt_t}→{completion_t} tok"]
+    tilde = "~" if estimated else ""
     if agg_cost:
-        segments.append(fmt_usd(agg_cost))
+        segments.append(f"{tilde}{fmt_usd(agg_cost)}")
     if session_cost:
-        segments.append(f"session {fmt_usd(session_cost)}")
+        segments.append(f"session {tilde}{fmt_usd(session_cost)}")
     segments.append(f"{elapsed:.1f}s")
     return "  •  ".join(segments)
 
@@ -1527,6 +1942,9 @@ def main() -> None:
         # repo root frozen at startup (nothing chdirs in-process).
         "session_reads": {},
         "memory_root": Path.cwd().resolve(),
+        # Session id: names the transcript that compaction points the model
+        # at, so compacted-away detail stays recoverable rather than lost.
+        "session_id": time.strftime("%Y%m%d-%H%M%S") + f"-{os.getpid()}",
     }
 
     # Mode cycle — used by both the prompt-toolkit keybinding (while at the
@@ -1562,7 +1980,10 @@ def main() -> None:
                 ack = Text()
                 ack.append("  › ", style=BRAND_DIM)
                 ack.append(text if len(text) <= 60 else text[:60] + "…")
-                ack.append("  (queued)", style="dim")
+                ack.append(
+                    "  (applies next hop)" if is_live_control(text) else "  (queued)",
+                    style="dim",
+                )
                 console.print(ack)
             except Exception:
                 pass
@@ -1776,10 +2197,18 @@ def main() -> None:
             state["messages"].append({"role": "user", "content": user_input})
         console.print()
 
-        # Tool-calling loop: keep streaming until model returns text without
-        # tool_calls or we hit the hop cap. The cap is larger when a plan is
-        # active because a legitimate multi-step task may need many hops.
+        # Tool-calling loop: keep streaming until the model returns text
+        # without tool_calls, the user's optional /hops limit fires, or the
+        # stall detector calls a genuinely stuck loop. There is no arbitrary
+        # hop cap — long tasks run to completion (esc interrupts).
         state["doom_streak"] = {}  # fresh user turn — failure streaks reset
+        state["stall"] = loopguard.StallDetector()
+        state["stall_nudge_msg"] = None
+        state["_max_tokens_shrunk"] = None  # per-turn output-budget override
+        turn_request_ids: list = []          # for the authoritative cost lookup
+        turn_started_iso = _utc_now_iso()
+        state["_compact_exhausted"] = False  # re-arm compaction each user turn
+        state["_drop_reasoning"] = False      # re-test reasoning support each turn
         # Quality guard resets: new turn, new deliverables. Suppressed for
         # the whole turn when the user explicitly asked for scaffolding.
         state["stub_files"] = {}
@@ -1794,39 +2223,90 @@ def main() -> None:
         last_elapsed = 0.0
         turn_failed = False  # empty/errored response — skip the cosmetic cost line
         try:
-            # While-loop so the cap can be promoted dynamically the moment the
-            # model creates a plan (a for-loop's range is frozen at construction
-            # time, which previously trapped multi-step turns at 8 hops).
             hopped = 0
-            max_hops = MAX_HOPS_NO_PLAN
+            _hop_limit = int(state["cfg"].get("max_hops") or 0)  # 0 = unlimited
+            _turn_started = time.monotonic()
             while True:
                 if state["esc_interrupt"].is_set():
                     raise KeyboardInterrupt  # ESC pressed — abort between hops
-                if state.get("plan") and max_hops < MAX_HOPS_WITH_PLAN:
-                    max_hops = MAX_HOPS_WITH_PLAN
-                if hopped >= max_hops:
+                # Mid-run steering: /model, /reasoning, /mode … typed while
+                # the turn is running apply to the NEXT hop instead of
+                # waiting for the turn to end.
+                _drain_live_controls(state)
+                if _hop_limit and hopped >= _hop_limit:
+                    # User-configured checkpoint (/hops) — a pause, not a
+                    # failure: history is kept and breadcrumbed for resume.
                     console.print(
-                        f"[yellow]Stopped after {hopped} tool hops — "
-                        "model wasn't converging. Ask it to wrap up or revise the plan.[/yellow]"
+                        f"[yellow]Paused after {hopped} tool hops (your /hops "
+                        "limit). Work so far is saved — say 'continue' to "
+                        "resume, or /hops off for unlimited.[/yellow]"
                     )
-                    # Breadcrumb: record the incomplete state in history so a
-                    # "continue" turn resumes the right steps instead of the
-                    # model reconstructing (or hallucinating) progress.
-                    _plan = state.get("plan")
-                    if _plan is not None and not _plan.is_complete():
-                        state["messages"].append({
-                            "role": "system",
-                            "content": (
-                                f"[Execution was paused after {hopped} tool hops "
-                                f"with the plan incomplete {_plan.summary()}. "
-                                f"Remaining steps:\n{_plan.reminder_text()}\n"
-                                "When the user asks to continue, resume these "
-                                "remaining steps. Do not claim the task is "
-                                "finished until they are done.]"
-                            ),
-                        })
+                    _pause_breadcrumb(state, hopped)
                     break
                 hopped += 1
+
+                # Auto-compaction: keep history under the model's context
+                # limit so a long turn never dies on "prompt is too long".
+                # Hop top sits between complete tool batches — the only safe
+                # place to mutate history.
+                if state["cfg"].get("auto_compact", True):
+                    _est = compact.est_history_tokens(state["messages"])
+                    if _est > 48_000 and not state.get("models_cache"):
+                        # Bounded: fetch_models_quiet does NOT cache failures,
+                        # and a 10s catalog stall per hop would be worse than
+                        # falling back to the 128k default limit.
+                        if state.get("_models_fetch_attempts", 0) < 3:
+                            state["_models_fetch_attempts"] = (
+                                state.get("_models_fetch_attempts", 0) + 1
+                            )
+                            fetch_models_quiet(state)  # silent, session-cached
+                    _mfl = (
+                        (state.get("last_model") or state["cfg"]["model"])
+                        if state["cfg"].get("auto_route") else state["cfg"]["model"]
+                    )
+                    state["_ctx_limit"] = compact.context_limit(
+                        _mfl, state.get("models_cache")
+                    )
+                    if (compact.should_compact(state["messages"], state["_ctx_limit"])
+                            and not state.get("_compact_exhausted")):
+                        _rep = compact.compact_history(
+                            state, limit=state["_ctx_limit"]
+                        )
+                        if _rep:
+                            console.print(
+                                "[dim]⚙ compacted context: "
+                                f"~{_rep['before_tok'] // 1000}k → "
+                                f"~{_rep['after_tok'] // 1000}k tok (est)"
+                                f"{' · transcript kept' if state.get('_transcript_upto') else ''}"
+                                "[/dim]"
+                            )
+                            # Still over after compacting means there is
+                            # nothing left to squeeze — stop trying every
+                            # hop (compaction thrash burns time and can
+                            # loop). The gateway's own error path takes
+                            # over if it genuinely doesn't fit.
+                            if compact.should_compact(
+                                state["messages"], state["_ctx_limit"]
+                            ):
+                                state["_compact_exhausted"] = True
+                        else:
+                            state["_compact_exhausted"] = True
+
+                # Periodic heartbeat for long turns — hops, context size,
+                # elapsed, spend (when the gateway reports cost).
+                if hopped % 10 == 0:
+                    _est = compact.est_history_tokens(state["messages"])
+                    _mins, _secs = divmod(int(time.monotonic() - _turn_started), 60)
+                    _lim = state.get("_ctx_limit")
+                    _ctx_seg = (
+                        f"~{_est // 1000}k/{_lim // 1000}k tok (est)"
+                        if _lim else f"~{_est // 1000}k tok (est)"
+                    )
+                    _cost_seg = f" · {fmt_usd(agg_cost)}" if agg_cost else ""
+                    console.print(
+                        f"[dim]— hop {hopped} · {_ctx_seg} · "
+                        f"{_mins}m{_secs:02d}s{_cost_seg} —[/dim]"
+                    )
 
                 # Re-ground the model in the current plan state on every hop.
                 # The plan lives client-side; without this the model has to
@@ -1834,7 +2314,6 @@ def main() -> None:
                 # to stop early or falsely claim completion. Injected
                 # transiently (not persisted) so it always reflects live state
                 # and history stays clean.
-                turn_messages = state["messages"]
                 _extras = []
                 _plan = state.get("plan")
                 if _plan is not None and not _plan.is_complete():
@@ -1857,22 +2336,38 @@ def main() -> None:
                 _fix = state.pop("quality_fix_msg", None)
                 if _fix:
                     _extras.append({"role": "system", "content": _fix})
-                if _extras:
-                    turn_messages = state["messages"] + _extras
+                # Stall nudge: consume-once and LAST — recency dominates for
+                # cheap models, and a repeated loop needs the freshest voice.
+                _nudge = state.pop("stall_nudge_msg", None)
+                if _nudge:
+                    _extras.append({"role": "system", "content": _nudge})
                 _hdr = "auto" if state["cfg"].get("auto_route") else state["cfg"]["model"]
                 if hopped > 1:
                     _hdr += f" · hop {hopped}"
-                reply, meta = render_stream(
-                    stream_chat(turn_messages, state["cfg"], tools=TOOLS),
-                    header=_hdr,
-                    state=state,
-                )
+                if agg_cost:
+                    _hdr += f" · {fmt_usd(agg_cost)}"
+                reply, meta = _stream_hop_with_retry(state, _extras, _hdr)
                 cost = meta.get("cost")
                 if cost is not None:
                     try:
                         agg_cost += float(cost)
                     except (TypeError, ValueError):
-                        pass
+                        cost = None
+                if cost is None:
+                    # The gateway does not return `cost` (verified live) —
+                    # compute it from usage × the catalog's own per-1M rates
+                    # so the spend line isn't permanently blank.
+                    _u = meta.get("usage")
+                    if _u:
+                        if not state.get("models_cache"):
+                            fetch_models_quiet(state)
+                        _est = pricing.estimate_cost(
+                            meta.get("model") or last_model,
+                            _u, state.get("models_cache"),
+                        )
+                        if _est is not None:
+                            agg_cost += _est
+                            state["cost_estimated"] = True
                 last_model = meta.get("model") or last_model
                 state["last_model"] = last_model
                 # SSE lines the client couldn't parse were dropped — if that
@@ -1892,6 +2387,7 @@ def main() -> None:
                         "repaired": False,
                         "raw_args": meta.get("dropped_sample", ""),
                     })
+                turn_request_ids.extend(meta.get("request_ids") or [])
                 last_usage = meta.get("usage") or last_usage
                 last_elapsed += meta.get("elapsed", 0.0)
                 last_optimize_plan = meta.get("optimize_plan") or last_optimize_plan
@@ -1920,11 +2416,10 @@ def main() -> None:
                             "[yellow]⚠ The model returned an empty response.[/yellow]"
                         )
                     console.print(
-                        "[dim]  This turn was discarded (not saved) — resend your "
-                        "message or say 'continue'. If it keeps happening the "
-                        "context may be large or the model/gateway may be "
-                        "rate-limiting: /clear to reset, /optimize to trim, or "
-                        "/model to switch.[/dim]"
+                        "[dim]  Work completed earlier this turn is saved — say "
+                        "'continue' to pick up from there. If it keeps "
+                        "happening: /compact now to shrink history, /clear to "
+                        "reset, or /model to switch.[/dim]"
                     )
                     break
                 if not tool_calls:
@@ -1934,10 +2429,11 @@ def main() -> None:
                     # with concrete evidence — cheap models respond to
                     # "script.js line 3 says 'Add game logic here'" far
                     # better than to generic scolding. Bounded: once per
-                    # turn, never past the hop cap, suppressed when the
-                    # user asked for scaffolding.
+                    # turn, never past the user's /hops limit, suppressed
+                    # when the user asked for scaffolding.
                     if (state.get("stub_files") and not state.get("quality_hop_fired")
-                            and not state.get("stub_guard_off") and hopped < max_hops):
+                            and not state.get("stub_guard_off")
+                            and (not _hop_limit or hopped < _hop_limit)):
                         state["quality_hop_fired"] = True
                         state["quality_fix_msg"] = _stub_fix_message(state["stub_files"])
                         _p0, _ev0 = next(iter(state["stub_files"].items()))
@@ -1969,11 +2465,56 @@ def main() -> None:
                     break
 
                 # Model called tools — execute and loop.
-                handle_tool_calls(tool_calls, state)
+                _report = handle_tool_calls(tool_calls, state)
+                _action = state["stall"].observe(
+                    loopguard.batch_signature(tool_calls),
+                    all_doomed=(
+                        bool(_report["total"])
+                        and _report["doomed"] == _report["total"]
+                    ),
+                )
+                if _action in ("nudge", "renudge"):
+                    state["stall_nudge_msg"] = (
+                        _STALL_NUDGE if _action == "nudge" else _STALL_RENUDGE
+                    )
+                    console.print(
+                        "[yellow]⚙ loop check: same action repeated "
+                        f"{state['stall'].last_cycles}× — nudging the model to "
+                        "change approach[/yellow]"
+                    )
+                elif _action == "stop":
+                    if state["cfg"].get("stall_policy") == "keep-going":
+                        # Unattended mode: never pause — keep nudging. The
+                        # user watches spend; esc interrupts.
+                        state["stall_nudge_msg"] = _STALL_RENUDGE
+                        console.print(
+                            "[yellow]⚙ stall persists — continuing per "
+                            "/stall keep-going (esc to interrupt)[/yellow]"
+                        )
+                    else:
+                        if state["stall"].stop_reason == "doom":
+                            console.print(
+                                "[yellow]Paused: the model produced malformed "
+                                "tool calls for "
+                                f"{loopguard.DOOM_STOP_HOPS} straight rounds. "
+                                "Work so far is saved — try /model to switch "
+                                "models, then say 'continue'.[/yellow]"
+                            )
+                        else:
+                            console.print(
+                                "[yellow]Paused: the model repeated the same "
+                                "action "
+                                f"{state['stall'].last_cycles} times in a row "
+                                "despite reminders. Work so far is saved — say "
+                                "'continue', or rephrase to unblock it. "
+                                "(/stall keep-going to never pause)[/yellow]"
+                            )
+                        _pause_breadcrumb(state, hopped)
+                        break
 
             # Quality guard, final honesty: the turn is over and flagged
-            # files survived (fix-it hop included, or the hop cap skipped
-            # it). Post-loop so BOTH break paths land here; exception paths
+            # files survived (fix-it hop included, or a pause preempted it).
+            # Post-loop so ALL break paths land here; exception paths
             # skip it. Warn the user plainly + leave a breadcrumb so a
             # follow-up "implement fully" gives the model concrete targets.
             _stubs = state.get("stub_files") or {}
@@ -2002,13 +2543,25 @@ def main() -> None:
                     "claim they are done.]"
                 )})
 
-            state["session_cost"] += agg_cost
+            # Replace the computed estimate with the gateway's own billed
+            # figure when it can be fetched (one request, ids filtered to
+            # this turn). Falls back to the estimate on any failure.
+            if turn_request_ids and agg_cost:
+                _actual = pricing.fetch_actual_costs(
+                    state["cfg"], turn_request_ids, turn_started_iso
+                )
+                if _actual and len(_actual) == len(set(turn_request_ids)):
+                    agg_cost = sum(_actual.values())
+                    state["cost_estimated"] = False
+
             prompt_t = last_usage.get("prompt_tokens", "?")
             completion_t = last_usage.get("completion_tokens", "?")
             if not turn_failed:
                 console.rule(style=BRAND_DIM, characters="─")
+                # session_cost is committed in the finally below — add this
+                # turn's spend here so the line shows the post-turn total.
                 console.print(
-                    f"[dim]{_turn_status_line(last_model, state['cfg'].get('auto_route', False), prompt_t, completion_t, agg_cost, state['session_cost'], last_elapsed)}[/dim]"
+                    f"[dim]{_turn_status_line(last_model, state['cfg'].get('auto_route', False), prompt_t, completion_t, agg_cost, state['session_cost'] + agg_cost, last_elapsed, state.get('cost_estimated', False))}[/dim]"
                 )
             if last_optimize_plan:
                 if last_optimize_plan.get("degraded"):
@@ -2022,7 +2575,6 @@ def main() -> None:
                         console.print(f"[dim]{line}[/dim]")
         except KeyboardInterrupt:
             console.rule(style="dim yellow", characters="─")
-            console.print("[yellow]aborted by user — returning to prompt[/yellow]")
             # Abort means "stop everything": discard stacked messages too —
             # without this the drain would immediately launch the next
             # queued turn. Partial type-ahead deliberately survives (it
@@ -2030,27 +2582,43 @@ def main() -> None:
             _n_queued = len(state["input_queue"])
             if _n_queued:
                 state["input_queue"].clear()
-                console.print(f"[dim]discarded {_n_queued} queued message(s)[/dim]")
             state["esc_interrupt"].clear()
-            # Drop the in-flight user turn so the next prompt is a clean slate.
-            # Trailing assistant/tool messages from partial hops are left in
-            # history; the model can ignore them or summarize as needed.
-            _drop_in_flight_turn(state)
+            # Completed work survives the abort — an hour of hops must not
+            # vanish from context because the user pressed esc.
+            _kept = _finalize_interrupted_turn(state, "abort")
+            if _kept:
+                console.print(
+                    f"[yellow]aborted by user — {_kept} completed action(s) "
+                    "kept, returning to prompt[/yellow]"
+                )
+            else:
+                console.print("[yellow]aborted by user — returning to prompt[/yellow]")
+            if _n_queued:
+                console.print(f"[dim]discarded {_n_queued} queued message(s)[/dim]")
         except httpx.HTTPStatusError as e:
+            # Retryable statuses were already retried with backoff inside
+            # _stream_hop_with_retry — reaching here means retries exhausted
+            # or a non-retryable status. Completed hops stay in history.
             console.rule(style="dim red", characters="─")
             body = _safe_response_text(e.response)
             console.print(f"[red]API error {e.response.status_code}: {body}[/red]")
-            _drop_in_flight_turn(state)
+            if _finalize_interrupted_turn(state, "error"):
+                console.print("[dim]completed work this turn is saved — say 'continue' to resume[/dim]")
         except httpx.RequestError as e:
             # Network / connection / timeout / DNS — recoverable, stay in REPL.
             console.rule(style="dim red", characters="─")
             console.print(f"[red]Network error ({type(e).__name__}): {e}[/red]")
-            _drop_in_flight_turn(state)
+            if _finalize_interrupted_turn(state, "error"):
+                console.print("[dim]completed work this turn is saved — say 'continue' to resume[/dim]")
         except Exception as e:  # pragma: no cover — last-line safety net
             console.rule(style="dim red", characters="─")
             console.print(f"[red]Unexpected error ({type(e).__name__}): {e}[/red]")
             console.print("[dim]session is still alive — returning to prompt[/dim]")
-            _drop_in_flight_turn(state)
+            _finalize_interrupted_turn(state, "error")
+        finally:
+            # Spend is real even when the turn aborts or errors — commit it
+            # unconditionally so /cost never under-reports.
+            state["session_cost"] += agg_cost
 
 
 if __name__ == "__main__":

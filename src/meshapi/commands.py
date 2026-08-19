@@ -115,6 +115,38 @@ def fetch_models_quiet(state: dict) -> "list | None":
     return None
 
 
+# The gateway hard-rejects anything outside this set (HTTP 422
+# literal_error), so "xhigh"/"max" cannot be passed through — they are
+# mapped to the nearest real level instead of failing every request.
+_REASONING_ALIASES = {
+    "xhigh": "high", "x-high": "high", "extra-high": "high",
+    "extra high": "high", "max": "high", "maximum": "high",
+    "minimal": "low", "min": "low", "medium-high": "high", "mid": "medium",
+}
+
+
+def warn_reasoning_unsupported(state: dict) -> None:
+    """Note when reasoning effort is set but this model has already rejected it.
+
+    Intentionally evidence-based: the catalog's `supports_thinking` is False
+    even for gpt-5.4 / sonnet-4.6 / opus-4.8, which DO accept the field
+    (verified live), so warning off that flag would be wrong far more often
+    than right. We only speak up about a model we have actually watched
+    reject it this session; otherwise the CLI just sends it and lets the
+    retry-without-it net handle a rejection.
+    """
+    effort = state["cfg"].get("reasoning_effort")
+    if not effort:
+        return
+    model_id = state["cfg"].get("model")
+    if model_id in (state.get("_reasoning_rejected") or set()):
+        console.print(
+            f"[yellow]⚠ {model_id} rejected reasoning effort earlier this "
+            "session — it will be sent without it (your setting is kept for "
+            "models that accept it).[/yellow]"
+        )
+
+
 def _fetch_models(state: dict) -> "list | None":
     """GET /models once per session (cached in state). None on failure,
     with the error already printed."""
@@ -296,6 +328,7 @@ def handle_command(cmd: str, state: dict) -> bool:
         state["messages"] = [{"role": "system", "content": build_system_prompt(state["cfg"])}]
         state["session_cost"] = 0.0
         state["session_reads"] = {}  # history is gone — dedupe must not lie
+        state["plan"] = None  # a plan from the wiped conversation must not haunt new turns
         console.print("[dim]Conversation cleared.[/dim]")
 
     elif name == "/model":
@@ -341,6 +374,9 @@ def handle_command(cmd: str, state: dict) -> bool:
                         f"model the gateway picks per prompt, not {arg}. Run "
                         f"[bold]/route off[/bold] to actually pin {arg}.[/yellow]"
                     )
+                # A reasoning_effort left over from a thinking model would
+                # make every request to a non-thinking model fail with 400.
+                warn_reasoning_unsupported(state)
         else:
             # No arg = show the current pin, and flag when it isn't the model
             # actually being used because auto-routing overrides it.
@@ -389,6 +425,17 @@ def handle_command(cmd: str, state: dict) -> bool:
             elif q == "free":
                 subset = [m for m in models if m.get("is_free")]
                 title = f"free models ({len(subset)})"
+            elif q in ("thinking", "reasoning"):
+                # Capability filter, not a name match — these are the models
+                # /reasoning can actually be sent to.
+                subset = [
+                    m for m in models
+                    if m.get("supports_thinking") and m.get("supports_completions_api")
+                ]
+                title = f"thinking models ({len(subset)})"
+            elif q == "tools":
+                subset = [m for m in models if m.get("supports_tools")]
+                title = f"tool-calling models ({len(subset)})"
             else:
                 subset = [
                     m for m in models
@@ -444,15 +491,30 @@ def handle_command(cmd: str, state: dict) -> bool:
         v = arg.strip().lower()
         if not v:
             cur = state["cfg"].get("reasoning_effort")
-            console.print(f"[dim]reasoning effort: {cur or 'off'}[/dim]")
+            console.print(
+                f"[dim]reasoning effort: {cur or 'off'}\n"
+                f"usage: /reasoning {'|'.join(_REASONING_LEVELS)}|off\n"
+                "higher effort = more thinking tokens (better on hard "
+                "problems, slower and pricier). Only sent to models that "
+                "support thinking.[/dim]"
+            )
         elif v == "off":
             state["cfg"]["reasoning_effort"] = None
             save_config(state["cfg"])
             console.print("[dim]Reasoning effort off — not sent with requests.[/dim]")
-        elif v in _REASONING_LEVELS:
-            state["cfg"]["reasoning_effort"] = v
+        elif v in _REASONING_LEVELS or v in _REASONING_ALIASES:
+            mapped = _REASONING_ALIASES.get(v, v)
+            state["cfg"]["reasoning_effort"] = mapped
             save_config(state["cfg"])
-            console.print(f"[dim]Reasoning effort set to {v}.[/dim]")
+            if mapped != v:
+                console.print(
+                    f"[yellow]The gateway accepts only "
+                    f"{'|'.join(_REASONING_LEVELS)} — '{v}' mapped to "
+                    f"'{mapped}'.[/yellow]"
+                )
+            else:
+                console.print(f"[dim]Reasoning effort set to {mapped}.[/dim]")
+            warn_reasoning_unsupported(state)
         else:
             console.print(
                 f"[red]Usage: /reasoning {'|'.join(_REASONING_LEVELS)}|off[/red]"
@@ -600,7 +662,30 @@ def handle_command(cmd: str, state: dict) -> bool:
             console.print(f"[dim]{state['cfg']['system']}[/dim]")
 
     elif name == "/cost":
-        console.print(f"[dim]Session spend: {fmt_usd(state.get('session_cost', 0))}[/dim]")
+        spend = state.get("session_cost", 0)
+        tilde = "~" if state.get("cost_estimated") else ""
+        console.print(f"[dim]Session spend: {tilde}{fmt_usd(spend)}[/dim]")
+        if state.get("cost_estimated"):
+            console.print(
+                "[dim]  (computed from token usage × the catalog's own per-1M "
+                "rates — the gateway does not return a cost field)[/dim]"
+            )
+        # Authoritative balance straight from the gateway, when reachable.
+        try:
+            cfg = state["cfg"]
+            r = httpx.get(
+                f"{cfg['base_url'].rstrip('/')}/balance",
+                headers={"Authorization": f"Bearer {cfg['api_key']}"},
+                timeout=10,
+            )
+            if r.status_code < 400:
+                b = r.json()
+                console.print(
+                    f"[dim]Account balance: ${float(b.get('available_usd', 0)):.4f} "
+                    f"available[/dim]"
+                )
+        except Exception:
+            pass
 
     elif name == "/optimize":
         # BETA: Mesh Optimize dial. 0 = off (full bypass), up to 0.95.
@@ -638,6 +723,101 @@ def handle_command(cmd: str, state: dict) -> bool:
                     else:
                         console.print("[dim]optimize off. Requests pass through untouched.[/dim]")
 
+    elif name == "/hops":
+        if not arg:
+            cur = int(state["cfg"].get("max_hops") or 0)
+            label = "unlimited" if cur == 0 else str(cur)
+            console.print(
+                f"[dim]hop limit: {label}"
+                + (" (stall detection still stops runaway loops)" if cur == 0 else "")
+                + "\nusage: /hops <n>   pause each turn after n tool hops\n"
+                "       /hops off   unlimited (default)[/dim]"
+            )
+        else:
+            raw = arg.strip().lower()
+            try:
+                value = 0 if raw in ("off", "0") else int(raw)
+            except ValueError:
+                console.print("[red]Not a number. Use a positive integer, or 'off'.[/red]")
+            else:
+                if value < 0:
+                    console.print("[red]Hop limit can't be negative. Use a positive integer or 'off'.[/red]")
+                else:
+                    state["cfg"]["max_hops"] = value
+                    save_config(state["cfg"])
+                    if value:
+                        console.print(
+                            f"[dim]hop limit set to {value} — each turn pauses "
+                            "after that many tool hops (work is kept; say "
+                            "'continue' to resume).[/dim]"
+                        )
+                    else:
+                        console.print(
+                            "[dim]hop limit off — turns run until the task is "
+                            "done (stall detection still stops runaway "
+                            "loops; esc interrupts).[/dim]"
+                        )
+
+    elif name == "/compact":
+        from . import compact as _compact
+        sub = arg.strip().lower()
+        if sub in ("", "now"):
+            models = fetch_models_quiet(state)
+            model_id = state.get("last_model") or state["cfg"].get("model") or ""
+            limit = _compact.context_limit(model_id, models)
+            if sub == "now":
+                rep = _compact.compact_history(state, limit=limit, aggressive=True)
+                if rep:
+                    console.print(
+                        f"[dim]compacted: ~{rep['before_tok'] // 1000}k → "
+                        f"~{rep['after_tok'] // 1000}k tok (est) — "
+                        f"{rep['truncated']} result(s) truncated, "
+                        f"{rep['folded']} run(s) folded[/dim]"
+                    )
+                else:
+                    console.print("[dim]nothing to compact — history is already lean.[/dim]")
+            else:
+                est = _compact.est_history_tokens(state.get("messages") or [])
+                pct = (est / limit * 100) if limit else 0
+                auto = "on" if state["cfg"].get("auto_compact", True) else "off"
+                console.print(
+                    f"[dim]context: ~{est // 1000}k of ~{limit // 1000}k tok "
+                    f"(est {pct:.0f}%) · auto-compact {auto}\n"
+                    "usage: /compact now          compact history right now\n"
+                    "       /compact auto on|off  toggle automatic compaction[/dim]"
+                )
+        elif sub in ("auto on", "auto off"):
+            on = sub.endswith("on")
+            state["cfg"]["auto_compact"] = on
+            save_config(state["cfg"])
+            detail = (
+                "on — long turns stay under the model's context limit" if on
+                else "off — long turns may hit the context limit and pause"
+            )
+            console.print(f"[dim]auto-compact {detail}.[/dim]")
+        else:
+            console.print("[red]Usage: /compact [now|auto on|auto off][/red]")
+
+    elif name == "/stall":
+        cur = state["cfg"].get("stall_policy") or "pause"
+        if not arg:
+            console.print(
+                f"[dim]stall policy: {cur}\n"
+                "usage: /stall pause       pause the turn when the model repeats "
+                "itself despite nudges (default)\n"
+                "       /stall keep-going  never pause — keep nudging (unattended "
+                "runs; esc still interrupts)[/dim]"
+            )
+        else:
+            raw = arg.strip().lower()
+            if raw in ("pause", "keep-going", "keepgoing", "keep_going"):
+                value = "pause" if raw == "pause" else "keep-going"
+                state["cfg"]["stall_policy"] = value
+                save_config(state["cfg"])
+                console.print(f"[dim]stall policy set to {value}.[/dim]")
+            else:
+                console.print("[red]Usage: /stall [pause|keep-going][/red]")
+
     elif name == "/login":
         prompt_for_api_key(state["cfg"], watcher=state.get("watcher"))
 
@@ -667,6 +847,9 @@ def handle_command(cmd: str, state: dict) -> bool:
             "/clear-attach              drop any queued image attachments\n"
             "/system <txt>              set system prompt\n"
             "/cost                      show session spend\n"
+            "/hops <n|off>              pause turns after n tool hops (off = unlimited)\n"
+            "/compact [now|auto on|off] context usage + history compaction\n"
+            "/stall pause|keep-going    what to do when the model repeats itself\n"
             "/optimize <dial>           token savings, beta: 0 off, up to 0.95\n"
             "/memory [notes|clear|on|off]  repo memory: map + notes from past sessions\n"
             "/login                     set or replace your API key\n"

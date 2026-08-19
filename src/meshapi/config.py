@@ -22,6 +22,11 @@ UPDATE_CHECK_FILE = CONFIG_DIR / "update_check.json"
 # Tool-call failure forensics: raw arguments of every doomed/repaired call,
 # so corruption can be attributed (model-side vs gateway SSE relay).
 TOOLCALL_FAILURES_FILE = CONFIG_DIR / "toolcall_failures.jsonl"
+# Full pre-compaction history, so compaction is recoverable instead of
+# destructive: the summary left in context names this path and the model can
+# read back exact code/errors it no longer has. (Claude Code does the same —
+# its compact summary points at the session transcript.)
+TRANSCRIPTS_DIR = CONFIG_DIR / "transcripts"
 FAILURE_LOG_MAX_BYTES = 1_000_000
 _RAW_ARGS_LOG_CAP = 32_768  # bound one pathological record
 
@@ -37,6 +42,14 @@ DEFAULT_CONFIG = {
     # Mesh Optimize dial (BETA). 0 = off. 0 to 0.95: how aggressively to
     # cut token spend. See /optimize in the REPL and README for details.
     "optimize": 0.0,
+    # Agentic loop controls. max_hops 0 = unlimited (stall detection still
+    # stops runaway loops); auto_compact keeps long turns under the model's
+    # context limit; stall_policy "pause" ends the turn at the prompt after
+    # repeated identical actions ignore nudges, "keep-going" nudges forever
+    # (unattended runs).
+    "max_hops": 0,
+    "auto_compact": True,
+    "stall_policy": "pause",
 }
 
 _DIR_MODE = stat.S_IRWXU                       # 0700
@@ -166,6 +179,33 @@ def save_config(cfg: dict) -> None:
     tmp.write_text(json.dumps(persisted, indent=2))
     secure_file(tmp)  # 0600 before it becomes config.json — no readable window
     os.replace(tmp, CONFIG_FILE)
+
+
+def transcript_path(session_id: str) -> "Path":
+    """Path for this session's full transcript (created lazily, 0600)."""
+    _secure_dir(CONFIG_DIR)
+    _secure_dir(TRANSCRIPTS_DIR)
+    safe = "".join(c for c in str(session_id) if c.isalnum() or c in "-_")[:64]
+    return TRANSCRIPTS_DIR / f"{safe or 'session'}.jsonl"
+
+
+def append_transcript(session_id: str, messages: list) -> "str | None":
+    """Append messages to the session transcript. Returns the path, or None.
+
+    Best-effort and never raises: losing a transcript line must never break
+    a turn. Written 0600 — it holds full file contents and shell output.
+    """
+    try:
+        path = transcript_path(session_id)
+        first = not path.exists()
+        with open(path, "a", encoding="utf-8") as fh:
+            for m in messages:
+                fh.write(json.dumps(m, ensure_ascii=False, default=str) + "\n")
+        if first:
+            secure_file(path)
+        return str(path)
+    except Exception:
+        return None
 
 
 def save_servers(servers: list) -> None:

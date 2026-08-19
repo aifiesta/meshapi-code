@@ -345,3 +345,99 @@ def test_find_image_tokens_backtick_is_text_escape(tmp_path, monkeypatch):
 def test_find_image_tokens_nonexistent_local_path_not_detected():
     # Liberal-then-verify: an image-extension path that doesn't exist is ignored.
     assert attachments.find_image_tokens("/nope/does/not/exist.png") == []
+
+
+# ---------------------------------------------------------------------------
+# read_file cap (READ_LIMIT) — huge reads must not enter history whole
+# ---------------------------------------------------------------------------
+
+def test_read_file_at_limit_untouched(tmp_path):
+    p = tmp_path / "exact.txt"
+    p.write_text("x" * tools.READ_LIMIT)
+    out = tools.execute("read_file", {"path": str(p)})
+    assert out == "x" * tools.READ_LIMIT
+    assert "[truncated" not in out
+
+
+def test_read_file_over_limit_truncated_with_notice(tmp_path):
+    p = tmp_path / "big.txt"
+    p.write_text("x" * (tools.READ_LIMIT + 1))
+    out = tools.execute("read_file", {"path": str(p)})
+    assert out.startswith("x" * 100)
+    assert f"file is {tools.READ_LIMIT + 1} chars" in out
+    assert "ranged shell command" in out
+    # body kept is exactly READ_LIMIT chars
+    assert out.index("\n[truncated") == tools.READ_LIMIT
+
+
+# ---------------------------------------------------------------------------
+# run_bash optional timeout — clamped, coerced, validated
+# ---------------------------------------------------------------------------
+
+def test_run_bash_timeout_validation():
+    assert tools.validate_call("run_bash", {"command": "ls", "timeout": "abc"}) is not None
+    assert tools.validate_call("run_bash", {"command": "ls", "timeout": None}) is None
+    assert tools.validate_call("run_bash", {"command": "ls", "timeout": 300}) is None
+    assert tools.validate_call("run_bash", {"command": "ls", "timeout": "300"}) is None
+    assert tools.validate_call("run_bash", {"command": "ls", "timeout": 30.5}) is None
+
+
+def test_run_bash_timeout_used_and_clamped():
+    # A 1s sleep with timeout=1 clamps to the 5s floor -> completes fine.
+    out = tools.execute("run_bash", {"command": "sleep 1 && echo done", "timeout": 1})
+    assert "done" in out and "[exit 0]" in out
+
+
+def test_run_bash_custom_timeout_expires():
+    out = tools.execute("run_bash", {"command": "sleep 20", "timeout": 5})
+    assert "timed out after 5s" in out
+    assert "max 600s" in out
+
+
+def test_run_bash_schema_mentions_timeout():
+    rb = next(t for t in tools.TOOLS if t["function"]["name"] == "run_bash")
+    props = rb["function"]["parameters"]["properties"]
+    assert "timeout" in props
+    assert props["timeout"]["type"] == "integer"
+    assert "required" not in props  # timeout stays optional
+    assert rb["function"]["parameters"]["required"] == ["command"]
+
+
+# ---------------------------------------------------------------------------
+# ask_user tool schema + validation
+# ---------------------------------------------------------------------------
+
+def test_ask_user_in_tools_and_is_interactive():
+    names = [t["function"]["name"] for t in tools.TOOLS]
+    assert "ask_user" in names
+    assert "ask_user" in tools.INTERACTIVE_TOOLS
+
+
+def test_ask_user_validation_rejects_thin_calls():
+    assert tools.validate_call("ask_user", {}) is not None
+    assert tools.validate_call("ask_user", {"questions": []}) is not None
+    # a question needs >= 2 options
+    one = {"questions": [{"question": "a?", "options": [{"label": "x"}]}]}
+    assert "at least 2" in tools.validate_call("ask_user", one)
+    # option needs a label
+    noLabel = {"questions": [{"question": "a?", "options": [{}, {}]}]}
+    assert "label" in tools.validate_call("ask_user", noLabel)
+    # too many questions
+    many = {"questions": [{"question": f"q{i}?",
+                           "options": [{"label": "a"}, {"label": "b"}]}
+                          for i in range(5)]}
+    assert "at most 4" in tools.validate_call("ask_user", many)
+
+
+def test_ask_user_validation_accepts_good_call():
+    good = {"questions": [{"question": "Which stack?", "header": "Stack",
+                           "options": [{"label": "Next.js", "description": "React"},
+                                       {"label": "Django"}]}]}
+    assert tools.validate_call("ask_user", good) is None
+
+
+def test_ask_user_summary():
+    out = tools.summarize_call("ask_user", {"questions": [
+        {"question": "Which database should we use?"}, {"question": "b?"}]})
+    assert out.startswith("ask_user: Which database")
+    assert "+1 more" in out

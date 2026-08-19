@@ -259,3 +259,11 @@ def test_save_config_result_is_valid_json_object(config_paths):
     on_disk = json.loads((config_paths / "config.json").read_text())
     assert isinstance(on_disk, dict)
     assert on_disk["model"] == "x/y"
+
+
+def test_loop_control_defaults():
+    """0.5.9 agentic-loop keys ship with immortal-by-default values."""
+    from meshapi.config import DEFAULT_CONFIG
+    assert DEFAULT_CONFIG["max_hops"] == 0          # unlimited
+    assert DEFAULT_CONFIG["auto_compact"] is True
+    assert DEFAULT_CONFIG["stall_policy"] == "pause"

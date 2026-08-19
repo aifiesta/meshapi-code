@@ -25,6 +25,9 @@ COMMANDS = {
     "/clear-attach": "drop queued attachments",
     "/system": "set system prompt",
     "/cost": "session spend",
+    "/hops": "hop limit: n | off (unlimited)",
+    "/compact": "context usage | now | auto on/off",
+    "/stall": "pause | keep-going on repeats",
     "/optimize": "token savings dial (beta)",
     "/memory": "repo memory: notes | clear | on | off",
     "/login": "set or replace the API key",
@@ -38,7 +41,11 @@ _ARG_CHOICES = {
     "/route": ("auto", "off", "preview"),
     "/mode": ("default", "accept-edits", "auto", "bypass"),
     "/reasoning": ("high", "medium", "low", "none", "off"),
+    "/models": ("free", "thinking", "tools"),
     "/memory": ("notes", "clear", "on", "off"),
+    "/hops": ("off",),
+    "/compact": ("now", "auto on", "auto off"),
+    "/stall": ("pause", "keep-going"),
 }
 
 

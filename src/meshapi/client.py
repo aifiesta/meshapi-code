@@ -1,5 +1,6 @@
 """Streaming OpenAI-compatible HTTP client for Mesh API."""
 import json
+import time
 from typing import Iterable, Optional
 
 import httpx
@@ -213,6 +214,14 @@ def stream_chat(
             optimized = {**payload, **extra, "messages": opt_messages}
             attempts = [optimized, payload]  # raw payload is the fallback
 
+    # A caller-forced output budget wins over every other lever — it exists
+    # because the gateway already rejected this request for asking too much
+    # (input + max_tokens > context window). Applied last, to every attempt,
+    # so optimize's own max_tokens default can't re-trigger the same 400.
+    forced_max = cfg.get("max_tokens")
+    if forced_max:
+        attempts = [{**body, "max_tokens": int(forced_max)} for body in attempts]
+
     last_meta: dict = {}
     last_model: str = ""
     accum = ToolCallAccumulator()
@@ -220,6 +229,7 @@ def stream_chat(
     dropped_sample = ""  # nonzero implicates the gateway relay, not the model)
     progress_tool = ""   # spinner feed: which tool's arguments are streaming
     progress_chars = 0   # ...and how many argument chars have arrived so far
+    request_ids: list = []  # every attempt's x-request-id (billing lookup)
 
     for attempt_index, body in enumerate(attempts):
         is_last_attempt = attempt_index == len(attempts) - 1
@@ -242,6 +252,12 @@ def stream_chat(
             resolved = r.headers.get("x-resolved-model-id")
             if resolved:
                 last_model = resolved
+            # The gateway's own id for this request — the key that unlocks
+            # its authoritative cost via POST /v1/usage/events.
+            rid = r.headers.get("x-request-id")
+            if rid:
+                last_meta["request_id"] = rid
+                request_ids.append(rid)
             for line in r.iter_lines():
                 if not line or not line.startswith("data: "):
                     continue
@@ -314,6 +330,8 @@ def stream_chat(
 
     if last_model:
         last_meta["model"] = last_model
+    if request_ids:
+        last_meta["request_ids"] = request_ids
     if dropped_chunks:
         last_meta["dropped_chunks"] = dropped_chunks
         last_meta["dropped_sample"] = dropped_sample
@@ -326,3 +344,64 @@ def stream_chat(
         last_meta["optimize_plan"] = plan
     if last_meta:
         yield last_meta
+
+
+def complete_chat(messages: list, cfg: dict, tools: "Optional[list]" = None,
+                  max_tokens: "int | None" = None) -> tuple:
+    """Non-streaming fallback for one hop. Returns (reply_text, meta).
+
+    Why this exists: Mesh's own retry + provider fallback is documented to
+    apply to NON-streaming chat completions only. This CLI streams
+    everything, so a run of streaming failures gets zero server-side
+    resilience — falling back to a single blocking request is what buys it
+    (and it is also how Claude Code recovers: `didFallBackToNonStreaming`).
+
+    Same meta shape as stream_chat's final yield, so callers need no special
+    casing: {usage, cost, model, tool_calls?, error?, elapsed}.
+    """
+    url = f"{cfg['base_url'].rstrip('/')}/chat/completions"
+    headers = {
+        "Authorization": f"Bearer {cfg['api_key']}",
+        "Content-Type": "application/json",
+    }
+    payload = build_payload(_drop_empty_assistant(messages), cfg, tools)
+    payload["stream"] = False
+    if max_tokens:
+        payload["max_tokens"] = int(max_tokens)
+
+    started = time.time()
+    r = httpx.post(url, json=payload, headers=headers, timeout=300)
+    r.raise_for_status()
+    data = r.json()
+    meta: dict = {"elapsed": time.time() - started, "non_streaming": True}
+    if isinstance(data, dict) and data.get("error"):
+        err = data["error"]
+        meta["error"] = err.get("message") if isinstance(err, dict) else str(err)
+        return "", meta
+
+    choices = (data or {}).get("choices") or []
+    msg = (choices[0] or {}).get("message", {}) if choices else {}
+    reply = msg.get("content") or ""
+    raw_calls = msg.get("tool_calls") or []
+    calls = []
+    for i, tc in enumerate(raw_calls):
+        fn = tc.get("function") or {}
+        calls.append({
+            "id": tc.get("id") or f"call_{i}",
+            "name": fn.get("name") or "",
+            "arguments": fn.get("arguments") or "",
+        })
+    if calls:
+        meta["tool_calls"] = calls
+    if data.get("usage"):
+        meta["usage"] = data["usage"]
+    if data.get("cost") is not None:
+        meta["cost"] = data["cost"]
+    meta["model"] = (
+        r.headers.get("x-resolved-model-id") or data.get("model") or ""
+    )
+    rid = r.headers.get("x-request-id")
+    if rid:
+        meta["request_id"] = rid
+        meta["request_ids"] = [rid]
+    return reply, meta
