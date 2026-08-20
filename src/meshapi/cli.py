@@ -559,7 +559,17 @@ def _maybe_drop_reasoning(state: dict, message: str) -> bool:
     state["_drop_reasoning"] = True
     # Remember it: later turns on this model skip the field (and the retry)
     # entirely, without ever guessing from an unreliable catalog flag.
-    state.setdefault("_reasoning_rejected", set()).add(state["cfg"].get("model"))
+    bad = state["cfg"].get("model")
+    state.setdefault("_reasoning_rejected", set()).add(bad)
+    # Persist (capped) so the NEXT session skips the doomed call too.
+    try:
+        from .config import save_config
+        stored = list(state["cfg"].get("reasoning_rejected_models") or [])
+        if bad and bad not in stored:
+            state["cfg"]["reasoning_rejected_models"] = (stored + [bad])[-50:]
+            save_config(state["cfg"])
+    except Exception:
+        pass
     console.print(
         "[yellow]⚠ this model rejected the reasoning-effort setting — "
         "retrying without it (your setting is kept for models that support "
@@ -683,6 +693,22 @@ def _effective_cfg(state: dict) -> dict:
     if state.get("_drop_reasoning") or (model_id in rejected and not cfg.get("auto_route")):
         return {**cfg, "reasoning_effort": None}
     return cfg
+
+
+def _bare_command(text: str) -> "str | None":
+    """"route" -> "/route": a lone word that exactly names a command is a
+    mistyped command, not a prompt. One such slip cost a user an 18k-token
+    agentic turn ($0.06) while the model explored the repo to guess what
+    "route" meant. Single word only, exact name only (never prefixes —
+    prose like "continue" must keep going to the model); add more words to
+    genuinely send a command-name as a prompt.
+    """
+    t = (text or "").strip().lower()
+    if not t or " " in t or t.startswith("/") or len(t) < 2:
+        return None
+    from .completer import COMMANDS
+    known = {c.lstrip("/") for c in COMMANDS} | {"quit", "effort"}
+    return "/" + t if t in known else None
 
 
 def _utc_now_iso() -> str:
@@ -2062,6 +2088,9 @@ def main() -> None:
         # Session id: names the transcript that compaction points the model
         # at, so compacted-away detail stays recoverable rather than lost.
         "session_id": time.strftime("%Y%m%d-%H%M%S") + f"-{os.getpid()}",
+        # Models observed rejecting reasoning_effort — seeded from config so
+        # a new session doesn't re-pay the rejected call every launch.
+        "_reasoning_rejected": set(cfg.get("reasoning_rejected_models") or []),
     }
 
     # Mode cycle — used by both the prompt-toolkit keybinding (while at the
@@ -2238,6 +2267,13 @@ def main() -> None:
         user_input = user_input.strip()
         if not user_input:
             continue
+        _bare = _bare_command(user_input)
+        if _bare:
+            console.print(
+                f"[dim]→ {_bare}  (a lone command name runs the command; "
+                "add more words to send it as a prompt)[/dim]"
+            )
+            user_input = _bare
         if user_input.startswith("/"):
             # Exception isolation for the command path — the tool loop has
             # had it forever; commands didn't, so ONE handler bug could

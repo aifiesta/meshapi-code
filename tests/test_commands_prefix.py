@@ -86,3 +86,60 @@ def test_abbreviation_is_live_control():
     assert cli.is_live_control("/eff max")
     assert cli.is_live_control("/effort low")
     assert not cli.is_live_control("/mod")       # ambiguous -> not steerable
+
+
+# ---------------------------------------------------------------------------
+# Bare-word command intercept (the $0.06 "route" lesson)
+# ---------------------------------------------------------------------------
+
+import meshapi.cli as cli_mod
+
+
+@pytest.mark.parametrize("text, want", [
+    ("route", "/route"),
+    ("effort", "/effort"),
+    ("cost", "/cost"),
+    ("help", "/help"),
+    ("EXIT", "/exit"),
+    ("  models  ", "/models"),
+])
+def test_bare_command_intercepts_known_names(text, want):
+    assert cli_mod._bare_command(text) == want
+
+
+@pytest.mark.parametrize("text", [
+    "continue",              # real prompt word, not a command
+    "hello there",           # multi-word: always a prompt
+    "route my packets now",  # command word inside prose: prompt
+    "/route",                # already a command
+    "q",                     # single letter: too risky to intercept
+    "",
+    "rout",                  # prefix only — bare words need EXACT names
+])
+def test_bare_command_leaves_prompts_alone(text):
+    assert cli_mod._bare_command(text) is None
+
+
+# ---------------------------------------------------------------------------
+# Persisted reasoning rejections — never pay the doomed call twice
+# ---------------------------------------------------------------------------
+
+def test_rejection_persists_to_config(monkeypatch):
+    saved = {}
+    monkeypatch.setattr("meshapi.config.save_config",
+                        lambda cfg: saved.update(cfg))
+    state = make_state()
+    state["cfg"]["reasoning_effort"] = "high"
+    state["cfg"]["model"] = "openai/gpt-5.4"
+    assert cli_mod._maybe_drop_reasoning(
+        state, "Unrecognized request argument supplied: reasoning_effort")
+    assert "openai/gpt-5.4" in saved.get("reasoning_rejected_models", [])
+
+
+def test_seeded_rejections_skip_the_doomed_call():
+    state = make_state()
+    state["cfg"]["reasoning_effort"] = "high"
+    state["cfg"]["model"] = "openai/gpt-5.4"
+    state["_reasoning_rejected"] = {"openai/gpt-5.4"}   # as seeded at launch
+    eff = cli_mod._effective_cfg(state)
+    assert eff["reasoning_effort"] is None              # stripped, no retry needed

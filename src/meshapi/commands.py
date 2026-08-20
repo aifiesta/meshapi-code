@@ -451,6 +451,34 @@ def handle_command(cmd: str, state: dict) -> bool:
     elif name == "/route":
         sub = arg.strip().lower()
         if not sub:
+            # Interactive mode picker (same widget as /effort); non-tty or
+            # Esc falls back to the status display below.
+            from . import askui as _askui
+            import contextlib as _ctx
+            watcher = state.get("watcher")
+            ctx = watcher.paused() if watcher is not None else _ctx.nullcontext()
+            cur_mode = state["cfg"].get("route_mode", "off")
+            if cur_mode != "smart" and state["cfg"].get("auto_route"):
+                cur_mode = "auto"
+            try:
+                with ctx:
+                    status, picked = _askui.slider(
+                        "Route", [
+                            ("off", "pin one model (you choose)"),
+                            ("auto", "gateway picks (billed classifier)"),
+                            ("smart", "local pick — free, weighted"),
+                        ], current=cur_mode,
+                        left_label="Manual", right_label="Smarter")
+            except Exception:
+                status, picked = "unavailable", None
+            if status == "picked" and picked != cur_mode:
+                return handle_command("/route " + picked, state)
+            if status == "picked":
+                console.print(f"[dim]route stays {picked}.[/dim]")
+                return True
+            if status == "cancelled":
+                console.print("[dim]Cancelled.[/dim]")
+                return True
             if state["cfg"].get("route_mode") == "smart":
                 from . import router as _router
                 w = _router.normalize_weights(state["cfg"].get("route_weights"))

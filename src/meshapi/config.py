@@ -58,6 +58,9 @@ DEFAULT_CONFIG = {
     # Effort: "auto" detects prompt difficulty (low/mid/high) and tilts the
     # weights; low|medium|high|xhigh|max forces the tilt for every prompt.
     "route_effort": "auto",
+    # Models observed rejecting reasoning_effort (with tools) — skipped
+    # without a doomed retry in future sessions. Evidence-based cache.
+    "reasoning_rejected_models": [],
 }
 
 _DIR_MODE = stat.S_IRWXU                       # 0700
