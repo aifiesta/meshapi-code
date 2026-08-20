@@ -125,6 +125,21 @@ _REASONING_ALIASES = {
 }
 
 
+def _set_effort(state: dict, level: str) -> None:
+    from . import router as _router
+    state["cfg"]["route_effort"] = level
+    save_config(state["cfg"])
+    if level == "auto":
+        console.print("[dim]Effort auto — difficulty detected per prompt.[/dim]")
+    else:
+        w = _router.effective_weights(state["cfg"].get("route_weights"), level)
+        console.print(
+            f"[dim]Effort {level} — every prompt now weighs capability at "
+            f"{w['cap']:.0%}. /effort auto to return to per-prompt "
+            "detection.[/dim]"
+        )
+
+
 def _fmt_weights(w: dict, effort: str = "auto") -> str:
     eff = "effort=auto (per-prompt)" if effort == "auto" else f"effort={effort}"
     return (f"cost={w['cost']:.2f} cap={w['cap']:.2f} "
@@ -521,29 +536,42 @@ def handle_command(cmd: str, state: dict) -> bool:
             from . import router as _router
             level = sub.removeprefix("effort").strip()
             if not level:
+                # Interactive slider (Claude Code-style). Falls back to the
+                # plain help on non-tty terminals or when cancelled.
+                from . import askui as _askui
+                opts = [("auto", "detects per prompt"),
+                        ("low", "cheapest competent"),
+                        ("medium", "balanced"),
+                        ("high", "strong models"),
+                        ("xhigh", "frontier"),
+                        ("max", "best, cost no object")]
+                watcher = state.get("watcher")
+                import contextlib as _ctx
+                ctx = watcher.paused() if watcher is not None else _ctx.nullcontext()
                 cur = state["cfg"].get("route_effort", "auto")
-                console.print(
-                    f"[dim]effort: {cur}\n"
-                    "auto = detect per prompt; a fixed level tilts capability "
-                    "for EVERY prompt:\n"
-                    "  low: cheapest competent · medium: balanced · high: "
-                    "strong models · xhigh: frontier · max: best regardless "
-                    "of cost\n"
-                    "usage: /route effort auto|low|medium|high|xhigh|max[/dim]"
-                )
-            elif level in _router.EFFORT_LEVELS:
-                state["cfg"]["route_effort"] = level
-                save_config(state["cfg"])
-                if level == "auto":
-                    console.print("[dim]Effort auto — difficulty detected per prompt.[/dim]")
+                try:
+                    with ctx:
+                        status, picked = _askui.slider(
+                            "Effort", opts, current=cur,
+                            left_label="Faster", right_label="Smarter")
+                except Exception:
+                    status, picked = "unavailable", None
+                if status == "picked":
+                    _set_effort(state, picked)
+                elif status == "cancelled":
+                    console.print("[dim]Cancelled.[/dim]")
                 else:
-                    w = _router.effective_weights(
-                        state["cfg"].get("route_weights"), level)
                     console.print(
-                        f"[dim]Effort {level} — every prompt now weighs "
-                        f"capability at {w['cap']:.0%}. /route effort auto "
-                        "to return to per-prompt detection.[/dim]"
+                        f"[dim]effort: {cur}\n"
+                        "auto = detect per prompt; a fixed level tilts "
+                        "capability for EVERY prompt:\n"
+                        "  low: cheapest competent · medium: balanced · high: "
+                        "strong models · xhigh: frontier · max: best "
+                        "regardless of cost\n"
+                        "usage: /route effort auto|low|medium|high|xhigh|max[/dim]"
                     )
+            elif level in _router.EFFORT_LEVELS:
+                _set_effort(state, level)
             else:
                 console.print(
                     f"[red]Unknown effort {level!r}. Use "

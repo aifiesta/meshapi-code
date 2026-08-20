@@ -267,3 +267,121 @@ def _default_free_text(question: str) -> str:
         return pt_prompt("  your answer › ")
     except (EOFError, KeyboardInterrupt):
         return ""
+
+
+# ---------------------------------------------------------------------------
+# Horizontal slider — the /effort picker (reusable for any enum setting)
+# ---------------------------------------------------------------------------
+
+_SLIDER_STYLE = Style.from_dict({
+    "title": "bold",
+    "rail": "#6c6c6c",
+    "stop": "#8a8a8a",
+    "stop.sel": "bold #af87ff",
+    "marker": "#af87ff",
+    "endlabel": "#8a8a8a",
+    "desc": "#6c6c6c italic",
+    "hint": "#6c6c6c",
+})
+
+_CELL = 10  # column width per stop
+
+
+def _slider_text(options: list, idx: int, title: str,
+                 left_label: str, right_label: str) -> FormattedText:
+    """Pure renderer for the slider frame. options: [(value, desc), ...]."""
+    n = len(options)
+    width = n * _CELL
+    out: list = [("class:title", f" {title}\n\n")]
+    # end labels
+    out.append(("class:endlabel", " " + left_label.ljust(width - len(right_label) - 1)
+                + right_label + "\n"))
+    # marker row
+    marker_pad = idx * _CELL + (_CELL // 2 - 1)
+    out.append(("", " " * (marker_pad + 1)))
+    out.append(("class:marker", "▲"))
+    out.append(("", "\n"))
+    # rail
+    out.append(("class:rail", " " + "─" * width + "\n"))
+    # stops row
+    out.append(("", " "))
+    for i, (value, _desc) in enumerate(options):
+        label = value.center(_CELL)
+        out.append(("class:stop.sel" if i == idx else "class:stop", label))
+    out.append(("", "\n"))
+    # description of the selected stop
+    desc = options[idx][1]
+    if desc:
+        pad = max(0, idx * _CELL + _CELL // 2 - len(desc) // 2)
+        pad = min(pad, max(0, width - len(desc)))
+        out.append(("class:desc", " " * (pad + 1) + desc + "\n"))
+    out.append(("class:hint", "\n ←/→ to adjust · Enter to confirm · Esc to cancel"))
+    return FormattedText(out)
+
+
+def slider(title: str, options: list, current: str = None,
+           left_label: str = "Faster", right_label: str = "Smarter") -> tuple:
+    """Interactive horizontal picker. options: [(value, one-line desc), ...].
+
+    Returns (status, value): ("picked", v) | ("cancelled", None) |
+    ("unavailable", None) for non-tty terminals — the caller falls back to
+    plain text. Erases itself on exit like the question picker.
+    """
+    if not options:
+        return ("unavailable", None)
+    if not sys.stdin.isatty() or not sys.stdout.isatty():
+        return ("unavailable", None)
+    values = [v for v, _ in options]
+    state = {"idx": values.index(current) if current in values else 0,
+             "picked": None, "cancelled": False}
+    kb = KeyBindings()
+
+    @kb.add("left")
+    def _(event):
+        state["idx"] = max(0, state["idx"] - 1)
+
+    @kb.add("right")
+    def _(event):
+        state["idx"] = min(len(options) - 1, state["idx"] + 1)
+
+    @kb.add("home")
+    def _(event):
+        state["idx"] = 0
+
+    @kb.add("end")
+    def _(event):
+        state["idx"] = len(options) - 1
+
+    @kb.add("enter")
+    def _(event):
+        state["picked"] = values[state["idx"]]
+        event.app.exit()
+
+    @kb.add("escape", eager=True)
+    @kb.add("c-c")
+    def _(event):
+        state["cancelled"] = True
+        event.app.exit()
+
+    for i in range(1, min(10, len(options) + 1)):
+        @kb.add(str(i))
+        def _(event, _i=i):
+            state["idx"] = _i - 1
+
+    app = Application(
+        layout=Layout(Window(
+            FormattedTextControl(lambda: _slider_text(
+                options, state["idx"], title, left_label, right_label)),
+            always_hide_cursor=True)),
+        key_bindings=kb,
+        style=_SLIDER_STYLE,
+        full_screen=False,
+        erase_when_done=True,
+    )
+    try:
+        app.run()
+    except (EOFError, KeyboardInterrupt):
+        return ("cancelled", None)
+    if state["cancelled"] or state["picked"] is None:
+        return ("cancelled", None)
+    return ("picked", state["picked"])

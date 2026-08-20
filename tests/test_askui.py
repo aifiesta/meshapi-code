@@ -97,3 +97,45 @@ def test_picker_erases_itself_on_exit():
     import inspect
     src = inspect.getsource(askui.ask)
     assert "erase_when_done=True" in src
+
+
+# ---------------------------------------------------------------------------
+# The /effort slider (horizontal enum picker)
+# ---------------------------------------------------------------------------
+
+from meshapi.askui import _slider_text, slider
+
+OPTS = [("auto", "detects per prompt"), ("low", "cheapest competent"),
+        ("medium", "balanced"), ("high", "strong models"),
+        ("xhigh", "frontier"), ("max", "best, cost no object")]
+
+
+def test_slider_frame_renders_all_stops():
+    out = text_of(_slider_text(OPTS, 0, "Effort", "Faster", "Smarter"))
+    for v, _ in OPTS:
+        assert v in out
+    assert "Effort" in out and "Faster" in out and "Smarter" in out
+    assert "←/→ to adjust · Enter to confirm · Esc to cancel" in out
+
+
+def test_slider_marker_tracks_selection():
+    lines0 = text_of(_slider_text(OPTS, 0, "E", "L", "R")).splitlines()
+    lines5 = text_of(_slider_text(OPTS, 5, "E", "L", "R")).splitlines()
+    m0 = next(l for l in lines0 if "▲" in l).index("▲")
+    m5 = next(l for l in lines5 if "▲" in l).index("▲")
+    assert m5 > m0                      # marker moves right with the index
+
+
+def test_slider_shows_selected_description():
+    out = text_of(_slider_text(OPTS, 4, "E", "L", "R"))
+    assert "frontier" in out
+    assert "cheapest competent" not in out   # only the selected desc shows
+
+
+def test_slider_unavailable_off_tty(monkeypatch):
+    monkeypatch.setattr(askui.sys.stdin, "isatty", lambda: False)
+    assert slider("Effort", OPTS) == ("unavailable", None)
+
+
+def test_slider_empty_options():
+    assert slider("E", []) == ("unavailable", None)
