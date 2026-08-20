@@ -54,10 +54,10 @@ DEFAULT_CONFIG = {
     # "auto" (gateway picks — mirrors auto_route), "smart" (local pick).
     # Weights steer smart picks along each cohort's efficiency frontier.
     "route_mode": "off",
-    # cap="auto": capability weight is driven by per-prompt difficulty;
-    # users tune cost vs speed. Numeric cap = power-user override.
-    "route_weights": {"cost": 0.6, "cap": "auto", "speed": 0.4,
-                      "difficulty": 1.0},
+    "route_weights": {"cost": 0.5, "cap": 0.3, "speed": 0.2},
+    # Effort: "auto" detects prompt difficulty (low/mid/high) and tilts the
+    # weights; low|medium|high|xhigh|max forces the tilt for every prompt.
+    "route_effort": "auto",
 }
 
 _DIR_MODE = stat.S_IRWXU                       # 0700
@@ -154,10 +154,11 @@ def load_config() -> dict:
         )
         loaded = {}
     cfg = {**DEFAULT_CONFIG, **loaded}
-    # 0.5.9-dev migration: the numeric cap default was replaced by cap="auto"
-    # (difficulty-driven). Only rewrite the exact old DEFAULT — an explicit
-    # user-chosen numeric cap is preserved.
-    if cfg.get("route_weights") == _OLD_ROUTE_WEIGHTS:
+    # 0.5.9-dev migration: two short-lived route_weights shapes (cap="auto",
+    # difficulty sensitivity key) collapsed back to numeric cost/cap/speed +
+    # route_effort. Reset any non-numeric shape to the default.
+    rw = cfg.get("route_weights") or {}
+    if rw.get("cap") == "auto" or "difficulty" in rw:
         cfg["route_weights"] = dict(DEFAULT_CONFIG["route_weights"])
     # `route` (cheapest/fastest/balanced) never existed gateway-side and was
     # replaced by auto_route in 0.5.0 — drop the stale key from old configs

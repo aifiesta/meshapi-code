@@ -125,14 +125,10 @@ _REASONING_ALIASES = {
 }
 
 
-def _fmt_weights(w: dict) -> str:
-    cap = w.get("cap")
-    sens = w.get("difficulty", 1.0)
-    if cap == "auto":
-        cap_s = f"auto (difficulty×{sens:.1f})" if sens < 1 else "auto (difficulty-driven)"
-    else:
-        cap_s = f"{cap:.2f} (difficulty ignored)"
-    return f"cost={w['cost']:.2f} cap={cap_s} speed={w['speed']:.2f}"
+def _fmt_weights(w: dict, effort: str = "auto") -> str:
+    eff = "effort=auto (per-prompt)" if effort == "auto" else f"effort={effort}"
+    return (f"cost={w['cost']:.2f} cap={w['cap']:.2f} "
+            f"speed={w['speed']:.2f} · {eff}")
 
 
 def warn_reasoning_unsupported(state: dict) -> None:
@@ -406,7 +402,7 @@ def handle_command(cmd: str, state: dict) -> bool:
                 from . import router as _router
                 w = _router.normalize_weights(state["cfg"].get("route_weights"))
                 console.print(
-                    f"[dim]route: smart — local pick per prompt · {_fmt_weights(w)} "
+                    f"[dim]route: smart — local pick per prompt · {_fmt_weights(w, state['cfg'].get('route_effort', 'auto'))} "
                     "(/route why after a prompt)[/dim]"
                 )
             elif state["cfg"].get("auto_route"):
@@ -448,8 +444,8 @@ def handle_command(cmd: str, state: dict) -> bool:
                 console.print(
                     "[dim]Smart routing on — the CLI picks a model per prompt "
                     "locally (no classifier tokens, no extra latency). Weights: "
-                    f"{_fmt_weights(w)} — capability follows prompt difficulty; "
-                    "tune cost vs speed with /route weights.[/dim]"
+                    f"{_fmt_weights(w, state['cfg'].get('route_effort', 'auto'))} — "
+                    "tune with /route weights, force depth with /route effort.[/dim]"
                 )
         elif sub.startswith("weights"):
             from . import router as _router
@@ -457,26 +453,20 @@ def handle_command(cmd: str, state: dict) -> bool:
             if not pairs:
                 w = _router.normalize_weights(state["cfg"].get("route_weights"))
                 console.print(
-                    f"[dim]weights: {_fmt_weights(w)}\n"
-                    "usage: /route weights cost=0.6 speed=0.4      (cap stays "
-                    "difficulty-driven)\n"
-                    "       /route weights difficulty=0.5           (how far "
-                    "difficulty may swing capability: 1=full, 0=off)\n"
-                    "       /route weights cap=0.5                  (pin capability "
-                    "manually; cap=auto to go back)[/dim]"
+                    f"[dim]weights: {_fmt_weights(w, state['cfg'].get('route_effort', 'auto'))}\n"
+                    "usage: /route weights cost=0.5 cap=0.3 speed=0.2\n"
+                    "       /route effort auto|low|medium|high|xhigh|max[/dim]"
                 )
             else:
                 try:
                     parsed = {}
                     for tok in pairs.replace(",", " ").split():
                         k, v = tok.split("=", 1)
-                        k = {"capability": "cap", "quality": "cap",
-                             "diff": "difficulty"}.get(k, k)
-                        if k not in ("cost", "cap", "speed", "difficulty"):
-                            raise ValueError(f"unknown axis {k!r}")
-                        if k == "difficulty" and not 0 <= float(v) <= 1:
-                            raise ValueError("difficulty is a sensitivity 0..1")
-                        parsed[k] = "auto" if (k == "cap" and v.lower() == "auto")                             else float(v)
+                        k = {"capability": "cap", "quality": "cap"}.get(k, k)
+                        if k not in ("cost", "cap", "speed"):
+                            raise ValueError(f"unknown axis {k!r} "
+                                             "(effort has its own command: /route effort)")
+                        parsed[k] = float(v)
                 except (ValueError, TypeError) as e:
                     console.print(f"[red]Couldn't parse weights ({e}). "
                                   "Example: /route weights cost=0.5 cap=0.3 speed=0.2[/red]")
@@ -486,9 +476,41 @@ def handle_command(cmd: str, state: dict) -> bool:
                     save_config(state["cfg"])
                     w = state["cfg"]["route_weights"]
                     console.print(
-                        f"[dim]weights set: {_fmt_weights(w)}. Applies from "
+                        f"[dim]weights set: {_fmt_weights(w, state['cfg'].get('route_effort', 'auto'))}. Applies from "
                         "the next prompt.[/dim]"
                     )
+        elif sub.startswith("effort"):
+            from . import router as _router
+            level = sub.removeprefix("effort").strip()
+            if not level:
+                cur = state["cfg"].get("route_effort", "auto")
+                console.print(
+                    f"[dim]effort: {cur}\n"
+                    "auto = detect per prompt; a fixed level tilts capability "
+                    "for EVERY prompt:\n"
+                    "  low: cheapest competent · medium: balanced · high: "
+                    "strong models · xhigh: frontier · max: best regardless "
+                    "of cost\n"
+                    "usage: /route effort auto|low|medium|high|xhigh|max[/dim]"
+                )
+            elif level in _router.EFFORT_LEVELS:
+                state["cfg"]["route_effort"] = level
+                save_config(state["cfg"])
+                if level == "auto":
+                    console.print("[dim]Effort auto — difficulty detected per prompt.[/dim]")
+                else:
+                    w = _router.effective_weights(
+                        state["cfg"].get("route_weights"), level)
+                    console.print(
+                        f"[dim]Effort {level} — every prompt now weighs "
+                        f"capability at {w['cap']:.0%}. /route effort auto "
+                        "to return to per-prompt detection.[/dim]"
+                    )
+            else:
+                console.print(
+                    f"[red]Unknown effort {level!r}. Use "
+                    f"{'|'.join(_router.EFFORT_LEVELS)}[/red]"
+                )
         elif sub == "why":
             info = state.get("_smart_pick_info")
             if not info:
@@ -513,7 +535,7 @@ def handle_command(cmd: str, state: dict) -> bool:
                     )
         else:
             console.print("[red]Usage: /route auto | smart | off | preview | "
-                          "weights [k=v …] | why[/red]")
+                          "weights [k=v …] | effort [level] | why[/red]")
 
     elif name == "/models":
         models = _fetch_models(state)

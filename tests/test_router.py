@@ -73,20 +73,13 @@ def test_classify_long_context():
 
 def test_weights_normalize_to_one():
     w = normalize_weights({"cost": 5, "cap": 3, "speed": 2})
-    assert _axes(w) == pytest.approx({"cost": 0.5, "cap": 0.3, "speed": 0.2})
-    assert w["difficulty"] == 1.0    # sensitivity rides along, outside the sum
-
-
-def test_weights_default_cap_is_auto():
-    w = normalize_weights(None)
-    assert w["cap"] == "auto"
-    assert abs(w["cost"] + w["speed"] - 1.0) < 1e-9
+    assert abs(sum(w.values()) - 1.0) < 1e-9
+    assert w == pytest.approx({"cost": 0.5, "cap": 0.3, "speed": 0.2})
 
 
 def test_weights_garbage_falls_back_to_defaults():
     w = normalize_weights({"cost": "x", "cap": None})
-    assert w["cap"] == "auto"       # None == auto mode
-    assert abs(w["cost"] + w["speed"] - 1.0) < 1e-9
+    assert abs(sum(w.values()) - 1.0) < 1e-9
 
 
 def test_weights_negative_clamped():
@@ -309,61 +302,35 @@ def test_extreme_cost_user_survives_hard_tilt():
 
 
 # ---------------------------------------------------------------------------
-# cap="auto" — difficulty replaces the capability knob (user direction)
+# Effort levels — difficulty auto-detected or user-forced (final design)
 # ---------------------------------------------------------------------------
 
-from meshapi.router import AUTO_CAP, effective_weights
+from meshapi.router import EFFORT_LEVELS, effective_weights
 
 
-def test_auto_cap_shares_follow_difficulty():
-    base = {"cost": 0.6, "cap": "auto", "speed": 0.4}
-    for d in ("low", "mid", "high"):
-        w = effective_weights(base, d)
-        assert abs(sum(w.values()) - 1.0) < 1e-9
-        assert w["cap"] == pytest.approx(AUTO_CAP[d])
-        # user's cost:speed ratio (60:40) preserved inside the remainder
-        assert w["cost"] / w["speed"] == pytest.approx(1.5)
+def test_effort_cap_share_is_monotonic():
+    base = {"cost": 0.5, "cap": 0.3, "speed": 0.2}
+    caps = [effective_weights(base, lvl)["cap"]
+            for lvl in ("low", "medium", "high", "xhigh", "max")]
+    assert caps == sorted(caps)                 # strictly escalating depth
+    assert caps[0] < 0.2 and caps[-1] > 0.95
 
 
-def test_auto_cap_easy_routes_cheap_hard_routes_up():
-    base = {"cost": 0.6, "cap": "auto", "speed": 0.4}
-    lo = pick("chat", effective_weights(base, "low"), TABLE, CATALOG, needs_tools=True)
-    hi = pick("chat", effective_weights(base, "high"), TABLE, CATALOG, needs_tools=True)
-    assert lo["model"] == "a/cheap"
-    assert hi["model"] == "c/best"
+def test_effort_medium_equals_mid_baseline():
+    base = {"cost": 0.5, "cap": 0.3, "speed": 0.2}
+    assert effective_weights(base, "medium") == pytest.approx(base)
+    assert effective_weights(base, "mid") == pytest.approx(base)
 
 
-def test_numeric_cap_still_overrides():
-    w = effective_weights({"cost": 0.1, "cap": 0.8, "speed": 0.1}, "low")
-    assert isinstance(w["cap"], float) and w["cap"] > 0.3   # power user kept control
+def test_effort_levels_change_the_pick():
+    base = {"cost": 0.5, "cap": 0.3, "speed": 0.2}
+    lo = pick("chat", effective_weights(base, "low"), TABLE, CATALOG,
+              needs_tools=True)["model"]
+    mx = pick("chat", effective_weights(base, "max"), TABLE, CATALOG,
+              needs_tools=True)["model"]
+    assert lo == "a/cheap"
+    assert mx == "c/best"
 
 
-def test_pick_accepts_unresolved_auto():
-    got = pick("chat", {"cost": 0.6, "cap": "auto", "speed": 0.4}, TABLE, CATALOG)
-    assert got and got["model"]
-
-
-# ---------------------------------------------------------------------------
-# difficulty= as a user weight (sensitivity dial, user-requested)
-# ---------------------------------------------------------------------------
-
-def test_difficulty_sensitivity_scales_the_swing():
-    base = {"cost": 0.6, "cap": "auto", "speed": 0.4}
-    full = effective_weights({**base, "difficulty": 1.0}, "high")["cap"]
-    half = effective_weights({**base, "difficulty": 0.5}, "high")["cap"]
-    off = effective_weights({**base, "difficulty": 0.0}, "high")["cap"]
-    assert full == pytest.approx(AUTO_CAP["high"])
-    assert off == pytest.approx(AUTO_CAP["mid"])          # difficulty ignored
-    assert off < half < full
-
-
-def test_difficulty_sensitivity_clamped_and_defaulted():
-    w = normalize_weights({"cost": 1, "speed": 1, "difficulty": 7})
-    assert w["difficulty"] == 1.0                          # clamped
-    assert normalize_weights({"cost": 1, "speed": 1})["difficulty"] == 1.0
-
-
-def test_pick_ignores_sensitivity_key_directly():
-    got = pick("chat", {"cost": 0.6, "cap": "auto", "speed": 0.4,
-                        "difficulty": 0.3}, TABLE, CATALOG)
-    assert got and got["model"]                            # no TypeError, no crash
+def test_effort_levels_constant_is_complete():
+    assert EFFORT_LEVELS == ("auto", "low", "medium", "high", "xhigh", "max")

@@ -273,22 +273,24 @@ def test_smart_routing_defaults():
     from meshapi.config import DEFAULT_CONFIG
     assert DEFAULT_CONFIG["route_mode"] == "off"
     w = DEFAULT_CONFIG["route_weights"]
-    assert set(w) == {"cost", "cap", "speed", "difficulty"}
-    assert w["cap"] == "auto"                     # difficulty-driven by default
-    assert w["difficulty"] == 1.0                 # full sensitivity by default
-    assert abs(w["cost"] + w["speed"] - 1.0) < 1e-9
+    assert set(w) == {"cost", "cap", "speed"}
+    assert abs(sum(w.values()) - 1.0) < 1e-9
+    assert DEFAULT_CONFIG["route_effort"] == "auto"
 
 
-def test_old_numeric_default_migrates_to_auto(tmp_path, monkeypatch):
+def test_interim_route_weight_shapes_migrate(tmp_path, monkeypatch):
+    """Two short-lived dev shapes (cap="auto", difficulty key) must reset to
+    the numeric default; an explicit numeric choice is preserved."""
     import json
     from meshapi import config as cfgmod
     monkeypatch.setattr(cfgmod, "CONFIG_FILE", tmp_path / "config.json")
     monkeypatch.setattr(cfgmod, "CONFIG_DIR", tmp_path)
-    (tmp_path / "config.json").write_text(json.dumps(
-        {"route_weights": {"cost": 0.5, "cap": 0.3, "speed": 0.2}}))
-    cfg = cfgmod.load_config()
-    assert cfg["route_weights"]["cap"] == "auto"   # old default rewritten
+    for interim in ({"cost": 0.6, "cap": "auto", "speed": 0.4},
+                    {"cost": 0.6, "cap": "auto", "speed": 0.4, "difficulty": 0.5}):
+        (tmp_path / "config.json").write_text(json.dumps({"route_weights": interim}))
+        cfg = cfgmod.load_config()
+        assert cfg["route_weights"] == cfgmod.DEFAULT_CONFIG["route_weights"]
     (tmp_path / "config.json").write_text(json.dumps(
         {"route_weights": {"cost": 0.2, "cap": 0.7, "speed": 0.1}}))
     cfg = cfgmod.load_config()
-    assert cfg["route_weights"]["cap"] == 0.7      # explicit choice preserved
+    assert cfg["route_weights"]["cap"] == 0.7

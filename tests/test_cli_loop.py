@@ -765,3 +765,17 @@ def test_difficulty_tilt_reaches_pick(monkeypatch):
     state = _smart_state(monkeypatch)
     cli._smart_route_turn(state, "what is a variable?")     # low difficulty
     assert seen["w"]["cost"] > 0.5      # tilted up from the 0.5 default
+
+
+def test_forced_effort_overrides_detection(monkeypatch):
+    state = _smart_state(monkeypatch)
+    state["cfg"]["route_effort"] = "max"
+    cli._smart_route_turn(state, "what is 2+2?")     # trivially easy prompt
+    assert state["_smart_pick_info"]["difficulty"] == "max"
+
+
+def test_auto_effort_detects(monkeypatch):
+    state = _smart_state(monkeypatch)
+    state["cfg"]["route_effort"] = "auto"
+    cli._smart_route_turn(state, "what is a dict?")
+    assert state["_smart_pick_info"]["difficulty"] == "low"

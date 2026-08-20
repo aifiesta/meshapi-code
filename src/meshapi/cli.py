@@ -616,11 +616,15 @@ def _smart_route_turn(state: dict, user_input: str) -> None:
         # Short follow-ups ("2", "yes", "continue") are answers WITHIN the
         # ongoing task, not new tasks — inherit the conversation's cohort
         # instead of reclassifying three characters of text.
-        if len(user_input.strip()) < 25 and state.get("_smart_cohort"):
-            cohort = state["_smart_cohort"]
+        forced = cfg.get("route_effort", "auto")
+        if forced != "auto":
+            difficulty = forced                      # user pinned the effort
+        elif len(user_input.strip()) < 25 and state.get("_smart_cohort"):
             difficulty = state.get("_smart_difficulty") or "mid"
         else:
             difficulty = router.estimate_difficulty(user_input)
+        if len(user_input.strip()) < 25 and state.get("_smart_cohort"):
+            cohort = state["_smart_cohort"]
         state["_smart_cohort"] = cohort
         state["_smart_difficulty"] = difficulty
         needs_ctx = int(compact.est_history_tokens(state.get("messages") or []) * 1.3) + 4096
@@ -635,7 +639,7 @@ def _smart_route_turn(state: dict, user_input: str) -> None:
         state["_smart_pick"] = info["model"]
         state["_smart_last"] = info["model"]
         state["_smart_pick_info"] = info
-        _dtag = "" if difficulty == "mid" else f"/{difficulty}"
+        _dtag = "" if difficulty in ("mid", "medium") else f"/{difficulty}"
         console.print(
             f"[{BRAND_DIM}]⚙ smart route: {info['cohort']}{_dtag} → {info['model']}"
             f"{' (sticky)' if info.get('sticky') else ''}  (/route why)[/{BRAND_DIM}]"

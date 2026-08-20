@@ -38,7 +38,7 @@ COMMANDS = {
 }
 
 _ARG_CHOICES = {
-    "/route": ("auto", "smart", "off", "preview", "weights", "why"),
+    "/route": ("auto", "smart", "off", "preview", "weights", "effort", "why"),
     "/mode": ("default", "accept-edits", "auto", "bypass"),
     "/reasoning": ("high", "medium", "low", "none", "off"),
     "/models": ("free", "thinking", "tools"),
