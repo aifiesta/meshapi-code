@@ -73,8 +73,8 @@ def test_classify_long_context():
 
 def test_weights_normalize_to_one():
     w = normalize_weights({"cost": 5, "cap": 3, "speed": 2})
-    assert abs(sum(w.values()) - 1.0) < 1e-9
-    assert w == {"cost": 0.5, "cap": 0.3, "speed": 0.2}
+    assert _axes(w) == pytest.approx({"cost": 0.5, "cap": 0.3, "speed": 0.2})
+    assert w["difficulty"] == 1.0    # sensitivity rides along, outside the sum
 
 
 def test_weights_default_cap_is_auto():
@@ -275,11 +275,15 @@ def test_estimate_difficulty(text, want):
     assert estimate_difficulty(text) == want
 
 
+def _axes(w):
+    return {k: v for k, v in w.items() if k in ("cost", "cap", "speed")}
+
+
 def test_difficulty_adjust_tilts_and_normalizes():
     base = {"cost": 0.5, "cap": 0.3, "speed": 0.2}
-    hi = difficulty_adjust(base, "high")
-    lo = difficulty_adjust(base, "low")
-    mid = difficulty_adjust(base, "mid")
+    hi = _axes(difficulty_adjust(base, "high"))
+    lo = _axes(difficulty_adjust(base, "low"))
+    mid = _axes(difficulty_adjust(base, "mid"))
     assert abs(sum(hi.values()) - 1) < 1e-9
     assert hi["cap"] > mid["cap"] > lo["cap"]
     assert lo["cost"] > mid["cost"] > hi["cost"]
@@ -337,3 +341,29 @@ def test_numeric_cap_still_overrides():
 def test_pick_accepts_unresolved_auto():
     got = pick("chat", {"cost": 0.6, "cap": "auto", "speed": 0.4}, TABLE, CATALOG)
     assert got and got["model"]
+
+
+# ---------------------------------------------------------------------------
+# difficulty= as a user weight (sensitivity dial, user-requested)
+# ---------------------------------------------------------------------------
+
+def test_difficulty_sensitivity_scales_the_swing():
+    base = {"cost": 0.6, "cap": "auto", "speed": 0.4}
+    full = effective_weights({**base, "difficulty": 1.0}, "high")["cap"]
+    half = effective_weights({**base, "difficulty": 0.5}, "high")["cap"]
+    off = effective_weights({**base, "difficulty": 0.0}, "high")["cap"]
+    assert full == pytest.approx(AUTO_CAP["high"])
+    assert off == pytest.approx(AUTO_CAP["mid"])          # difficulty ignored
+    assert off < half < full
+
+
+def test_difficulty_sensitivity_clamped_and_defaulted():
+    w = normalize_weights({"cost": 1, "speed": 1, "difficulty": 7})
+    assert w["difficulty"] == 1.0                          # clamped
+    assert normalize_weights({"cost": 1, "speed": 1})["difficulty"] == 1.0
+
+
+def test_pick_ignores_sensitivity_key_directly():
+    got = pick("chat", {"cost": 0.6, "cap": "auto", "speed": 0.4,
+                        "difficulty": 0.3}, TABLE, CATALOG)
+    assert got and got["model"]                            # no TypeError, no crash

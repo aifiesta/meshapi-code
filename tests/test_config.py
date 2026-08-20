@@ -273,8 +273,9 @@ def test_smart_routing_defaults():
     from meshapi.config import DEFAULT_CONFIG
     assert DEFAULT_CONFIG["route_mode"] == "off"
     w = DEFAULT_CONFIG["route_weights"]
-    assert set(w) == {"cost", "cap", "speed"}
+    assert set(w) == {"cost", "cap", "speed", "difficulty"}
     assert w["cap"] == "auto"                     # difficulty-driven by default
+    assert w["difficulty"] == 1.0                 # full sensitivity by default
     assert abs(w["cost"] + w["speed"] - 1.0) < 1e-9
 
 

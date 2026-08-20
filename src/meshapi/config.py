@@ -56,7 +56,8 @@ DEFAULT_CONFIG = {
     "route_mode": "off",
     # cap="auto": capability weight is driven by per-prompt difficulty;
     # users tune cost vs speed. Numeric cap = power-user override.
-    "route_weights": {"cost": 0.6, "cap": "auto", "speed": 0.4},
+    "route_weights": {"cost": 0.6, "cap": "auto", "speed": 0.4,
+                      "difficulty": 1.0},
 }
 
 _DIR_MODE = stat.S_IRWXU                       # 0700

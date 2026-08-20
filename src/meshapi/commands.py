@@ -127,7 +127,11 @@ _REASONING_ALIASES = {
 
 def _fmt_weights(w: dict) -> str:
     cap = w.get("cap")
-    cap_s = "auto (difficulty-driven)" if cap == "auto" else f"{cap:.2f}"
+    sens = w.get("difficulty", 1.0)
+    if cap == "auto":
+        cap_s = f"auto (difficulty×{sens:.1f})" if sens < 1 else "auto (difficulty-driven)"
+    else:
+        cap_s = f"{cap:.2f} (difficulty ignored)"
     return f"cost={w['cost']:.2f} cap={cap_s} speed={w['speed']:.2f}"
 
 
@@ -454,9 +458,11 @@ def handle_command(cmd: str, state: dict) -> bool:
                 w = _router.normalize_weights(state["cfg"].get("route_weights"))
                 console.print(
                     f"[dim]weights: {_fmt_weights(w)}\n"
-                    "usage: /route weights cost=0.6 speed=0.4    (cap stays "
+                    "usage: /route weights cost=0.6 speed=0.4      (cap stays "
                     "difficulty-driven)\n"
-                    "       /route weights cap=0.5              (pin capability "
+                    "       /route weights difficulty=0.5           (how far "
+                    "difficulty may swing capability: 1=full, 0=off)\n"
+                    "       /route weights cap=0.5                  (pin capability "
                     "manually; cap=auto to go back)[/dim]"
                 )
             else:
@@ -465,9 +471,11 @@ def handle_command(cmd: str, state: dict) -> bool:
                     for tok in pairs.replace(",", " ").split():
                         k, v = tok.split("=", 1)
                         k = {"capability": "cap", "quality": "cap",
-                             "difficulty": "cap"}.get(k, k)
-                        if k not in ("cost", "cap", "speed"):
+                             "diff": "difficulty"}.get(k, k)
+                        if k not in ("cost", "cap", "speed", "difficulty"):
                             raise ValueError(f"unknown axis {k!r}")
+                        if k == "difficulty" and not 0 <= float(v) <= 1:
+                            raise ValueError("difficulty is a sensitivity 0..1")
                         parsed[k] = "auto" if (k == "cap" and v.lower() == "auto")                             else float(v)
                 except (ValueError, TypeError) as e:
                     console.print(f"[red]Couldn't parse weights ({e}). "
