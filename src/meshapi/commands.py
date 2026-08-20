@@ -481,10 +481,16 @@ def handle_command(cmd: str, state: dict) -> bool:
                               "then send a prompt.[/dim]")
             else:
                 sticky = " (kept from earlier in the session)" if info.get("sticky") else ""
+                diff = info.get("difficulty")
+                dtxt = f"  ·  difficulty: {diff}" if diff else ""
                 console.print(
-                    f"[dim]cohort: {info['cohort']}  →  picked "
+                    f"[dim]cohort: {info['cohort']}{dtxt}  →  picked "
                     f"[bold]{info['model']}[/bold]{sticky}[/dim]"
                 )
+                if diff == "low":
+                    console.print("[dim]    (easy prompt — cost weighted up, capability down)[/dim]")
+                elif diff == "high":
+                    console.print("[dim]    (hard prompt — capability weighted up)[/dim]")
                 for r in info.get("ranked") or []:
                     console.print(
                         f"[dim]    {r['model']:40} score {r['score']:>6}  "

@@ -618,19 +618,26 @@ def _smart_route_turn(state: dict, user_input: str) -> None:
         # instead of reclassifying three characters of text.
         if len(user_input.strip()) < 25 and state.get("_smart_cohort"):
             cohort = state["_smart_cohort"]
+            difficulty = state.get("_smart_difficulty") or "mid"
+        else:
+            difficulty = router.estimate_difficulty(user_input)
         state["_smart_cohort"] = cohort
+        state["_smart_difficulty"] = difficulty
         needs_ctx = int(compact.est_history_tokens(state.get("messages") or []) * 1.3) + 4096
-        info = router.pick(cohort, cfg.get("route_weights"), table, catalog,
+        weights = router.difficulty_adjust(cfg.get("route_weights"), difficulty)
+        info = router.pick(cohort, weights, table, catalog,
                            needs_tools=True, needs_ctx=needs_ctx,
                            incumbent=state.get("_smart_last"),
                            exclude=state.get("_smart_bad"))
         if not info or not info.get("model"):
             return
+        info["difficulty"] = difficulty
         state["_smart_pick"] = info["model"]
         state["_smart_last"] = info["model"]
         state["_smart_pick_info"] = info
+        _dtag = "" if difficulty == "mid" else f"/{difficulty}"
         console.print(
-            f"[{BRAND_DIM}]⚙ smart route: {info['cohort']} → {info['model']}"
+            f"[{BRAND_DIM}]⚙ smart route: {info['cohort']}{_dtag} → {info['model']}"
             f"{' (sticky)' if info.get('sticky') else ''}  (/route why)[/{BRAND_DIM}]"
         )
     except Exception:

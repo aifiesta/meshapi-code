@@ -246,3 +246,52 @@ def test_exclude_blocks_the_default_fallback_too():
     got = pick("chat", None, TABLE, CATALOG, needs_ctx=10_000_000,
                exclude={"a/cheap"})     # a/cheap is the cohort default
     assert got is None                   # nothing safe left -> caller's pin rides
+
+
+# ---------------------------------------------------------------------------
+# Difficulty axis — crude marginal-gain proxy
+# ---------------------------------------------------------------------------
+
+from meshapi.router import difficulty_adjust, estimate_difficulty
+
+
+@pytest.mark.parametrize("text, want", [
+    ("what is 2+2?", "low"),
+    ("write a haiku", "low"),
+    ("fix the bug in this function please", "low"),
+    ("design a distributed rate limiter with race condition handling, "
+     "prove correctness, cover edge cases", "high"),
+    ("refactor this module to be thread-safe and add comprehensive "
+     "edge case tests", "high"),
+])
+def test_estimate_difficulty(text, want):
+    assert estimate_difficulty(text) == want
+
+
+def test_difficulty_adjust_tilts_and_normalizes():
+    base = {"cost": 0.5, "cap": 0.3, "speed": 0.2}
+    hi = difficulty_adjust(base, "high")
+    lo = difficulty_adjust(base, "low")
+    mid = difficulty_adjust(base, "mid")
+    assert abs(sum(hi.values()) - 1) < 1e-9
+    assert hi["cap"] > mid["cap"] > lo["cap"]
+    assert lo["cost"] > mid["cost"] > hi["cost"]
+    assert mid == pytest.approx(base)
+
+
+def test_difficulty_changes_the_pick():
+    """Same cohort, same base weights: hard prompt escalates, easy stays cheap."""
+    lo_w = difficulty_adjust({"cost": 0.5, "cap": 0.3, "speed": 0.2}, "low")
+    hi_w = difficulty_adjust({"cost": 0.5, "cap": 0.3, "speed": 0.2}, "high")
+    lo_pick = pick("chat", lo_w, TABLE, CATALOG, needs_tools=True)["model"]
+    hi_pick = pick("chat", hi_w, TABLE, CATALOG, needs_tools=True)["model"]
+    assert lo_pick == "a/cheap"
+    assert hi_pick == "c/best"
+
+
+def test_extreme_cost_user_survives_hard_tilt():
+    """cost=0.9 is a deliberate user choice — a hard prompt must not
+    override it into a frontier-price model."""
+    w = difficulty_adjust({"cost": 0.9, "cap": 0.05, "speed": 0.05}, "high")
+    got = pick("chat", w, TABLE, CATALOG, needs_tools=True)
+    assert got["model"] == "a/cheap"

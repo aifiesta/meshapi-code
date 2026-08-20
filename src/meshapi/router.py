@@ -111,6 +111,74 @@ def classify(text: str, *, has_image: bool = False, has_tools: bool = False,
 
 
 # ---------------------------------------------------------------------------
+# Difficulty — a crude marginal-gain proxy
+# ---------------------------------------------------------------------------
+# The most consistent routing-research finding (RouteLLM -> 2026): predict
+# whether the expensive model is WORTH IT for this prompt, not just what kind
+# of prompt it is. v1 is deliberately crude — deterministic surface signals
+# mapped to a weight adjustment — but it breaks the "easy and hard prompts
+# get identical picks" tie, which is the industry's biggest measured gap
+# (RouterArena: every router under-uses cheap models on easy prompts).
+
+_HARD_RE = re.compile(
+    r"\b(?:architecture|design(?:\s+a|\s+an|\s+the)?|refactor|optimi[sz]e|prove|"
+    r"derive|multi-?step|end-?to-?end|production|concurren\w*|distributed|"
+    r"race condition|deadlock|migrate|benchmark|edge cases?|trade-?offs?|"
+    r"scalab\w+|formal|rigorous|comprehensive|in depth|thorough)\b", re.I)
+_EASY_RE = re.compile(
+    r"^(?:what(?:'s| is| are)?|who|when|where|define|meaning of|translate|"
+    r"convert|list|name)\b", re.I)
+_CONSTRAINT_RE = re.compile(
+    r"\b(?:must|should|ensure|exactly|at least|no more than|without using|"
+    r"step[- ]by[- ]step)\b", re.I)
+
+
+def estimate_difficulty(text: str) -> str:
+    """"low" | "mid" | "high" from surface signals. Deterministic."""
+    t = (text or "").strip()
+    score = 0
+    if len(t) > 400:
+        score += 1
+    if len(t) > 1200:
+        score += 1
+    score += min(3, len(_HARD_RE.findall(t)))
+    if len(_CONSTRAINT_RE.findall(t)) >= 3:
+        score += 1
+    if t.count("```") >= 2:
+        score += 1
+    if _EASY_RE.search(t) and len(t) < 90:
+        score -= 2
+    elif len(t) < 40:
+        score -= 1
+    if score <= 0:
+        return "low"
+    return "high" if score >= 3 else "mid"
+
+
+def difficulty_adjust(weights: "dict | None", difficulty: str) -> dict:
+    """Tilt the user's weights by predicted difficulty, then renormalize.
+
+    Easy prompt: capability matters less, cost more — route DOWN with
+    confidence. Hard prompt: capability dominates — the marginal gain of a
+    frontier model is real. The user's weights stay the baseline; this is a
+    per-prompt tilt, never a persisted change.
+    """
+    w = normalize_weights(weights)
+    if difficulty == "low":
+        w = {"cost": w["cost"] * 1.5, "cap": w["cap"] * 0.55,
+             "speed": w["speed"] * 1.2}
+    elif difficulty == "high":
+        # Strong tilt: the cost axis spans the full 0-100 normalized range,
+        # so a timid cap multiplier can't overcome a cheap model's built-in
+        # ~100-point cost advantage. x3.0 makes capability decisive at
+        # default weights while a deliberate cost=0.9 user still routes
+        # cheap — their stated preference survives the tilt.
+        w = {"cost": w["cost"] * 0.35, "cap": w["cap"] * 3.0,
+             "speed": w["speed"] * 0.75}
+    return normalize_weights(w)
+
+
+# ---------------------------------------------------------------------------
 # Picking
 # ---------------------------------------------------------------------------
 

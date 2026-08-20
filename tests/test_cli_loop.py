@@ -604,14 +604,13 @@ def test_user_setting_is_never_mutated():
 # Smart routing glue: turn-start pick + per-hop cfg override
 # ---------------------------------------------------------------------------
 
+_SMART_COHORTS = ("chat", "agentic", "writing", "extraction", "reasoning-math",
+                  "coding", "cheap-bulk")
 SMART_TABLE = {
     "models": {"x/pick": {"caps": {"tools": True}, "ctx": 200000, "speed": 70,
-                          "scores": {"chat": 80, "agentic": 75, "writing": 82,
-                                     "extraction": 78}}},
-    "frontiers": {"chat": ["x/pick"], "agentic": ["x/pick"],
-                  "writing": ["x/pick"], "extraction": ["x/pick"]},
-    "defaults": {"chat": "x/pick", "agentic": "x/pick",
-                 "writing": "x/pick", "extraction": "x/pick"},
+                          "scores": {c: 80 for c in _SMART_COHORTS}}},
+    "frontiers": {c: ["x/pick"] for c in _SMART_COHORTS},
+    "defaults": {c: "x/pick" for c in _SMART_COHORTS},
 }
 SMART_CATALOG = [{"id": "x/pick",
                   "pricing": {"prompt_usd_per_1m": "1", "completion_usd_per_1m": "2"}}]
@@ -731,3 +730,38 @@ def test_fatal_error_abandons_smart_pick(monkeypatch):
 def test_abandon_without_pick_is_noop():
     state = make_state()
     assert cli._smart_route_abandon(state, "whatever") is False
+
+
+# ---------------------------------------------------------------------------
+# Difficulty axis riding the smart pick
+# ---------------------------------------------------------------------------
+
+def test_pick_info_carries_difficulty(monkeypatch):
+    state = _smart_state(monkeypatch)
+    cli._smart_route_turn(state, "design a distributed rate limiter with race "
+                                 "condition handling, prove correctness, cover edge cases")
+    assert state["_smart_pick"] == "x/pick"          # pick actually happened
+    assert state["_smart_pick_info"]["difficulty"] == "high"
+    assert state["_smart_difficulty"] == "high"
+
+
+def test_short_followup_inherits_difficulty_too(monkeypatch):
+    state = _smart_state(monkeypatch)
+    cli._smart_route_turn(state, "design a distributed system, prove correctness, "
+                                 "cover edge cases and trade-offs")
+    assert state["_smart_difficulty"] == "high"
+    cli._smart_route_turn(state, "2")
+    assert state["_smart_pick_info"]["difficulty"] == "high"   # inherited, not re-scored
+
+
+def test_difficulty_tilt_reaches_pick(monkeypatch):
+    """The weights handed to pick() must be the tilted ones."""
+    seen = {}
+    real_pick = cli.router.pick
+    def spy(cohort, weights, *a, **k):
+        seen["w"] = weights
+        return real_pick(cohort, weights, *a, **k)
+    monkeypatch.setattr(cli.router, "pick", spy)
+    state = _smart_state(monkeypatch)
+    cli._smart_route_turn(state, "what is a variable?")     # low difficulty
+    assert seen["w"]["cost"] > 0.5      # tilted up from the 0.5 default
