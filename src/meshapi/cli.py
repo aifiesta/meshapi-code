@@ -451,16 +451,25 @@ def _retry_wait(state: dict, attempt: int, reason: str,
 # type "/model X" while watching a long run go sideways.
 LIVE_CONTROL_COMMANDS = (
     "/model", "/reasoning", "/route", "/fallback", "/mode", "/hops",
-    "/stall", "/optimize", "/compact",
+    "/stall", "/optimize", "/compact", "/effort",
 )
 
 
 def is_live_control(text: str) -> bool:
-    """True if `text` is a slash command applicable mid-run."""
+    """True if `text` is a slash command applicable mid-run.
+
+    Abbreviations resolve the same way handle_command resolves them, so a
+    mid-run "/eff max" steers immediately instead of queuing as a turn.
+    """
     t = (text or "").strip()
     if not t.startswith("/"):
         return False
-    return t.split()[0].lower() in LIVE_CONTROL_COMMANDS
+    name = t.split()[0].lower()
+    if name in LIVE_CONTROL_COMMANDS:
+        return True
+    from .commands import resolve_command
+    resolved, _ = resolve_command(name)
+    return resolved in LIVE_CONTROL_COMMANDS
 
 
 def _drain_live_controls(state: dict) -> bool:

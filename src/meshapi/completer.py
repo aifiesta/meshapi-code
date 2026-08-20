@@ -25,6 +25,7 @@ COMMANDS = {
     "/clear-attach": "drop queued attachments",
     "/system": "set system prompt",
     "/cost": "session spend",
+    "/effort": "routing depth: auto | low..max",
     "/hops": "hop limit: n | off (unlimited)",
     "/compact": "context usage | now | auto on/off",
     "/stall": "pause | keep-going on repeats",
@@ -39,6 +40,7 @@ COMMANDS = {
 
 _ARG_CHOICES = {
     "/route": ("auto", "smart", "off", "preview", "weights", "effort", "why"),
+    "/effort": ("auto", "low", "medium", "high", "xhigh", "max"),
     "/mode": ("default", "accept-edits", "auto", "bypass"),
     "/reasoning": ("high", "medium", "low", "none", "off"),
     "/models": ("free", "thinking", "tools"),

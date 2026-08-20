@@ -321,11 +321,44 @@ def prompt_for_api_key(cfg: dict, watcher=None) -> bool:
     return False
 
 
+def resolve_command(name: str) -> "tuple[str | None, list]":
+    """Resolve a possibly-abbreviated command to its full name.
+
+    Exact match wins outright (so /mode never resolves to /model). Otherwise
+    a UNIQUE prefix resolves ("/eff" -> "/effort"); an ambiguous prefix
+    returns the candidates for a helpful message. (None, []) = unknown.
+    """
+    from .completer import COMMANDS  # lazy: completer imports this module
+    known = set(COMMANDS) | {"/exit", "/quit", "/q", "/effort"}
+    if name in known:
+        return name, [name]
+    matches = sorted(c for c in known if c.startswith(name))
+    if len(matches) == 1:
+        return matches[0], matches
+    return None, matches
+
+
 def handle_command(cmd: str, state: dict) -> bool:
-    """Handle slash commands. Returns True if app should continue."""
+    """Handle slash commands. Returns True if app should continue.
+
+    Abbreviations welcome: any unique prefix runs the command ("/eff high"
+    == "/effort high"); ambiguous prefixes list their candidates.
+    """
     parts = cmd.strip().split(maxsplit=1)
     name = parts[0].lower()
     arg = parts[1] if len(parts) > 1 else ""
+    resolved, matches = resolve_command(name)
+    if resolved is None:
+        if matches:
+            console.print(
+                f"[yellow]{name} is ambiguous:[/yellow] [dim]"
+                + "  ".join(matches) + "[/dim]"
+            )
+            return True
+        # fall through: the unknown-command message at the end handles it
+    elif resolved != name:
+        console.print(f"[dim]→ {resolved}[/dim]")
+        name = resolved
 
     if name in ("/exit", "/quit", "/q"):
         return False
@@ -394,6 +427,11 @@ def handle_command(cmd: str, state: dict) -> bool:
                 )
             else:
                 console.print(f"[dim]Current model: {state['cfg']['model']}[/dim]")
+
+    elif name == "/effort":
+        # First-class shortcut — effort is a primary control, not a /route
+        # footnote. Identical semantics to "/route effort …".
+        return handle_command(("/route effort " + arg).strip(), state)
 
     elif name == "/route":
         sub = arg.strip().lower()
@@ -969,6 +1007,7 @@ def handle_command(cmd: str, state: dict) -> bool:
             "/clear-attach              drop any queued image attachments\n"
             "/system <txt>              set system prompt\n"
             "/cost                      show session spend\n"
+            "/effort <auto|low..max>    routing depth (how strong a model to pick)\n"
             "/hops <n|off>              pause turns after n tool hops (off = unlimited)\n"
             "/compact [now|auto on|off] context usage + history compaction\n"
             "/stall pause|keep-going    what to do when the model repeats itself\n"
