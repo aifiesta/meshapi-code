@@ -46,6 +46,7 @@ src/meshapi/
   plan.py         # plan state model for create_plan / update_step
   askui.py        # arrow-key option picker (prompt_toolkit Application) for ask_user
   pricing.py      # client-side cost: usage × catalog rates (gateway sends no cost)
+  router.py       # smart routing: local cohort classify + table-driven pick (fail-open)
   loopguard.py    # stall detection (identical-batch cycles), retry policy, batch sealing
   compact.py      # token estimation + deterministic 2-phase history compaction
   memory.py       # repo memory: warm-start map, remember notes, read-dedupe
@@ -160,7 +161,9 @@ Public docs: **https://developers.meshapi.ai**. Don't scrape the HTML — it pub
 
 ## Slash commands
 
-`/model` (fuzzy tab-completion from the catalog — `/model qw` pops every qwen model; `completer.SlashCompleter`, ThreadedCompleter so the lazy silent catalog fetch never blocks a keystroke) `/models` (also `free|thinking|tools` capability filters) `/route` (auto|off|preview) `/fallback` (also completes model ids) `/reasoning` `/file` `/image` `/clear-attach` `/system` `/mode` `/cost` (session spend + live account balance) `/hops` (n|off — per-turn hop checkpoint, 0/off = unlimited) `/compact` (context usage | now | auto on/off) `/stall` (pause|keep-going) `/optimize` `/login` `/update` `/clear` (also resets the plan) `/help` `/exit` (`/quit`, `/q`).
+`/model` (fuzzy tab-completion from the catalog — `/model qw` pops every qwen model; `completer.SlashCompleter`, ThreadedCompleter so the lazy silent catalog fetch never blocks a keystroke) `/models` (also `free|thinking|tools` capability filters) `/route` (auto|smart|off|preview|weights|why) `/fallback` (also completes model ids) `/reasoning` `/file` `/image` `/clear-attach` `/system` `/mode` `/cost` (session spend + live account balance) `/hops` (n|off — per-turn hop checkpoint, 0/off = unlimited) `/compact` (context usage | now | auto on/off) `/stall` (pause|keep-going) `/optimize` `/login` `/update` `/clear` (also resets the plan) `/help` `/exit` (`/quit`, `/q`).
+
+**Smart routing** (`router.py`, `/route smart`): local per-prompt model picking. `classify()` = deterministic signal regexes (image > long-context > code > extraction > math > classify > research > writing; `has_tools` tips code→agentic and the chat default→agentic — this CLI always sends tools, so `needs_tools=True` on every pick). `pick()` scores a cohort's candidate list from `src/meshapi/routing_table.json` (bundled data: opaque per-model×cohort scores + verified capability booleans — **compiled elsewhere; the methodology is not in this repo**) with normalized user weights over cost (live catalog prices, log-compressed)/capability/speed, top-3 stickiness via `incumbent`, and a strict **fail-open contract**: any miss returns None and the pinned model rides. CLI seam: `_smart_route_turn` (turn start, once per user turn) stashes `state["_smart_pick"]`; `_effective_cfg` swaps it in as `{model: pick, auto_route: False}`. `route_mode`/`route_weights` in config; `/route smart|weights|why`; header shows `smart → model`. Never bill a classifier call or add a network hop for routing — that's the whole point.
 
 **Mid-run steering:** `cli.LIVE_CONTROL_COMMANDS` / `_drain_live_controls` — `/model`, `/reasoning`, `/route`, `/fallback`, `/mode`, `/hops`, `/stall`, `/optimize`, `/compact` typed *during* a turn are applied at the top of the next hop (cfg is re-read per hop, so the switch lands on the next request) instead of queuing as a new turn. `/clear` and `/exit` are deliberately NOT live-applicable. Ordinary text still queues as a full turn.
 

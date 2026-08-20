@@ -64,8 +64,14 @@ _EXTRACT_RE = re.compile(
 _MATH_RE = re.compile(
     r"\b(?:solve|prove|calculate|equation|integral|derivative|probability|theorem)\b|"
     r"[∑∫√π]|\b\d+\s*[+\-*/^]\s*\d+\b", re.I)
+# "writing" = prose artifacts. A bare "write ..." (write a file, write a
+# script) is NOT prose — it needs the artifact noun nearby, else it falls
+# through to code/agentic/chat where it belongs.
 _WRITE_RE = re.compile(
-    r"\b(?:write|draft|compose|blog|essay|story|poem|copy|caption|rewrite|tone)\b", re.I)
+    r"\b(?:blog|essay|story|poem|caption|newsletter|tagline|slogan|headline"
+    r"|article|tweet|linkedin post|cover letter|micro-?story|blurb)\b"
+    r"|\b(?:write|draft|compose|rewrite)\b.{0,40}\b(?:blog|essay|story|poem|post"
+    r"|email|copy|article|bio|speech|lyrics)\b", re.I)
 _RESEARCH_RE = re.compile(
     r"\b(?:latest|news|current|today|recent|search the web|cite|sources?|202\d)\b", re.I)
 _CLASSIFY_RE = re.compile(
