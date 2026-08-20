@@ -267,3 +267,11 @@ def test_loop_control_defaults():
     assert DEFAULT_CONFIG["max_hops"] == 0          # unlimited
     assert DEFAULT_CONFIG["auto_compact"] is True
     assert DEFAULT_CONFIG["stall_policy"] == "pause"
+
+
+def test_smart_routing_defaults():
+    from meshapi.config import DEFAULT_CONFIG
+    assert DEFAULT_CONFIG["route_mode"] == "off"
+    w = DEFAULT_CONFIG["route_weights"]
+    assert abs(sum(w.values()) - 1.0) < 1e-9
+    assert set(w) == {"cost", "cap", "speed"}

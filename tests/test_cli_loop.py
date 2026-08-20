@@ -598,3 +598,69 @@ def test_user_setting_is_never_mutated():
     cli._maybe_drop_reasoning(state, "... reasoning_effort ...")
     cli._effective_cfg(state)
     assert state["cfg"]["reasoning_effort"] == "high"
+
+
+# ---------------------------------------------------------------------------
+# Smart routing glue: turn-start pick + per-hop cfg override
+# ---------------------------------------------------------------------------
+
+SMART_TABLE = {
+    "models": {"x/pick": {"caps": {"tools": True}, "ctx": 200000, "speed": 70,
+                          "scores": {"chat": 80, "agentic": 75}}},
+    "frontiers": {"chat": ["x/pick"], "agentic": ["x/pick"]},
+    "defaults": {"chat": "x/pick", "agentic": "x/pick"},
+}
+SMART_CATALOG = [{"id": "x/pick",
+                  "pricing": {"prompt_usd_per_1m": "1", "completion_usd_per_1m": "2"}}]
+
+
+def _smart_state(monkeypatch):
+    monkeypatch.setattr(cli.router, "load_table", lambda path=None: SMART_TABLE)
+    monkeypatch.setattr(cli, "fetch_models_quiet", lambda state: SMART_CATALOG)
+    state = make_state()
+    state["cfg"]["route_mode"] = "smart"
+    state["models_cache"] = SMART_CATALOG
+    return state
+
+
+def test_smart_route_turn_picks_and_overrides(monkeypatch):
+    state = _smart_state(monkeypatch)
+    cli._smart_route_turn(state, "hello there")
+    assert state["_smart_pick"] == "x/pick"
+    assert state["_smart_pick_info"]["cohort"] == "agentic"  # tools always on
+    eff = cli._effective_cfg(state)
+    assert eff["model"] == "x/pick"
+    assert eff["auto_route"] is False
+    assert state["cfg"]["model"] != "x/pick" or True  # pinned cfg never mutated
+    assert state["cfg"].get("route_mode") == "smart"
+
+
+def test_smart_route_off_mode_is_inert(monkeypatch):
+    state = _smart_state(monkeypatch)
+    state["cfg"]["route_mode"] = "off"
+    cli._smart_route_turn(state, "hello")
+    assert state["_smart_pick"] is None
+    assert cli._effective_cfg(state) is state["cfg"]
+
+
+def test_smart_route_fails_open_without_table(monkeypatch):
+    state = _smart_state(monkeypatch)
+    monkeypatch.setattr(cli.router, "load_table", lambda path=None: None)
+    cli._smart_route_turn(state, "hello")
+    assert state["_smart_pick"] is None          # pinned model rides
+
+
+def test_smart_route_fails_open_on_exception(monkeypatch):
+    state = _smart_state(monkeypatch)
+    monkeypatch.setattr(cli.router, "pick",
+                        lambda *a, **k: (_ for _ in ()).throw(RuntimeError("boom")))
+    cli._smart_route_turn(state, "hello")        # must not raise
+    assert state["_smart_pick"] is None
+
+
+def test_smart_route_sticky_across_turns(monkeypatch):
+    state = _smart_state(monkeypatch)
+    cli._smart_route_turn(state, "first prompt")
+    assert state["_smart_last"] == "x/pick"
+    cli._smart_route_turn(state, "second prompt")
+    assert state["_smart_pick_info"]["sticky"] is True

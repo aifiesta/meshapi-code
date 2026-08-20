@@ -50,6 +50,11 @@ DEFAULT_CONFIG = {
     "max_hops": 0,
     "auto_compact": True,
     "stall_policy": "pause",
+    # Smart routing (local table-driven picker). route_mode: "off" (pin),
+    # "auto" (gateway picks — mirrors auto_route), "smart" (local pick).
+    # Weights steer smart picks along each cohort's efficiency frontier.
+    "route_mode": "off",
+    "route_weights": {"cost": 0.5, "cap": 0.3, "speed": 0.2},
 }
 
 _DIR_MODE = stat.S_IRWXU                       # 0700

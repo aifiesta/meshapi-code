@@ -52,7 +52,7 @@ def test_complete_model_ids_from_cache():
 
 def test_complete_arg_choices_for_route():
     out = _complete("/route ", {"models_cache": []})
-    assert set(out) == {"auto", "off", "preview"}
+    assert set(out) == {"auto", "smart", "off", "preview", "weights", "why"}
 
 
 def test_non_slash_input_yields_nothing():

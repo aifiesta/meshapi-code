@@ -25,7 +25,7 @@ from rich.markdown import Markdown
 from rich.markup import escape as _rich_escape
 from rich.text import Text
 
-from . import __version__, askui, compact, loopguard, memory, pricing, statusbar
+from . import __version__, askui, compact, loopguard, memory, pricing, router, statusbar
 from .attachments import AttachmentError, find_image_tokens, load_image
 from .client import complete_chat, stream_chat
 from .commands import fetch_models_quiet, handle_command, prompt_for_api_key
@@ -113,7 +113,10 @@ def render_banner(cfg: dict) -> None:
         Text.from_markup(f"[bold {BRAND}]✦  meshapi {__version__}[/bold {BRAND}]"),
         Text.from_markup(f"cwd:   [{BRAND}]{pretty_cwd()}[/{BRAND}]"),
         Text.from_markup(f"model: [bold {BRAND}]{cfg['model']}[/bold {BRAND}]"),
-        Text.from_markup(f"route: [{BRAND}]{'auto' if cfg.get('auto_route') else 'off'}[/{BRAND}]"),
+        Text.from_markup(
+            f"route: [{BRAND}]"
+            f"{'smart' if cfg.get('route_mode') == 'smart' else ('auto' if cfg.get('auto_route') else 'off')}"
+            f"[/{BRAND}]"),
     ]
     console.print()
     for i, logo_line in enumerate(MESH_LOGO_LINES):
@@ -556,6 +559,55 @@ def _maybe_drop_reasoning(state: dict, message: str) -> bool:
     return True
 
 
+def _smart_route_turn(state: dict, user_input: str) -> None:
+    """Compute this turn's smart pick (route_mode == "smart"). Fail-open:
+    any miss leaves state["_smart_pick"] unset and the pinned model rides.
+
+    Runs once per user turn — the pick then holds for every hop (mid-turn
+    model flapping would waste prompt cache and confuse the transcript).
+    needs_tools is always True here: this CLI sends its tool schema on every
+    request, so the picked model must be able to hold tools regardless of
+    which cohort the prompt itself lands in.
+    """
+    state["_smart_pick"] = None
+    cfg = state["cfg"]
+    if cfg.get("route_mode") != "smart":
+        return
+    try:
+        table = router.load_table()
+        if table is None:
+            return
+        if not state.get("models_cache"):
+            fetch_models_quiet(state)
+        catalog = state.get("models_cache")
+        if not catalog:
+            return
+        history_chars = sum(
+            len(m.get("content") or "") if isinstance(m.get("content"), str) else 0
+            for m in state.get("messages") or [])
+        cohort, _conf = router.classify(
+            user_input,
+            has_image=bool(state.get("pending_attachments")),
+            has_tools=True,
+            history_chars=history_chars,
+        )
+        needs_ctx = int(compact.est_history_tokens(state.get("messages") or []) * 1.3) + 4096
+        info = router.pick(cohort, cfg.get("route_weights"), table, catalog,
+                           needs_tools=True, needs_ctx=needs_ctx,
+                           incumbent=state.get("_smart_last"))
+        if not info or not info.get("model"):
+            return
+        state["_smart_pick"] = info["model"]
+        state["_smart_last"] = info["model"]
+        state["_smart_pick_info"] = info
+        console.print(
+            f"[{BRAND_DIM}]⚙ smart route: {info['cohort']} → {info['model']}"
+            f"{' (sticky)' if info.get('sticky') else ''}  (/route why)[/{BRAND_DIM}]"
+        )
+    except Exception:
+        state["_smart_pick"] = None  # never let routing break a turn
+
+
 def _effective_cfg(state: dict) -> dict:
     """cfg for this hop, minus settings this model has proven it can't take.
 
@@ -571,6 +623,10 @@ def _effective_cfg(state: dict) -> dict:
     works.
     """
     cfg = state["cfg"]
+    if state.get("_smart_pick") and cfg.get("route_mode") == "smart":
+        # Smart routing: this turn's locally-picked model replaces the pin;
+        # auto_route is forced off so build_payload sends the concrete id.
+        cfg = {**cfg, "model": state["_smart_pick"], "auto_route": False}
     if not cfg.get("reasoning_effort"):
         return cfg
     rejected = state.get("_reasoning_rejected") or set()
@@ -2195,6 +2251,7 @@ def main() -> None:
             state["pending_attachments"] = []
         else:
             state["messages"].append({"role": "user", "content": user_input})
+        _smart_route_turn(state, user_input)
         console.print()
 
         # Tool-calling loop: keep streaming until the model returns text
@@ -2341,7 +2398,12 @@ def main() -> None:
                 _nudge = state.pop("stall_nudge_msg", None)
                 if _nudge:
                     _extras.append({"role": "system", "content": _nudge})
-                _hdr = "auto" if state["cfg"].get("auto_route") else state["cfg"]["model"]
+                if state.get("_smart_pick") and state["cfg"].get("route_mode") == "smart":
+                    _hdr = f"smart → {state['_smart_pick']}"
+                elif state["cfg"].get("auto_route"):
+                    _hdr = "auto"
+                else:
+                    _hdr = state["cfg"]["model"]
                 if hopped > 1:
                     _hdr += f" · hop {hopped}"
                 if agg_cost:

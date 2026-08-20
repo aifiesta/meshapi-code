@@ -392,7 +392,15 @@ def handle_command(cmd: str, state: dict) -> bool:
     elif name == "/route":
         sub = arg.strip().lower()
         if not sub:
-            if state["cfg"].get("auto_route"):
+            if state["cfg"].get("route_mode") == "smart":
+                from . import router as _router
+                w = _router.normalize_weights(state["cfg"].get("route_weights"))
+                console.print(
+                    "[dim]route: smart — local pick per prompt · weights "
+                    f"cost={w['cost']:.2f} cap={w['cap']:.2f} speed={w['speed']:.2f} "
+                    "(/route why after a prompt)[/dim]"
+                )
+            elif state["cfg"].get("auto_route"):
                 console.print(
                     "[dim]route: auto — the gateway picks a model per prompt "
                     f"(pinned: {state['cfg']['model']})[/dim]"
@@ -401,6 +409,7 @@ def handle_command(cmd: str, state: dict) -> bool:
                 console.print(f"[dim]route: off (model: {state['cfg']['model']})[/dim]")
         elif sub == "auto":
             state["cfg"]["auto_route"] = True
+            state["cfg"]["route_mode"] = "auto"
             save_config(state["cfg"])
             console.print(
                 "[dim]Auto-routing on — each prompt goes to the model the "
@@ -409,12 +418,81 @@ def handle_command(cmd: str, state: dict) -> bool:
             )
         elif sub in ("off", "default"):
             state["cfg"]["auto_route"] = False
+            state["cfg"]["route_mode"] = "off"
             save_config(state["cfg"])
             console.print(f"[dim]Auto-routing off — pinned to {state['cfg']['model']}.[/dim]")
         elif sub == "preview":
             _route_preview(state)
+        elif sub == "smart":
+            from . import router as _router
+            if _router.load_table() is None:
+                console.print(
+                    "[yellow]No routing table bundled with this build — smart "
+                    "routing unavailable ( /route auto uses the gateway's "
+                    "router instead).[/yellow]"
+                )
+            else:
+                state["cfg"]["route_mode"] = "smart"
+                state["cfg"]["auto_route"] = False  # mutually exclusive
+                save_config(state["cfg"])
+                w = _router.normalize_weights(state["cfg"].get("route_weights"))
+                console.print(
+                    "[dim]Smart routing on — the CLI picks a model per prompt "
+                    "locally (no classifier tokens, no extra latency). Weights: "
+                    f"cost={w['cost']:.2f} cap={w['cap']:.2f} speed={w['speed']:.2f} "
+                    "— tune with /route weights, inspect with /route why.[/dim]"
+                )
+        elif sub.startswith("weights"):
+            from . import router as _router
+            pairs = sub.removeprefix("weights").strip()
+            if not pairs:
+                w = _router.normalize_weights(state["cfg"].get("route_weights"))
+                console.print(
+                    f"[dim]weights: cost={w['cost']:.2f} cap={w['cap']:.2f} "
+                    f"speed={w['speed']:.2f}\n"
+                    "usage: /route weights cost=0.5 cap=0.3 speed=0.2[/dim]"
+                )
+            else:
+                try:
+                    parsed = {}
+                    for tok in pairs.replace(",", " ").split():
+                        k, v = tok.split("=", 1)
+                        k = {"capability": "cap", "quality": "cap"}.get(k, k)
+                        if k not in ("cost", "cap", "speed"):
+                            raise ValueError(f"unknown axis {k!r}")
+                        parsed[k] = float(v)
+                except (ValueError, TypeError) as e:
+                    console.print(f"[red]Couldn't parse weights ({e}). "
+                                  "Example: /route weights cost=0.5 cap=0.3 speed=0.2[/red]")
+                else:
+                    merged = {**state["cfg"].get("route_weights", {}), **parsed}
+                    state["cfg"]["route_weights"] = _router.normalize_weights(merged)
+                    save_config(state["cfg"])
+                    w = state["cfg"]["route_weights"]
+                    console.print(
+                        f"[dim]weights set: cost={w['cost']:.2f} cap={w['cap']:.2f} "
+                        f"speed={w['speed']:.2f} (normalized to 1). Applies from "
+                        "the next prompt.[/dim]"
+                    )
+        elif sub == "why":
+            info = state.get("_smart_pick_info")
+            if not info:
+                console.print("[dim]No smart pick this session yet — /route smart "
+                              "then send a prompt.[/dim]")
+            else:
+                sticky = " (kept from earlier in the session)" if info.get("sticky") else ""
+                console.print(
+                    f"[dim]cohort: {info['cohort']}  →  picked "
+                    f"[bold]{info['model']}[/bold]{sticky}[/dim]"
+                )
+                for r in info.get("ranked") or []:
+                    console.print(
+                        f"[dim]    {r['model']:40} score {r['score']:>6}  "
+                        f"cap {r['cap']:>3}  ${r['cost']:<7} speed {r['speed']}[/dim]"
+                    )
         else:
-            console.print("[red]Usage: /route auto | off | preview[/red]")
+            console.print("[red]Usage: /route auto | smart | off | preview | "
+                          "weights [k=v …] | why[/red]")
 
     elif name == "/models":
         models = _fetch_models(state)
@@ -838,7 +916,8 @@ def handle_command(cmd: str, state: dict) -> bool:
             "/clear                     reset conversation\n"
             "/model <name>              switch model (e.g. anthropic/claude-sonnet-4.5)\n"
             "/models [free|<query>]     browse the catalog (context, $/1M pricing)\n"
-            "/route auto|off|preview    auto-route each prompt to the best model\n"
+            "/route auto|smart|off      routing: gateway auto, local smart pick, or pinned\n"
+            "/route weights k=v | why   tune smart weights (cost/cap/speed); explain the pick\n"
             "/fallback <m1> <m2> | off  ordered fallback models if the primary fails\n"
             "/reasoning <level>         high|medium|low|none|off reasoning effort\n"
             "/mode <perm>               default|accept-edits|auto|bypass  (or shift+tab)\n"
