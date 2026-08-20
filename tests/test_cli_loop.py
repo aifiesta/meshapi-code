@@ -606,9 +606,12 @@ def test_user_setting_is_never_mutated():
 
 SMART_TABLE = {
     "models": {"x/pick": {"caps": {"tools": True}, "ctx": 200000, "speed": 70,
-                          "scores": {"chat": 80, "agentic": 75}}},
-    "frontiers": {"chat": ["x/pick"], "agentic": ["x/pick"]},
-    "defaults": {"chat": "x/pick", "agentic": "x/pick"},
+                          "scores": {"chat": 80, "agentic": 75, "writing": 82,
+                                     "extraction": 78}}},
+    "frontiers": {"chat": ["x/pick"], "agentic": ["x/pick"],
+                  "writing": ["x/pick"], "extraction": ["x/pick"]},
+    "defaults": {"chat": "x/pick", "agentic": "x/pick",
+                 "writing": "x/pick", "extraction": "x/pick"},
 }
 SMART_CATALOG = [{"id": "x/pick",
                   "pricing": {"prompt_usd_per_1m": "1", "completion_usd_per_1m": "2"}}]
@@ -664,3 +667,67 @@ def test_smart_route_sticky_across_turns(monkeypatch):
     assert state["_smart_last"] == "x/pick"
     cli._smart_route_turn(state, "second prompt")
     assert state["_smart_pick_info"]["sticky"] is True
+
+
+# ---------------------------------------------------------------------------
+# Smart routing: outcome-level fail-over (the nemotron-empty-answers report)
+# ---------------------------------------------------------------------------
+
+def test_short_followup_inherits_cohort(monkeypatch):
+    state = _smart_state(monkeypatch)
+    cli._smart_route_turn(state, "write an essay on llm")
+    first = state["_smart_pick_info"]["cohort"]
+    cli._smart_route_turn(state, "2")            # bare menu answer
+    assert state["_smart_pick_info"]["cohort"] == first
+
+
+def test_long_followup_reclassifies(monkeypatch):
+    state = _smart_state(monkeypatch)
+    cli._smart_route_turn(state, "write an essay on llm")
+    cli._smart_route_turn(state, "now extract every heading from it as a json array please")
+    assert state["_smart_pick_info"]["cohort"] != state.get("_never")  # ran fresh classify
+    assert state["_smart_cohort"] == state["_smart_pick_info"]["cohort"]
+
+
+def test_empty_responses_abandon_smart_pick_and_recover(monkeypatch):
+    """Live failure: picked model returns empty twice -> blacklist it, fall
+    back to the pinned model, and the TURN STILL SUCCEEDS."""
+    state = _smart_state(monkeypatch)
+    cli._smart_route_turn(state, "hello")
+    assert state["_smart_pick"] == "x/pick"
+    fake, calls = scripted_render([
+        ("ok", "", {"usage": {}}),        # picked model: empty
+        ("ok", "", {"usage": {}}),        # retry: empty again
+        ("ok", "rescued by pin", {"usage": {}}),   # pinned model answers
+    ])
+    monkeypatch.setattr(cli, "render_stream", fake)
+    reply, meta = cli._stream_hop_with_retry(state, [], "hdr")
+    assert reply == "rescued by pin"
+    assert state["_smart_pick"] is None
+    assert "x/pick" in state["_smart_bad"]
+    assert calls["n"] == 3
+
+
+def test_blacklisted_model_never_picked_again(monkeypatch):
+    state = _smart_state(monkeypatch)
+    state["_smart_bad"] = {"x/pick"}
+    cli._smart_route_turn(state, "hello")
+    assert state["_smart_pick"] is None           # only candidate is banned -> pin rides
+
+
+def test_fatal_error_abandons_smart_pick(monkeypatch):
+    state = _smart_state(monkeypatch)
+    cli._smart_route_turn(state, "hello")
+    fake, calls = scripted_render([
+        ("ok", "", {"error": "text content blocks must be non-empty"}),  # fatal on pick
+        ("ok", "pin works", {"usage": {}}),
+    ])
+    monkeypatch.setattr(cli, "render_stream", fake)
+    reply, meta = cli._stream_hop_with_retry(state, [], "hdr")
+    assert reply == "pin works"
+    assert "x/pick" in state["_smart_bad"]
+
+
+def test_abandon_without_pick_is_noop():
+    state = make_state()
+    assert cli._smart_route_abandon(state, "whatever") is False

@@ -559,6 +559,28 @@ def _maybe_drop_reasoning(state: dict, message: str) -> bool:
     return True
 
 
+def _smart_route_abandon(state: dict, reason: str) -> bool:
+    """The smart pick failed LIVE (empty replies / fatal error) — blacklist
+    it for the session and fall back to the pinned model, keeping the turn
+    alive. True if there was a pick to abandon.
+
+    This is outcome-level fail-open: a routing table can say a model is
+    good, but the model answering NOW beats the table's opinion of it.
+    """
+    bad = state.get("_smart_pick")
+    if not bad:
+        return False
+    state.setdefault("_smart_bad", set()).add(bad)
+    state["_smart_pick"] = None
+    state["_smart_last"] = None
+    console.print(
+        f"[yellow]⚠ smart pick {bad} {reason} — falling back to "
+        f"{state['cfg']['model']} (that model is skipped for the rest of "
+        "this session)[/yellow]"
+    )
+    return True
+
+
 def _smart_route_turn(state: dict, user_input: str) -> None:
     """Compute this turn's smart pick (route_mode == "smart"). Fail-open:
     any miss leaves state["_smart_pick"] unset and the pinned model rides.
@@ -591,10 +613,17 @@ def _smart_route_turn(state: dict, user_input: str) -> None:
             has_tools=True,
             history_chars=history_chars,
         )
+        # Short follow-ups ("2", "yes", "continue") are answers WITHIN the
+        # ongoing task, not new tasks — inherit the conversation's cohort
+        # instead of reclassifying three characters of text.
+        if len(user_input.strip()) < 25 and state.get("_smart_cohort"):
+            cohort = state["_smart_cohort"]
+        state["_smart_cohort"] = cohort
         needs_ctx = int(compact.est_history_tokens(state.get("messages") or []) * 1.3) + 4096
         info = router.pick(cohort, cfg.get("route_weights"), table, catalog,
                            needs_tools=True, needs_ctx=needs_ctx,
-                           incumbent=state.get("_smart_last"))
+                           incumbent=state.get("_smart_last"),
+                           exclude=state.get("_smart_bad"))
         if not info or not info.get("model"):
             return
         state["_smart_pick"] = info["model"]
@@ -805,12 +834,24 @@ def _stream_hop_with_retry(state: dict, extras: list, hdr: str):
                 compacted_for_context = True
                 if _compact_and_report(state, "context limit hit"):
                     continue
+            if kind == "fatal" and _smart_route_abandon(state, "hit a fatal error"):
+                continue  # pinned model takes over this hop
             return reply, meta  # fatal — the caller's error path handles it
         if (not meta.get("tool_calls") and not (reply or "").strip()
-                and empty_retries < 2 and attempt < loopguard.MAX_STREAM_ATTEMPTS):
-            empty_retries += 1
-            _retry_wait(state, attempt, "empty response from the model")
-            continue
+                and attempt < loopguard.MAX_STREAM_ATTEMPTS):
+            if empty_retries < 1:
+                empty_retries += 1
+                _retry_wait(state, attempt, "empty response from the model")
+                continue
+            # One retry on the same model is enough evidence — if it was a
+            # smart pick, abandon it and let the pinned model take the turn.
+            if _smart_route_abandon(state, "keeps returning empty responses"):
+                empty_retries = 0
+                continue
+            if empty_retries < 2:
+                empty_retries += 1
+                _retry_wait(state, attempt, "empty response from the model")
+                continue
         return reply, meta
 
 

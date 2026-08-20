@@ -229,3 +229,20 @@ def test_bundled_table_frontiers_respect_the_floor():
         for mid in mids:
             q = table["models"][mid]["scores"].get(cohort)
             assert q is not None and q >= 30, f"{mid} on {cohort} frontier at {q}"
+
+
+# ---------------------------------------------------------------------------
+# Session blacklist (exclude) — models that failed live are unpickable
+# ---------------------------------------------------------------------------
+
+def test_exclude_removes_candidate_and_incumbent():
+    got = pick("chat", {"cost": 0.05, "cap": 0.9, "speed": 0.05}, TABLE, CATALOG,
+               exclude={"c/best"}, incumbent="c/best")
+    assert got["model"] != "c/best"
+    assert got["sticky"] is False
+
+
+def test_exclude_blocks_the_default_fallback_too():
+    got = pick("chat", None, TABLE, CATALOG, needs_ctx=10_000_000,
+               exclude={"a/cheap"})     # a/cheap is the cohort default
+    assert got is None                   # nothing safe left -> caller's pin rides

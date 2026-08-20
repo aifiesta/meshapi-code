@@ -141,7 +141,8 @@ def normalize_weights(w: "dict | None") -> dict:
 
 def pick(cohort: str, weights: "dict | None", table: "dict | None",
          catalog: "list | None", *, needs_tools: bool = False,
-         needs_ctx: int = 0, incumbent: "str | None" = None) -> "dict | None":
+         needs_ctx: int = 0, incumbent: "str | None" = None,
+         exclude: "set | None" = None) -> "dict | None":
     """Choose a model for `cohort`. Returns {model, cohort, ranked, sticky}
     or None (caller falls back). Pure — no I/O, no mutation."""
     try:
@@ -152,8 +153,13 @@ def pick(cohort: str, weights: "dict | None", table: "dict | None",
         cat_by_id = {m.get("id"): m for m in catalog}
         w = normalize_weights(weights)
 
+        exclude = exclude or set()
+        if incumbent in exclude:
+            incumbent = None
         cands = []
         for mid in frontier:
+            if mid in exclude:
+                continue  # session-blacklisted: it already failed us live
             row = models.get(mid)
             cat = cat_by_id.get(mid)
             if not row or not cat:
@@ -173,8 +179,10 @@ def pick(cohort: str, weights: "dict | None", table: "dict | None",
             cands = qualified
         if not cands:
             default = (table.get("defaults") or {}).get(cohort)
+            if not default or default in exclude:
+                return None
             return {"model": default, "cohort": cohort, "ranked": [],
-                    "sticky": False} if default else None
+                    "sticky": False}
 
         max_cost = max(c for _, _, c, _ in cands)
         denom = math.log10(max_cost + 1) or 1.0
