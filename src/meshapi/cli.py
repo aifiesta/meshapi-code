@@ -624,7 +624,7 @@ def _smart_route_turn(state: dict, user_input: str) -> None:
         state["_smart_cohort"] = cohort
         state["_smart_difficulty"] = difficulty
         needs_ctx = int(compact.est_history_tokens(state.get("messages") or []) * 1.3) + 4096
-        weights = router.difficulty_adjust(cfg.get("route_weights"), difficulty)
+        weights = router.effective_weights(cfg.get("route_weights"), difficulty)
         info = router.pick(cohort, weights, table, catalog,
                            needs_tools=True, needs_ctx=needs_ctx,
                            incumbent=state.get("_smart_last"),

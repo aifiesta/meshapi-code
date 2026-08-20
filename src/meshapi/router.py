@@ -23,8 +23,13 @@ import math
 import re
 from pathlib import Path
 
-# Default weights: the user-facing contract. Must sum to ~1 (renormalized).
-DEFAULT_WEIGHTS = {"cost": 0.5, "cap": 0.3, "speed": 0.2}
+# Default weights: the user-facing contract. cap="auto" means the capability
+# weight is DRIVEN BY PROMPT DIFFICULTY (easy prompts barely pay for
+# capability, hard prompts pay a lot) — the user tunes only cost vs speed.
+# An explicit numeric cap remains a power-user override.
+DEFAULT_WEIGHTS = {"cost": 0.6, "cap": "auto", "speed": 0.4}
+# capability share per difficulty band when cap="auto"
+AUTO_CAP = {"low": 0.12, "mid": 0.35, "high": 0.78}
 # Runtime quality floor: weights choose along the frontier of COMPETENT
 # models. A candidate under this cohort score is dropped whenever anything
 # better survives — no speed/cost setting may select a model the table says
@@ -164,6 +169,8 @@ def difficulty_adjust(weights: "dict | None", difficulty: str) -> dict:
     per-prompt tilt, never a persisted change.
     """
     w = normalize_weights(weights)
+    if w.get("cap") == "auto":
+        return effective_weights(w, difficulty)
     if difficulty == "low":
         w = {"cost": w["cost"] * 1.5, "cap": w["cap"] * 0.55,
              "speed": w["speed"] * 1.2}
@@ -196,15 +203,40 @@ def _blend_price(row: dict, cohort: str) -> "float | None":
 
 
 def normalize_weights(w: "dict | None") -> dict:
+    """Normalize to sum 1. cap="auto" is preserved as a mode flag; the
+    cost/speed pair is normalized over its own share."""
     out = dict(DEFAULT_WEIGHTS)
     for k in out:
+        raw = (w or {}).get(k, out[k])
+        if k == "cap" and (raw is None or str(raw).lower() == "auto"):
+            out[k] = "auto"
+            continue
         try:
-            v = float((w or {}).get(k, out[k]))
-            out[k] = max(0.0, v)
+            out[k] = max(0.0, float(raw))
         except (TypeError, ValueError):
             pass
+    if out["cap"] == "auto":
+        pair = out["cost"] + out["speed"] or 1.0
+        return {"cost": out["cost"] / pair, "cap": "auto",
+                "speed": out["speed"] / pair}
     total = sum(out.values()) or 1.0
     return {k: v / total for k, v in out.items()}
+
+
+def effective_weights(w: "dict | None", difficulty: str) -> dict:
+    """The weights a pick actually uses.
+
+    cap="auto" (default): difficulty OWNS the capability share (AUTO_CAP),
+    and the user's cost/speed ratio splits the remainder — "capability" as
+    a knob is replaced by difficulty detection.
+    Numeric cap (power user): the classic tilt (difficulty_adjust) applies.
+    """
+    w = normalize_weights(w)
+    if w.get("cap") == "auto":
+        cap = AUTO_CAP.get(difficulty, AUTO_CAP["mid"])
+        rest = 1.0 - cap
+        return {"cost": rest * w["cost"], "cap": cap, "speed": rest * w["speed"]}
+    return difficulty_adjust(w, difficulty)
 
 
 def pick(cohort: str, weights: "dict | None", table: "dict | None",
@@ -220,6 +252,10 @@ def pick(cohort: str, weights: "dict | None", table: "dict | None",
         models = table.get("models") or {}
         cat_by_id = {m.get("id"): m for m in catalog}
         w = normalize_weights(weights)
+        if w.get("cap") == "auto":
+            # Caller didn't resolve difficulty (direct pick() use) — assume a
+            # mid-difficulty prompt so "auto" always scores numerically.
+            w = effective_weights(w, "mid")
 
         exclude = exclude or set()
         if incumbent in exclude:

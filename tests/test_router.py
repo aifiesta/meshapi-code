@@ -77,9 +77,16 @@ def test_weights_normalize_to_one():
     assert w == {"cost": 0.5, "cap": 0.3, "speed": 0.2}
 
 
+def test_weights_default_cap_is_auto():
+    w = normalize_weights(None)
+    assert w["cap"] == "auto"
+    assert abs(w["cost"] + w["speed"] - 1.0) < 1e-9
+
+
 def test_weights_garbage_falls_back_to_defaults():
     w = normalize_weights({"cost": "x", "cap": None})
-    assert abs(sum(w.values()) - 1.0) < 1e-9
+    assert w["cap"] == "auto"       # None == auto mode
+    assert abs(w["cost"] + w["speed"] - 1.0) < 1e-9
 
 
 def test_weights_negative_clamped():
@@ -295,3 +302,38 @@ def test_extreme_cost_user_survives_hard_tilt():
     w = difficulty_adjust({"cost": 0.9, "cap": 0.05, "speed": 0.05}, "high")
     got = pick("chat", w, TABLE, CATALOG, needs_tools=True)
     assert got["model"] == "a/cheap"
+
+
+# ---------------------------------------------------------------------------
+# cap="auto" — difficulty replaces the capability knob (user direction)
+# ---------------------------------------------------------------------------
+
+from meshapi.router import AUTO_CAP, effective_weights
+
+
+def test_auto_cap_shares_follow_difficulty():
+    base = {"cost": 0.6, "cap": "auto", "speed": 0.4}
+    for d in ("low", "mid", "high"):
+        w = effective_weights(base, d)
+        assert abs(sum(w.values()) - 1.0) < 1e-9
+        assert w["cap"] == pytest.approx(AUTO_CAP[d])
+        # user's cost:speed ratio (60:40) preserved inside the remainder
+        assert w["cost"] / w["speed"] == pytest.approx(1.5)
+
+
+def test_auto_cap_easy_routes_cheap_hard_routes_up():
+    base = {"cost": 0.6, "cap": "auto", "speed": 0.4}
+    lo = pick("chat", effective_weights(base, "low"), TABLE, CATALOG, needs_tools=True)
+    hi = pick("chat", effective_weights(base, "high"), TABLE, CATALOG, needs_tools=True)
+    assert lo["model"] == "a/cheap"
+    assert hi["model"] == "c/best"
+
+
+def test_numeric_cap_still_overrides():
+    w = effective_weights({"cost": 0.1, "cap": 0.8, "speed": 0.1}, "low")
+    assert isinstance(w["cap"], float) and w["cap"] > 0.3   # power user kept control
+
+
+def test_pick_accepts_unresolved_auto():
+    got = pick("chat", {"cost": 0.6, "cap": "auto", "speed": 0.4}, TABLE, CATALOG)
+    assert got and got["model"]

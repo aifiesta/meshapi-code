@@ -54,7 +54,9 @@ DEFAULT_CONFIG = {
     # "auto" (gateway picks — mirrors auto_route), "smart" (local pick).
     # Weights steer smart picks along each cohort's efficiency frontier.
     "route_mode": "off",
-    "route_weights": {"cost": 0.5, "cap": 0.3, "speed": 0.2},
+    # cap="auto": capability weight is driven by per-prompt difficulty;
+    # users tune cost vs speed. Numeric cap = power-user override.
+    "route_weights": {"cost": 0.6, "cap": "auto", "speed": 0.4},
 }
 
 _DIR_MODE = stat.S_IRWXU                       # 0700
@@ -128,6 +130,9 @@ def save_api_key(key: str) -> None:
     secure_file(CREDENTIALS_FILE)  # tighten a pre-existing looser file
 
 
+_OLD_ROUTE_WEIGHTS = {"cost": 0.5, "cap": 0.3, "speed": 0.2}
+
+
 def load_config() -> dict:
     _secure_dir(CONFIG_DIR)
     if not CONFIG_FILE.exists():
@@ -148,6 +153,11 @@ def load_config() -> dict:
         )
         loaded = {}
     cfg = {**DEFAULT_CONFIG, **loaded}
+    # 0.5.9-dev migration: the numeric cap default was replaced by cap="auto"
+    # (difficulty-driven). Only rewrite the exact old DEFAULT — an explicit
+    # user-chosen numeric cap is preserved.
+    if cfg.get("route_weights") == _OLD_ROUTE_WEIGHTS:
+        cfg["route_weights"] = dict(DEFAULT_CONFIG["route_weights"])
     # `route` (cheapest/fastest/balanced) never existed gateway-side and was
     # replaced by auto_route in 0.5.0 — drop the stale key from old configs
     # (it disappears from disk on the next save_config).

@@ -125,6 +125,12 @@ _REASONING_ALIASES = {
 }
 
 
+def _fmt_weights(w: dict) -> str:
+    cap = w.get("cap")
+    cap_s = "auto (difficulty-driven)" if cap == "auto" else f"{cap:.2f}"
+    return f"cost={w['cost']:.2f} cap={cap_s} speed={w['speed']:.2f}"
+
+
 def warn_reasoning_unsupported(state: dict) -> None:
     """Note when reasoning effort is set but this model has already rejected it.
 
@@ -396,8 +402,7 @@ def handle_command(cmd: str, state: dict) -> bool:
                 from . import router as _router
                 w = _router.normalize_weights(state["cfg"].get("route_weights"))
                 console.print(
-                    "[dim]route: smart — local pick per prompt · weights "
-                    f"cost={w['cost']:.2f} cap={w['cap']:.2f} speed={w['speed']:.2f} "
+                    f"[dim]route: smart — local pick per prompt · {_fmt_weights(w)} "
                     "(/route why after a prompt)[/dim]"
                 )
             elif state["cfg"].get("auto_route"):
@@ -439,8 +444,8 @@ def handle_command(cmd: str, state: dict) -> bool:
                 console.print(
                     "[dim]Smart routing on — the CLI picks a model per prompt "
                     "locally (no classifier tokens, no extra latency). Weights: "
-                    f"cost={w['cost']:.2f} cap={w['cap']:.2f} speed={w['speed']:.2f} "
-                    "— tune with /route weights, inspect with /route why.[/dim]"
+                    f"{_fmt_weights(w)} — capability follows prompt difficulty; "
+                    "tune cost vs speed with /route weights.[/dim]"
                 )
         elif sub.startswith("weights"):
             from . import router as _router
@@ -448,19 +453,22 @@ def handle_command(cmd: str, state: dict) -> bool:
             if not pairs:
                 w = _router.normalize_weights(state["cfg"].get("route_weights"))
                 console.print(
-                    f"[dim]weights: cost={w['cost']:.2f} cap={w['cap']:.2f} "
-                    f"speed={w['speed']:.2f}\n"
-                    "usage: /route weights cost=0.5 cap=0.3 speed=0.2[/dim]"
+                    f"[dim]weights: {_fmt_weights(w)}\n"
+                    "usage: /route weights cost=0.6 speed=0.4    (cap stays "
+                    "difficulty-driven)\n"
+                    "       /route weights cap=0.5              (pin capability "
+                    "manually; cap=auto to go back)[/dim]"
                 )
             else:
                 try:
                     parsed = {}
                     for tok in pairs.replace(",", " ").split():
                         k, v = tok.split("=", 1)
-                        k = {"capability": "cap", "quality": "cap"}.get(k, k)
+                        k = {"capability": "cap", "quality": "cap",
+                             "difficulty": "cap"}.get(k, k)
                         if k not in ("cost", "cap", "speed"):
                             raise ValueError(f"unknown axis {k!r}")
-                        parsed[k] = float(v)
+                        parsed[k] = "auto" if (k == "cap" and v.lower() == "auto")                             else float(v)
                 except (ValueError, TypeError) as e:
                     console.print(f"[red]Couldn't parse weights ({e}). "
                                   "Example: /route weights cost=0.5 cap=0.3 speed=0.2[/red]")
@@ -470,8 +478,7 @@ def handle_command(cmd: str, state: dict) -> bool:
                     save_config(state["cfg"])
                     w = state["cfg"]["route_weights"]
                     console.print(
-                        f"[dim]weights set: cost={w['cost']:.2f} cap={w['cap']:.2f} "
-                        f"speed={w['speed']:.2f} (normalized to 1). Applies from "
+                        f"[dim]weights set: {_fmt_weights(w)}. Applies from "
                         "the next prompt.[/dim]"
                     )
         elif sub == "why":

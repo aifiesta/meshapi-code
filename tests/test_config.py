@@ -273,5 +273,21 @@ def test_smart_routing_defaults():
     from meshapi.config import DEFAULT_CONFIG
     assert DEFAULT_CONFIG["route_mode"] == "off"
     w = DEFAULT_CONFIG["route_weights"]
-    assert abs(sum(w.values()) - 1.0) < 1e-9
     assert set(w) == {"cost", "cap", "speed"}
+    assert w["cap"] == "auto"                     # difficulty-driven by default
+    assert abs(w["cost"] + w["speed"] - 1.0) < 1e-9
+
+
+def test_old_numeric_default_migrates_to_auto(tmp_path, monkeypatch):
+    import json
+    from meshapi import config as cfgmod
+    monkeypatch.setattr(cfgmod, "CONFIG_FILE", tmp_path / "config.json")
+    monkeypatch.setattr(cfgmod, "CONFIG_DIR", tmp_path)
+    (tmp_path / "config.json").write_text(json.dumps(
+        {"route_weights": {"cost": 0.5, "cap": 0.3, "speed": 0.2}}))
+    cfg = cfgmod.load_config()
+    assert cfg["route_weights"]["cap"] == "auto"   # old default rewritten
+    (tmp_path / "config.json").write_text(json.dumps(
+        {"route_weights": {"cost": 0.2, "cap": 0.7, "speed": 0.1}}))
+    cfg = cfgmod.load_config()
+    assert cfg["route_weights"]["cap"] == 0.7      # explicit choice preserved
