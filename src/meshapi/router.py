@@ -25,6 +25,12 @@ from pathlib import Path
 
 # Default weights: the user-facing contract. Must sum to ~1 (renormalized).
 DEFAULT_WEIGHTS = {"cost": 0.5, "cap": 0.3, "speed": 0.2}
+# Runtime quality floor: weights choose along the frontier of COMPETENT
+# models. A candidate under this cohort score is dropped whenever anything
+# better survives — no speed/cost setting may select a model the table says
+# can't do the task (belt-and-braces with the compiler's own floor; also
+# protects against stale bundled tables).
+QUALITY_FLOOR = 45
 
 _TABLE_CACHE: "dict | None" = None
 
@@ -162,6 +168,9 @@ def pick(cohort: str, weights: "dict | None", table: "dict | None",
             if q is None or cost is None:
                 continue
             cands.append((mid, float(q), cost, float(row.get("speed") or 30)))
+        qualified = [c for c in cands if c[1] >= QUALITY_FLOOR]
+        if qualified:
+            cands = qualified
         if not cands:
             default = (table.get("defaults") or {}).get(cohort)
             return {"model": default, "cohort": cohort, "ranked": [],

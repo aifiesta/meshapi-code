@@ -172,3 +172,60 @@ def test_load_table_missing_returns_none(tmp_path):
     assert router.load_table(str(tmp_path / "nope.json")) is None
     bad = tmp_path / "bad.json"; bad.write_text("{not json")
     assert router.load_table(str(bad)) is None
+
+
+# ---------------------------------------------------------------------------
+# Quality floor — the codestral-writes-essays regression (live user report)
+# ---------------------------------------------------------------------------
+
+FLOOR_TABLE = {
+    "models": {
+        "fast/bad":   {"caps": {"tools": True}, "ctx": 128000, "speed": 99,
+                       "scores": {"writing": 27}},   # codestral-shaped
+        "slow/good":  {"caps": {"tools": True}, "ctx": 128000, "speed": 54,
+                       "scores": {"writing": 100}},
+        "mid/decent": {"caps": {"tools": True}, "ctx": 128000, "speed": 90,
+                       "scores": {"writing": 84}},
+    },
+    "frontiers": {"writing": ["slow/good", "mid/decent", "fast/bad"]},
+    "defaults": {"writing": "mid/decent"},
+}
+FLOOR_CATALOG = [
+    {"id": "fast/bad",   "pricing": {"prompt_usd_per_1m": "0.3", "completion_usd_per_1m": "0.9"}},
+    {"id": "slow/good",  "pricing": {"prompt_usd_per_1m": "5", "completion_usd_per_1m": "25"}},
+    {"id": "mid/decent", "pricing": {"prompt_usd_per_1m": "0.6", "completion_usd_per_1m": "2.5"}},
+]
+
+
+def test_speed_max_never_picks_below_quality_floor():
+    """weights choose among COMPETENT models — a 27/100 writer must lose the
+    writing pick even at speed=0.8 (the exact live failure: codestral-2508,
+    write=27 speed=99, picked for 'write an essay' and then refused)."""
+    got = pick("writing", {"cost": 0.1, "cap": 0.1, "speed": 0.8},
+               FLOOR_TABLE, FLOOR_CATALOG)
+    assert got["model"] == "mid/decent"       # fastest of the qualified
+    assert all(r["model"] != "fast/bad" or r["cap"] >= router.QUALITY_FLOOR
+               for r in got["ranked"]) or "fast/bad" not in [r["model"] for r in got["ranked"]]
+
+
+def test_floor_relaxes_when_nothing_qualifies():
+    """If EVERY candidate is under the floor, still pick something (fail-open
+    beats fail-closed) — the least-bad option by the user's weights."""
+    table = {"models": {"only/weak": {"caps": {"tools": True}, "ctx": 9000,
+                                      "speed": 80, "scores": {"writing": 30}}},
+             "frontiers": {"writing": ["only/weak"]}, "defaults": {}}
+    cat = [{"id": "only/weak",
+            "pricing": {"prompt_usd_per_1m": "0.1", "completion_usd_per_1m": "0.2"}}]
+    got = pick("writing", None, table, cat)
+    assert got["model"] == "only/weak"
+
+
+def test_bundled_table_frontiers_respect_the_floor():
+    """The shipped table itself must not carry sub-floor frontier members."""
+    table = router.load_table()
+    if table is None:
+        pytest.skip("no bundled table in this build")
+    for cohort, mids in (table.get("frontiers") or {}).items():
+        for mid in mids:
+            q = table["models"][mid]["scores"].get(cohort)
+            assert q is not None and q >= 30, f"{mid} on {cohort} frontier at {q}"
