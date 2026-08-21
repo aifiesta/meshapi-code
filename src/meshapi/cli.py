@@ -559,7 +559,10 @@ def _maybe_drop_reasoning(state: dict, message: str) -> bool:
     state["_drop_reasoning"] = True
     # Remember it: later turns on this model skip the field (and the retry)
     # entirely, without ever guessing from an unreliable catalog flag.
-    bad = state["cfg"].get("model")
+    # Attribution matters: under smart routing the request went to the PICK,
+    # not the pinned model — blaming the pin let the same pick fail every
+    # turn (seen live: two warnings, one session, one model).
+    bad = state.get("_smart_pick") or state["cfg"].get("model")
     state.setdefault("_reasoning_rejected", set()).add(bad)
     # Persist (capped) so the NEXT session skips the doomed call too.
     try:
@@ -686,10 +689,26 @@ def _effective_cfg(state: dict) -> dict:
         # Smart routing: this turn's locally-picked model replaces the pin;
         # auto_route is forced off so build_payload sends the concrete id.
         cfg = {**cfg, "model": state["_smart_pick"], "auto_route": False}
+        # The probes already MEASURED whether this model accepts
+        # reasoning_effort with tools present — ask the table instead of
+        # paying a doomed call + retry to rediscover it per session.
+        if cfg.get("reasoning_effort"):
+            try:
+                row = (router.load_table() or {}).get("models", {}).get(cfg["model"])
+                if row and not row.get("caps", {}).get("reasoning_with_tools"):
+                    if state.get("_reasoning_noted_for") != cfg["model"]:
+                        state["_reasoning_noted_for"] = cfg["model"]
+                        console.print(
+                            f"[dim](reasoning off for {cfg['model']} — probed "
+                            "unsupported with tools)[/dim]"
+                        )
+                    cfg = {**cfg, "reasoning_effort": None}
+            except Exception:
+                pass
     if not cfg.get("reasoning_effort"):
         return cfg
     rejected = state.get("_reasoning_rejected") or set()
-    model_id = cfg.get("model")
+    model_id = cfg.get("model")   # effective: the smart pick when routing
     if state.get("_drop_reasoning") or (model_id in rejected and not cfg.get("auto_route")):
         return {**cfg, "reasoning_effort": None}
     return cfg

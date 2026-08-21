@@ -779,3 +779,50 @@ def test_auto_effort_detects(monkeypatch):
     state["cfg"]["route_effort"] = "auto"
     cli._smart_route_turn(state, "what is a dict?")
     assert state["_smart_pick_info"]["difficulty"] == "low"
+
+
+# ---------------------------------------------------------------------------
+# Reasoning × smart routing: table caps consulted, rejections attributed
+# to the PICK (live bug: same model warned twice in one session because the
+# rejection was blamed on the pinned model)
+# ---------------------------------------------------------------------------
+
+def test_smart_pick_reasoning_stripped_from_table_caps(monkeypatch):
+    table = {"models": {"x/noreason": {"caps": {"tools": True,
+                                               "reasoning_with_tools": False},
+                                       "ctx": 9000, "speed": 50,
+                                       "scores": {"chat": 80}}},
+             "frontiers": {"chat": ["x/noreason"]}, "defaults": {}}
+    monkeypatch.setattr(cli.router, "load_table", lambda path=None: table)
+    state = make_state()
+    state["cfg"].update(route_mode="smart", reasoning_effort="high")
+    state["_smart_pick"] = "x/noreason"
+    eff = cli._effective_cfg(state)
+    assert eff["model"] == "x/noreason"
+    assert eff["reasoning_effort"] is None      # stripped BEFORE any doomed call
+    assert state["cfg"]["reasoning_effort"] == "high"   # user setting kept
+
+
+def test_smart_pick_reasoning_kept_when_probed_supported(monkeypatch):
+    table = {"models": {"x/reasons": {"caps": {"tools": True,
+                                              "reasoning_with_tools": True},
+                                      "ctx": 9000, "speed": 50,
+                                      "scores": {"chat": 80}}},
+             "frontiers": {"chat": ["x/reasons"]}, "defaults": {}}
+    monkeypatch.setattr(cli.router, "load_table", lambda path=None: table)
+    state = make_state()
+    state["cfg"].update(route_mode="smart", reasoning_effort="high")
+    state["_smart_pick"] = "x/reasons"
+    assert cli._effective_cfg(state)["reasoning_effort"] == "high"
+
+
+def test_rejection_attributed_to_smart_pick_not_pin(monkeypatch):
+    monkeypatch.setattr("meshapi.config.save_config", lambda cfg: None)
+    state = make_state()
+    state["cfg"].update(model="openai/gpt-5.4", reasoning_effort="high",
+                        route_mode="smart")
+    state["_smart_pick"] = "openai/gpt-3.5-turbo-1106"
+    cli._maybe_drop_reasoning(
+        state, "Unrecognized request argument supplied: reasoning_effort")
+    assert "openai/gpt-3.5-turbo-1106" in state["_reasoning_rejected"]
+    assert "openai/gpt-5.4" not in state["_reasoning_rejected"]
