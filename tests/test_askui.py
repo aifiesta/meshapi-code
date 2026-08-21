@@ -139,3 +139,68 @@ def test_slider_unavailable_off_tty(monkeypatch):
 
 def test_slider_empty_options():
     assert slider("E", []) == ("unavailable", None)
+
+
+# ---- slider layout (regression: fixed cells crammed long labels) ----
+
+LONG_OPTS = [("concise", "Short and direct"),
+             ("default", "Balanced"),
+             ("explanatory", "Narrates the reasoning behind each decision"),
+             ("learning", "Teaching mode")]
+
+
+def _lines(idx, width=78, opts=LONG_OPTS):
+    return text_of(_slider_text(opts, idx, "Output style", "Terse",
+                                "Teaching", term_width=width)).splitlines()
+
+
+def test_labels_never_touch_even_when_longer_than_the_cell():
+    # "explanatory" is 11 chars; the old fixed 10-char cell made adjacent
+    # labels collide and pushed the stops row wider than the rail.
+    stops = [l for l in _lines(0) if "explanatory" in l][0]
+    assert "  explanatory  " in stops
+    for a, b in (("concise", "default"), ("default", "explanatory"),
+                 ("explanatory", "learning")):
+        between = stops.split(a)[1].split(b)[0]
+        assert len(between) >= 2, (a, b, between)
+
+
+def test_marker_aligns_with_the_selected_tick():
+    for idx in range(len(LONG_OPTS)):
+        lines = _lines(idx)
+        marker = next(l for l in lines if "▲" in l)
+        rail = next(l for l in lines if "┬" in l)
+        assert rail[marker.index("▲")] == "┬", idx
+
+
+def test_labels_keep_a_gap_at_every_width():
+    # The invariant is simply that no two labels run together: the stops row
+    # must always split into exactly one token per option. At 34 columns the
+    # untruncated version produced "explanatlearning" as a single word.
+    for width in (30, 34, 40, 46, 60, 78, 120):
+        stops = next(l for l in _lines(0, width) if "concis" in l)
+        assert len(stops.split()) == len(LONG_OPTS), (width, stops)
+
+
+def test_rail_and_stops_row_stay_within_the_terminal():
+    for width in (34, 46, 60, 78, 120):
+        for idx in range(len(LONG_OPTS)):
+            for line in _lines(idx, width):
+                assert len(line) <= width, (width, idx, line)
+
+
+def test_long_description_wraps_instead_of_overrunning():
+    lines = _lines(2, 78)
+    desc = [l for l in lines if "Narrates" in l]
+    assert desc and all(len(l) <= 78 for l in desc)
+
+
+def test_narrow_terminal_shortens_the_hint():
+    assert "to adjust" in "\n".join(_lines(0, 78))
+    assert "to adjust" not in "\n".join(_lines(0, 34))
+
+
+def test_single_stop_does_not_divide_by_zero():
+    out = text_of(_slider_text([("only", "just one")], 0, "T", "L", "R",
+                               term_width=40))
+    assert "only" in out

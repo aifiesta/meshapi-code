@@ -28,7 +28,9 @@ which the caller turns into an ordinary "ask in prose instead" tool result
 """
 from __future__ import annotations
 
+import shutil
 import sys
+import textwrap
 
 from prompt_toolkit.application import Application
 from prompt_toolkit.formatted_text import FormattedText
@@ -284,38 +286,96 @@ _SLIDER_STYLE = Style.from_dict({
     "hint": "#6c6c6c",
 })
 
-_CELL = 10  # column width per stop
+_CELL = 10       # minimum column width per stop
+_GUTTER = 3      # blank columns between adjacent labels
+
+
+def _slider_cell(options: list, avail: int) -> int:
+    """Column width per stop: wide enough for the longest label + a gutter.
+
+    A FIXED cell was the old bug — an 11-char label ("explanatory") in a
+    10-char cell pushed the stops row wider than the rail, so labels touched
+    and the marker stopped lining up with the selection. Shrink only when
+    the terminal genuinely cannot fit it.
+    """
+    longest = max((len(v) for v, _ in options), default=0)
+    n = max(1, len(options))
+    cell = max(_CELL, longest + _GUTTER)
+    if cell * n > avail:
+        # Fitting the terminal wins over showing whole labels: an overflowing
+        # rail wraps and the whole widget falls apart, whereas a truncated
+        # label is still readable. Never returns a width that overflows.
+        cell = max(3, avail // n)
+    return cell
 
 
 def _slider_text(options: list, idx: int, title: str,
-                 left_label: str, right_label: str) -> FormattedText:
+                 left_label: str, right_label: str,
+                 term_width: int = None) -> FormattedText:
     """Pure renderer for the slider frame. options: [(value, desc), ...]."""
     n = len(options)
-    width = n * _CELL
+    if term_width is None:
+        try:
+            term_width = shutil.get_terminal_size((80, 24)).columns
+        except Exception:
+            term_width = 80
+    avail = max(20, term_width - 2)
+    cell = _slider_cell(options, avail)
+    width = n * cell
+    centers = [i * cell + cell // 2 for i in range(n)]
+
     out: list = [("class:title", f" {title}\n\n")]
-    # end labels
-    out.append(("class:endlabel", " " + left_label.ljust(width - len(right_label) - 1)
-                + right_label + "\n"))
-    # marker row
-    marker_pad = idx * _CELL + (_CELL // 2 - 1)
-    out.append(("", " " * (marker_pad + 1)))
+
+    # End labels, on one line only if they fit; otherwise the rail speaks
+    # for itself and they are dropped rather than wrapped into noise.
+    if len(left_label) + len(right_label) + 2 <= min(width, avail):
+        gap = width - len(left_label) - len(right_label)
+        out.append(("class:endlabel",
+                    " " + left_label + " " * gap + right_label + "\n"))
+
+    # Marker, centered over the selected stop.
+    out.append(("", " " * (centers[idx] + 1)))
     out.append(("class:marker", "▲"))
     out.append(("", "\n"))
-    # rail
-    out.append(("class:rail", " " + "─" * width + "\n"))
-    # stops row
+
+    # Rail with a tick under each stop, so labels read as positions.
+    rail = ["─"] * width
+    for c in centers:
+        if 0 <= c < width:
+            rail[c] = "┬"
+    out.append(("class:rail", " " + "".join(rail) + "\n"))
+
+    # Stops row: each label centered in its own cell.
     out.append(("", " "))
     for i, (value, _desc) in enumerate(options):
-        label = value.center(_CELL)
-        out.append(("class:stop.sel" if i == idx else "class:stop", label))
+        # Truncate to cell-1 so every cell keeps at least one blank column:
+        # at the narrowest widths full-width labels ran together
+        # ("explanatlearning") and read as a single garbled word.
+        out.append(("class:stop.sel" if i == idx else "class:stop",
+                    value[:max(1, cell - 1)].center(cell)))
     out.append(("", "\n"))
-    # description of the selected stop
+
+    # Description of the selected stop: wrapped, never overrunning the rail.
     desc = options[idx][1]
     if desc:
-        pad = max(0, idx * _CELL + _CELL // 2 - len(desc) // 2)
-        pad = min(pad, max(0, width - len(desc)))
-        out.append(("class:desc", " " * (pad + 1) + desc + "\n"))
-    out.append(("class:hint", "\n ←/→ to adjust · Enter to confirm · Esc to cancel"))
+        out.append(("", "\n"))
+        lines = textwrap.wrap(desc, avail) or [desc]
+        # A short description reads as a caption on the selected stop, so
+        # centre it there. A long one is prose — indenting it under the
+        # marker just makes a ragged column, so run it flush left.
+        if len(lines) == 1 and len(lines[0]) <= width:
+            pad = min(max(0, centers[idx] - len(lines[0]) // 2),
+                      max(0, width - len(lines[0])))
+        else:
+            pad = 0
+        for line in lines:
+            out.append(("class:desc", " " * (pad + 1) + line + "\n"))
+
+    # Degrade the hint on narrow terminals rather than let it wrap into a
+    # second line — same posture as the status bar.
+    hint = ("←/→ to adjust · Enter to confirm · Esc to cancel"
+            if avail >= 50 else "←/→ · Enter · Esc")
+    out.append(("class:hint", "\n " + hint))
     return FormattedText(out)
 
 
