@@ -229,6 +229,19 @@ def normalize_weights(w: "dict | None") -> dict:
     return {k: v / total for k, v in out.items()}
 
 
+ESCALATION_LADDER = ("low", "mid", "high", "xhigh", "max")
+
+
+def escalate(level: str, steps: int = 1) -> str:
+    """Next level up the effort ladder — the cascade's escalation step."""
+    lvl = _EFFORT_ALIAS.get(level, level)
+    try:
+        i = ESCALATION_LADDER.index(lvl)
+    except ValueError:
+        i = 1
+    return ESCALATION_LADDER[min(len(ESCALATION_LADDER) - 1, i + steps)]
+
+
 def effective_weights(w: "dict | None", level: str) -> dict:
     """The weights a pick actually uses: user weights tilted by effort."""
     return difficulty_adjust(w, _EFFORT_ALIAS.get(level, level))
@@ -237,7 +250,8 @@ def effective_weights(w: "dict | None", level: str) -> dict:
 def pick(cohort: str, weights: "dict | None", table: "dict | None",
          catalog: "list | None", *, needs_tools: bool = False,
          needs_ctx: int = 0, incumbent: "str | None" = None,
-         exclude: "set | None" = None) -> "dict | None":
+         exclude: "set | None" = None,
+         incumbent_bonus: float = 0.0) -> "dict | None":
     """Choose a model for `cohort`. Returns {model, cohort, ranked, sticky}
     or None (caller falls back). Pure — no I/O, no mutation."""
     try:
@@ -292,9 +306,16 @@ def pick(cohort: str, weights: "dict | None", table: "dict | None",
         denom = math.log10(max_cost + 1) or 1.0
 
         def score(t):
-            _, q, cost, sp = t
+            mid, q, cost, sp = t
             cost_n = 100 * (1 - math.log10(cost + 1) / denom)
-            return w["cost"] * cost_n + w["cap"] * q + w["speed"] * sp
+            base = w["cost"] * cost_n + w["cap"] * q + w["speed"] * sp
+            # Switching models discards the provider's prompt cache and
+            # re-sends the whole history. The incumbent therefore carries a
+            # bonus proportional to how much cached context is at stake —
+            # a marginal score win shouldn't pay a real cache bill.
+            if incumbent_bonus and mid == incumbent:
+                base += incumbent_bonus
+            return base
 
         ranked = sorted(cands, key=score, reverse=True)
         top = [t[0] for t in ranked[:3]]

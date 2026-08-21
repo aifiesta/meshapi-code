@@ -581,6 +581,78 @@ def _maybe_drop_reasoning(state: dict, message: str) -> bool:
     return True
 
 
+def _switch_cost_bonus(state: dict) -> float:
+    """Score bonus for staying on the incumbent, scaled by cached context.
+
+    Switching re-sends the whole history to a new provider and throws away
+    the prompt cache. Early in a turn that's nearly free; 40k tokens in it
+    is a real bill, so the incumbent has to be genuinely beaten, not
+    marginally edged out. Capped so it can never trap a turn on a model
+    that stops working (the blacklist path ignores this entirely).
+    """
+    try:
+        tokens = compact.est_history_tokens(state.get("messages") or [])
+    except Exception:
+        return 0.0
+    return min(12.0, tokens / 2500.0)
+
+
+def _smart_escalate(state: dict, reason: str) -> bool:
+    """Cascade step: the current model is visibly struggling — move UP the
+    effort ladder for the rest of this turn and re-pick.
+
+    This is the reactive half of routing. Prediction picks the first model;
+    evidence picks the next one. Signals come from instrumentation the CLI
+    already had: placeholder-riddled writes (quality guard), repeated
+    malformed tool calls (doom streak), and repeated identical actions
+    (stall detector). Bounded to 2 escalations per turn so a genuinely
+    hard task climbs to a frontier model but a broken one can't spend
+    forever.
+    """
+    cfg = state["cfg"]
+    if cfg.get("route_mode") != "smart":
+        return False
+    if state.get("_smart_escalations", 0) >= 2:
+        return False
+    try:
+        table = router.load_table()
+        catalog = state.get("models_cache")
+        if not table or not catalog:
+            return False
+        cohort = state.get("_smart_cohort") or "chat"
+        cur = state.get("_smart_difficulty") or "mid"
+        nxt = router.escalate(cur)
+        if nxt == cur:
+            return False       # already at the top — nothing to escalate to
+        weights = router.effective_weights(cfg.get("route_weights"), nxt)
+        needs_ctx = int(compact.est_history_tokens(state.get("messages") or [])
+                        * 1.3) + 4096
+        info = router.pick(cohort, weights, table, catalog, needs_tools=True,
+                           needs_ctx=needs_ctx, incumbent=None,  # escalating: no stickiness
+                           exclude=state.get("_smart_bad"))
+        if not info or not info.get("model"):
+            return False
+        prev = state.get("_smart_pick")
+        state["_smart_escalations"] = state.get("_smart_escalations", 0) + 1
+        state["_smart_difficulty"] = nxt
+        info["difficulty"] = nxt
+        info["escalated"] = True
+        state["_smart_pick_info"] = info
+        state["_smart_pick"] = info["model"]
+        state["_smart_last"] = info["model"]
+        if info["model"] != prev:
+            console.print(
+                f"[yellow]⚙ escalating: {reason} → effort {nxt}, switching to "
+                f"{info['model']}[/yellow]"
+            )
+        # True = an escalation was APPLIED (difficulty raised, pick recomputed).
+        # The model may legitimately stay the same if it still wins at the
+        # higher effort — that's a valid outcome, not a failed escalation.
+        return True
+    except Exception:
+        return False
+
+
 def _smart_reroute_step(state: dict, step_title: str) -> None:
     """Re-pick the model when a plan step starts.
 
@@ -601,7 +673,11 @@ def _smart_reroute_step(state: dict, step_title: str) -> None:
         catalog = state.get("models_cache")
         if not table or not catalog:
             return
-        cohort, _ = router.classify(step_title, has_tools=True)
+        cohort, conf = router.classify(step_title, has_tools=True)
+        # Step titles are terse ("create utils.js"); when the title carries no
+        # real signal, the turn's own cohort is the better guess.
+        if conf <= 0.5 and state.get("_smart_cohort"):
+            cohort = state["_smart_cohort"]
         forced = cfg.get("route_effort", "auto")
         difficulty = (forced if forced != "auto"
                       else router.estimate_difficulty(step_title))
@@ -617,7 +693,8 @@ def _smart_reroute_step(state: dict, step_title: str) -> None:
                      if prev_difficulty == difficulty else None)
         info = router.pick(cohort, weights, table, catalog, needs_tools=True,
                            needs_ctx=needs_ctx, incumbent=incumbent,
-                           exclude=state.get("_smart_bad"))
+                           exclude=state.get("_smart_bad"),
+                           incumbent_bonus=_switch_cost_bonus(state))
         if not info or not info.get("model"):
             return
         prev = state.get("_smart_pick")
@@ -1864,6 +1941,10 @@ def handle_tool_calls(tool_calls: list, state: dict) -> dict:
             doomed_n += 1
             streaks = state.setdefault("doom_streak", {})
             streaks[name] = streaks.get(name, 0) + 1
+            if streaks[name] == 2:
+                # Twice in a row unable to emit valid arguments for the same
+                # tool — a capability problem, not bad luck.
+                _smart_escalate(state, f"repeated malformed {name} calls")
             result = _doom_feedback(p, streaks[name])
             first_line = result.splitlines()[0]
             console.print(f"[yellow]  → skipped {name}: {_rich_escape(first_line)}[/yellow]")
@@ -2455,6 +2536,7 @@ def main() -> None:
         turn_request_ids: list = []          # for the authoritative cost lookup
         turn_started_iso = _utc_now_iso()
         state["_compact_exhausted"] = False  # re-arm compaction each user turn
+        state["_smart_escalations"] = 0       # cascade budget, per user turn
         state["_drop_reasoning"] = False      # re-test reasoning support each turn
         # Quality guard resets: new turn, new deliverables. Suppressed for
         # the whole turn when the user explicitly asked for scaffolding.
@@ -2688,6 +2770,11 @@ def main() -> None:
                             and (not _hop_limit or hopped < _hop_limit)):
                         state["quality_hop_fired"] = True
                         state["quality_fix_msg"] = _stub_fix_message(state["stub_files"])
+                        # Placeholder-riddled output is the clearest possible
+                        # evidence the model is out of its depth — escalate
+                        # the fix-it hop rather than asking the same model to
+                        # do better on a second try.
+                        _smart_escalate(state, "output had placeholder markers")
                         _p0, _ev0 = next(iter(state["stub_files"].items()))
                         _more = (
                             f" — and {len(state['stub_files']) - 1} more file(s)"
@@ -2726,6 +2813,7 @@ def main() -> None:
                     ),
                 )
                 if _action in ("nudge", "renudge"):
+                    _smart_escalate(state, "model is repeating the same action")
                     state["stall_nudge_msg"] = (
                         _STALL_NUDGE if _action == "nudge" else _STALL_RENUDGE
                     )

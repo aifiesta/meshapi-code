@@ -1009,3 +1009,104 @@ def test_step_reroute_stickiness_holds_at_equal_difficulty(monkeypatch):
     cli._smart_reroute_step(state, "create utils.js")      # also low
     assert state["_smart_pick"] == "cheap/fast"
     assert state["_smart_pick_info"].get("sticky") is True
+
+
+# ---------------------------------------------------------------------------
+# Cascade: escalate on EVIDENCE of failure (the reactive half of routing)
+# ---------------------------------------------------------------------------
+
+def test_escalate_moves_up_the_ladder_and_switches(monkeypatch):
+    state = _plan_state(monkeypatch)
+    state["_smart_cohort"] = "coding"
+    state["_smart_difficulty"] = "low"
+    state["_smart_pick"] = state["_smart_last"] = "cheap/fast"
+    assert cli._smart_escalate(state, "test") is True
+    assert state["_smart_difficulty"] == "mid"
+    assert state["_smart_pick_info"]["escalated"] is True
+    # a second escalation reaches an effort where the strong model wins
+    cli._smart_escalate(state, "still struggling")
+    assert state["_smart_difficulty"] == "high"
+    assert state["_smart_pick"] == "strong/slow"
+
+
+def test_escalation_is_budgeted_per_turn(monkeypatch):
+    state = _plan_state(monkeypatch)
+    state["_smart_cohort"] = "coding"
+    state["_smart_difficulty"] = "low"
+    state["_smart_pick"] = "cheap/fast"
+    cli._smart_escalate(state, "1")
+    cli._smart_escalate(state, "2")
+    before = state["_smart_difficulty"]
+    assert cli._smart_escalate(state, "3") is False      # budget exhausted
+    assert state["_smart_difficulty"] == before
+
+
+def test_escalate_inert_when_not_smart(monkeypatch):
+    state = _plan_state(monkeypatch)
+    state["cfg"]["route_mode"] = "off"
+    assert cli._smart_escalate(state, "x") is False
+
+
+def test_escalate_at_top_of_ladder_is_noop(monkeypatch):
+    state = _plan_state(monkeypatch)
+    state["_smart_cohort"] = "coding"
+    state["_smart_difficulty"] = "max"
+    assert cli._smart_escalate(state, "x") is False
+
+
+def test_escalate_never_raises(monkeypatch):
+    state = _plan_state(monkeypatch)          # sets load_table…
+    monkeypatch.setattr(cli.router, "load_table",   # …then break it
+                        lambda path=None: (_ for _ in ()).throw(RuntimeError("x")))
+    assert cli._smart_escalate(state, "x") is False
+
+
+def test_escalate_honors_blacklist(monkeypatch):
+    state = _plan_state(monkeypatch)
+    state["_smart_cohort"] = "coding"
+    state["_smart_difficulty"] = "low"
+    state["_smart_bad"] = {"strong/slow"}
+    cli._smart_escalate(state, "x")
+    assert state["_smart_pick"] != "strong/slow"
+
+
+# ---------------------------------------------------------------------------
+# Switch cost: cached context makes the incumbent harder to displace
+# ---------------------------------------------------------------------------
+
+def test_switch_cost_bonus_scales_with_history():
+    small = make_state()
+    small["messages"] = [{"role": "user", "content": "hi"}]
+    big = make_state()
+    big["messages"] = [{"role": "user", "content": "x" * 200_000}]
+    assert cli._switch_cost_bonus(small) < 1.0
+    assert cli._switch_cost_bonus(big) == 12.0        # capped
+
+
+def test_switch_cost_keeps_incumbent_on_marginal_gain():
+    """A ~4-point score edge shouldn't pay a 40k-token cache bill."""
+    table = {"models": {
+        "a/inc": {"caps": {"tools": True}, "ctx": 200000, "speed": 70,
+                  "scores": {"chat": 70}},
+        "b/new": {"caps": {"tools": True}, "ctx": 200000, "speed": 74,
+                  "scores": {"chat": 73}}},
+        "frontiers": {"chat": ["b/new", "a/inc"]}, "defaults": {}}
+    cat = [{"id": "a/inc", "pricing": {"prompt_usd_per_1m": "1", "completion_usd_per_1m": "2"}},
+           {"id": "b/new", "pricing": {"prompt_usd_per_1m": "1", "completion_usd_per_1m": "2"}}]
+    w = {"cost": 0.2, "cap": 0.6, "speed": 0.2}
+    # Assert on the SCORING, not the final model: stickiness already keeps a
+    # top-3 incumbent, so the bonus is only visible in the ranking order.
+    no_bonus = cli.router.pick("chat", w, table, cat, needs_tools=True,
+                               incumbent_bonus=0)
+    assert no_bonus["ranked"][0]["model"] == "b/new"     # better model wins
+    bonus = cli.router.pick("chat", w, table, cat, needs_tools=True,
+                            incumbent="a/inc", incumbent_bonus=12)
+    assert bonus["ranked"][0]["model"] == "a/inc"        # cache affinity wins
+    assert bonus["model"] == "a/inc"
+
+
+def test_vague_step_title_inherits_turn_cohort(monkeypatch):
+    state = _plan_state(monkeypatch)
+    state["_smart_cohort"] = "coding"
+    cli._smart_reroute_step(state, "finish it")        # no signal in the title
+    assert state["_smart_pick_info"]["cohort"] == "coding"
