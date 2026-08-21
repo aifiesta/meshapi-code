@@ -451,7 +451,7 @@ def _retry_wait(state: dict, attempt: int, reason: str,
 # type "/model X" while watching a long run go sideways.
 LIVE_CONTROL_COMMANDS = (
     "/model", "/reasoning", "/route", "/fallback", "/mode", "/hops",
-    "/stall", "/optimize", "/compact", "/effort",
+    "/stall", "/optimize", "/compact", "/effort", "/style",
 )
 
 

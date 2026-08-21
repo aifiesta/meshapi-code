@@ -58,6 +58,8 @@ DEFAULT_CONFIG = {
     # Effort: "auto" detects prompt difficulty (low/mid/high) and tilts the
     # weights; low|medium|high|xhigh|max forces the tilt for every prompt.
     "route_effort": "auto",
+    # How the assistant writes (prose only — never tool access or scope).
+    "output_style": "default",
     # Models observed rejecting reasoning_effort (with tools) — skipped
     # without a doomed retry in future sessions. Evidence-based cache.
     "reasoning_rejected_models": [],
@@ -163,6 +165,11 @@ def load_config() -> dict:
     rw = cfg.get("route_weights") or {}
     if rw.get("cap") == "auto" or "difficulty" in rw:
         cfg["route_weights"] = dict(DEFAULT_CONFIG["route_weights"])
+    # A hand-edited or stale output_style must degrade to default rather
+    # than silently injecting nothing while the UI claims a style is on.
+    from . import styles as _styles
+    cfg["output_style"] = (_styles.normalize(cfg.get("output_style"))
+                           or _styles.DEFAULT)
     # `route` (cheapest/fastest/balanced) never existed gateway-side and was
     # replaced by auto_route in 0.5.0 — drop the stale key from old configs
     # (it disappears from disk on the next save_config).

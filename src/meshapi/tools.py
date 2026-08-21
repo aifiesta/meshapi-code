@@ -121,7 +121,15 @@ def build_system_prompt(cfg: dict) -> str:
         )
     except Exception:
         block = ""
-    return prompt + (("\n\n" + block) if block else "")
+    prompt = prompt + (("\n\n" + block) if block else "")
+    # Output style LAST: it is an instruction about prose, and recency wins
+    # on cheap models (the same reason the stub-guard nudge rides last).
+    try:
+        from . import styles
+        style = styles.block(cfg.get("output_style"))
+    except Exception:
+        style = ""
+    return prompt + (("\n\n" + style) if style else "")
 
 # OpenAI-compatible tool spec — Mesh API forwards these to the underlying provider.
 TOOLS = [

@@ -167,6 +167,30 @@ def _set_effort(state: dict, level: str) -> None:
         )
 
 
+def _set_style(state: dict, value: str) -> None:
+    """Persist an output style AND apply it to the live session.
+
+    The system prompt is built once at session start, so writing config
+    alone would leave the running turn on the old style — the setting would
+    look applied and do nothing until /clear. Rebuild message[0] in place.
+    """
+    from . import styles as _styles
+    canon = _styles.normalize(value)
+    if canon is None:
+        console.print(
+            f"[red]Unknown output style {value!r}. Options: "
+            f"{', '.join(_styles.ORDER)}[/red]")
+        return
+    state["cfg"]["output_style"] = canon
+    save_config(state["cfg"])
+    msgs = state.get("messages") or []
+    if msgs and msgs[0].get("role") == "system":
+        msgs[0]["content"] = build_system_prompt(state["cfg"])
+    console.print(
+        f"[dim]Output style {_styles.label(canon)} — "
+        f"{_styles.describe(canon)}.[/dim]")
+
+
 def _fmt_weights(w: dict, effort: str = "auto") -> str:
     eff = "effort=auto (per-prompt)" if effort == "auto" else f"effort={effort}"
     return (f"cost={w['cost']:.2f} cap={w['cap']:.2f} "
@@ -371,7 +395,7 @@ def resolve_command(name: str) -> "tuple[str | None, list]":
     returns the candidates for a helpful message. (None, []) = unknown.
     """
     from .completer import COMMANDS  # lazy: completer imports this module
-    known = set(COMMANDS) | {"/exit", "/quit", "/q", "/effort"}
+    known = set(COMMANDS) | {"/exit", "/quit", "/q", "/effort", "/style"}
     if name in known:
         return name, [name]
     matches = sorted(c for c in known if c.startswith(name))
@@ -478,6 +502,41 @@ def handle_command(cmd: str, state: dict) -> bool:
                 )
             else:
                 console.print(f"[dim]Current model: {state['cfg']['model']}[/dim]")
+
+    elif name == "/style":
+        from . import styles as _styles
+        sub = arg.strip()
+        if not sub:
+            # Interactive picker, same widget as /effort and /route.
+            from . import askui as _askui
+            import contextlib as _ctx
+            watcher = state.get("watcher")
+            ctx = watcher.paused() if watcher is not None else _ctx.nullcontext()
+            cur = _styles.normalize(state["cfg"].get("output_style")) or _styles.DEFAULT
+            try:
+                with ctx:
+                    status, picked = _askui.slider(
+                        "Output style", _styles.options(), current=cur,
+                        left_label="Terse", right_label="Teaching")
+            except Exception:
+                status, picked = "unavailable", None
+            if status == "picked":
+                if picked != cur:
+                    _set_style(state, picked)
+                else:
+                    console.print(
+                        f"[dim]Output style stays {_styles.label(cur)}.[/dim]")
+                return True
+            if status == "cancelled":
+                console.print("[dim]Cancelled.[/dim]")
+                return True
+            # non-tty: report, don't guess
+            console.print(
+                f"[dim]Output style {_styles.label(cur)} — "
+                f"{_styles.describe(cur)}. Set with /style "
+                f"{'|'.join(_styles.ORDER)}.[/dim]")
+            return True
+        _set_style(state, sub)
 
     elif name == "/effort":
         # First-class shortcut — effort is a primary control, not a /route
@@ -1108,7 +1167,7 @@ def handle_command(cmd: str, state: dict) -> bool:
             "/effort <auto|low..max>    routing depth (how strong a model to pick)\n"
             "/hops <n|off>              pause turns after n tool hops (off = unlimited)\n"
             "/compact [now|auto on|off] context usage + history compaction\n"
-            "/stall pause|keep-going    what to do when the model repeats itself\n"
+            "/stall pause|keep-going    what to do when the model repeats itself\n"            "/style [concise|default|explanatory|learning]  how answers are written\n"
             "/optimize <dial>           token savings, beta: 0 off, up to 0.95\n"
             "/memory [notes|clear|on|off]  repo memory: map + notes from past sessions\n"
             "/login                     set or replace your API key\n"
