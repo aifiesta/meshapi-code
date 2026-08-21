@@ -104,3 +104,42 @@ def test_no_tool_names_in_style_prose():
         for name in ("read_file", "write_file", "run_bash", "start_server",
                      "web_search", "create_plan", "update_step", "ask_user"):
             assert name not in text
+
+
+# ---- each style must FORBID or REQUIRE something the others don't ----
+# Regression: the first version described intent ("as few words as the
+# question allows") and all three styles produced the same numbered list
+# with an "Overall..." summary. Vague guidance at the end of a ~2.5k-token
+# system prompt is indistinguishable from no guidance on a cheap model.
+
+def test_concise_forbids_lists_and_summaries():
+    t = styles.block("concise").lower()
+    assert "list" in t and "unless the user" in t      # lists gated, not banned
+    assert "in summary" in t and "overall" in t        # names the exact closers
+    assert "80 words" in t                             # a checkable budget
+
+
+def test_explanatory_requires_an_explicit_tradeoff():
+    t = styles.block("explanatory").lower()
+    assert "trade-off" in t
+    assert "at least one" in t                         # a requirement, not a hint
+    assert "feature list" in t                         # names what it replaces
+
+
+def test_learning_requires_a_concrete_try_this_line():
+    t = styles.block("learning")
+    assert "Try this:" in t
+    assert "analogy" in t.lower() and "worked example" in t.lower()
+
+
+def test_the_three_styles_are_mutually_distinguishable():
+    # No two style texts may be near-duplicates: each must contain a rule
+    # absent from the others, which is what makes one answer tell them apart.
+    marks = {"concise": "80 words",
+             "explanatory": "trade-off",
+             "learning": "Try this:"}
+    for name, mark in marks.items():
+        assert mark.lower() in styles.block(name).lower()
+        for other in marks:
+            if other != name:
+                assert mark.lower() not in styles.block(other).lower(), (name, other)

@@ -16,6 +16,14 @@ to it).
 DEFAULT = "default"
 
 # value -> (label, one-line description for the picker, system-prompt text)
+#
+# These texts are PRESCRIPTIVE on purpose. The first version described an
+# intent ("answer in as few words as the question allows") and every style
+# produced the same numbered list with an "Overall..." summary — on a cheap
+# model a vague instruction at the end of a ~2.5k-token system prompt is
+# indistinguishable from no instruction. Each style now names the concrete
+# structures it requires and the ones it forbids, and each forbids something
+# the others allow, so the difference is visible in one answer.
 STYLES = {
     "default": (
         "Default",
@@ -24,40 +32,48 @@ STYLES = {
     ),
     "concise": (
         "Concise",
-        "Short and direct — minimal prose, no preamble",
-        "OUTPUT STYLE — CONCISE. Answer in as few words as the question "
-        "honestly allows. No preamble, no restating the request, no summary "
-        "of what you just did unless the user asked for one. Prefer a short "
-        "sentence or a tight list over a paragraph. Skip pleasantries and "
-        "self-narration entirely. Never pad a short answer to look thorough. "
-        "Brevity applies to PROSE ONLY — never shorten actual work: write "
-        "complete files, run every step the task needs, and never replace "
-        "real content with a placeholder to save space.",
+        "Short and direct — answer first, no lists, no summary",
+        "OUTPUT STYLE — CONCISE. Lead with the direct answer in your first "
+        "sentence. Keep an explanatory reply under about 80 words. Do NOT "
+        "use a numbered or bulleted list unless the user explicitly asked "
+        "for a list or for steps — write prose. Do NOT end with a summary "
+        "or restatement; closing lines that begin 'Overall', 'In summary', "
+        "'In essence' or 'In conclusion' are forbidden. No preamble, no "
+        "restating the question, no narrating what you are about to do, no "
+        "offers of further help. Stop as soon as the question is answered. "
+        "This governs PROSE ONLY — never shorten the actual work: write "
+        "complete files, run every step the task needs, and never substitute "
+        "a placeholder for real content to save space.",
     ),
     "explanatory": (
         "Explanatory",
-        "Narrates the reasoning and trade-offs behind each decision",
-        "OUTPUT STYLE — EXPLANATORY. As you work, explain the reasoning "
-        "behind your decisions: why this approach over the alternatives, "
-        "what trade-off you accepted, what you ruled out and on what "
-        "evidence. When you touch an unfamiliar part of the codebase, say "
-        "briefly what it does and how it fits. Keep explanations tied to the "
-        "concrete work in front of you — this is commentary on real "
-        "decisions, not a general tutorial, and it never replaces doing the "
-        "work.",
+        "Digs into mechanism and trade-offs, not just what",
+        "OUTPUT STYLE — EXPLANATORY. Go past WHAT something is to HOW and "
+        "WHY it works: the mechanism underneath, the reason it is built that "
+        "way, and what it is traded off against. Every answer must name at "
+        "least one explicit trade-off, limitation or alternative that was "
+        "given up — phrase it as a contrast ('X buys you Y at the cost of "
+        "Z'). When you are doing work rather than answering a question, "
+        "narrate the decisions: why this approach over the alternative you "
+        "rejected, and on what evidence. Do not pad with definitions the "
+        "user already has, and do not merely list features — a bare feature "
+        "list with no causal explanation is exactly what this style exists "
+        "to replace.",
     ),
     "learning": (
         "Learning",
-        "Teaching mode — explains concepts and invites you to try things",
-        "OUTPUT STYLE — LEARNING. Treat the user as someone who wants to "
-        "understand the material, not just receive a result. Explain the "
-        "underlying concept when one is doing real work in your solution, "
-        "name the pattern or technique you used so it can be looked up, and "
-        "point out the mistake that the approach avoids. Where a small piece "
-        "of the task would teach more by being done than read, offer it to "
-        "the user as an optional exercise — then, unless they take it up, "
-        "finish the whole task yourself. Never leave work undone in the name "
-        "of teaching.",
+        "Teaching mode — analogy, worked example, then one thing to try",
+        "OUTPUT STYLE — LEARNING. Teach the idea rather than reciting it. "
+        "Name the underlying concept explicitly so it can be looked up, and "
+        "ground it in ONE concrete analogy or a small worked example with "
+        "real values — not an abstract description. Call out the mistake or "
+        "misconception the idea protects against. End EVERY reply with a "
+        "single final line that starts with 'Try this:' proposing one small "
+        "concrete thing the user can do or check for themselves to test "
+        "their understanding. Where a piece of the task would teach more by "
+        "being done than read, offer it as an optional exercise — then, "
+        "unless the user takes it up, finish the whole task yourself. Never "
+        "leave work undone in the name of teaching.",
     ),
 }
 
