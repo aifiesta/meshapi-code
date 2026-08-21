@@ -419,3 +419,26 @@ def test_asks_for_action():
     assert asks_for_action("create a file called x.txt")
     assert asks_for_action("fix the failing test")
     assert not asks_for_action("what is the capital of France?")
+
+
+# ---- continuation detection (regression: the <25-char inheritance bug) ----
+
+def test_is_continuation_accepts_real_followups():
+    for t in ("2", "yes", "y", "ok", "ok.", "continue", "do it", "keep going",
+              "next", "proceed", "again", "sure", "thanks", ""):
+        assert router.is_continuation(t), t
+
+
+def test_is_continuation_rejects_short_self_contained_tasks():
+    # All under the old 25-char threshold, all genuinely new tasks. The bug:
+    # "write an essay on LLMs" (22 chars) inherited the previous agentic
+    # cohort and was routed to a code model.
+    for t in ("write an essay on LLMs", "fix the bug", "create notes.txt",
+              "summarize this file", "add a login page"):
+        assert not router.is_continuation(t), t
+
+
+def test_short_essay_prompt_classifies_as_writing():
+    cohort, conf = router.classify("write an essay on LLMs", has_tools=True)
+    assert cohort == "writing"
+    assert conf > 0.5

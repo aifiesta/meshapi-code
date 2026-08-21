@@ -147,6 +147,30 @@ _CONSTRAINT_RE = re.compile(
     r"step[- ]by[- ]step)\b", re.I)
 
 
+# Replies that answer WITHIN an ongoing task rather than starting a new one.
+# Length alone is NOT the test: "write an essay on LLMs" is 22 chars and is a
+# brand-new task, but a <25-char rule inherited the previous turn's cohort and
+# routed it as agentic (seen live). Match the shape of a continuation instead.
+_CONTINUATION_RE = re.compile(
+    r"^(y|n|ok|okay|yes|yeah|no|nope|sure|go|go on|go ahead|do it|do that|"
+    r"continue|carry on|keep going|next|proceed|again|more|retry|resume|"
+    r"stop|wait|thanks|thank you|please|fix it|same|both|either|neither|"
+    r"\d+|[^\w]*)$", re.IGNORECASE)
+
+
+def is_continuation(text: str) -> bool:
+    """True when *text* reads as an answer inside a task, not a new task.
+
+    Pure and side-effect free so the CLI seam stays testable.
+    """
+    t = " ".join((text or "").strip().split()).rstrip(".!?,")
+    if not t:
+        return True
+    if len(t) > 24:          # long enough to carry its own instruction
+        return False
+    return bool(_CONTINUATION_RE.match(t))
+
+
 def estimate_difficulty(text: str) -> str:
     """"low" | "mid" | "high" from surface signals. Deterministic."""
     t = (text or "").strip()

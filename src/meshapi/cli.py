@@ -830,17 +830,23 @@ def _smart_route_turn(state: dict, user_input: str, had_image: bool = False) -> 
         )
         # Short follow-ups ("2", "yes", "continue") are answers WITHIN the
         # ongoing task, not new tasks — inherit the conversation's cohort
-        # instead of reclassifying three characters of text.
+        # instead of reclassifying three characters of text. Judge that by
+        # SHAPE, not length: a bare "<25 chars" rule swallowed "write an
+        # essay on LLMs" (22 chars) and routed a writing task as agentic.
+        # A low-confidence short line still inherits — that is the genuinely
+        # ambiguous case the original rule was reaching for.
+        inherit = bool(
+            state.get("_smart_cohort") and not had_image
+            and (router.is_continuation(user_input)
+                 or (_conf <= 0.5 and len(user_input.strip()) < 25)))
         forced = cfg.get("route_effort", "auto")
         if forced != "auto":
             difficulty = forced                      # user pinned the effort
-        elif (len(user_input.strip()) < 25 and state.get("_smart_cohort")
-                and not had_image):
+        elif inherit:
             difficulty = state.get("_smart_difficulty") or "mid"
         else:
             difficulty = router.estimate_difficulty(user_input)
-        if (len(user_input.strip()) < 25 and state.get("_smart_cohort")
-                and not had_image):
+        if inherit:
             cohort = state["_smart_cohort"]
         state["_smart_cohort"] = cohort
         state["_smart_difficulty"] = difficulty
