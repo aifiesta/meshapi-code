@@ -1110,3 +1110,49 @@ def test_vague_step_title_inherits_turn_cohort(monkeypatch):
     state["_smart_cohort"] = "coding"
     cli._smart_reroute_step(state, "finish it")        # no signal in the title
     assert state["_smart_pick_info"]["cohort"] == "coding"
+
+
+def test_de_escalation_after_clean_hops(monkeypatch):
+    state = _plan_state(monkeypatch)
+    state.update(_smart_cohort="coding", _smart_difficulty="high",
+                 _smart_base_difficulty="low", _smart_escalations=1,
+                 _smart_pick="strong/slow", _smart_last="strong/slow",
+                 _smart_clean_hops=3)
+    cli._smart_de_escalate(state)
+    assert state["_smart_difficulty"] == "mid"
+    assert state["_smart_clean_hops"] == 0           # streak consumed
+
+
+def test_de_escalation_needs_the_full_streak(monkeypatch):
+    state = _plan_state(monkeypatch)
+    state.update(_smart_cohort="coding", _smart_difficulty="high",
+                 _smart_base_difficulty="low", _smart_escalations=1,
+                 _smart_clean_hops=2)                # one short
+    cli._smart_de_escalate(state)
+    assert state["_smart_difficulty"] == "high"
+
+
+def test_de_escalation_never_below_the_turn_baseline(monkeypatch):
+    state = _plan_state(monkeypatch)
+    state.update(_smart_cohort="coding", _smart_difficulty="high",
+                 _smart_base_difficulty="high", _smart_escalations=1,
+                 _smart_clean_hops=5)
+    cli._smart_de_escalate(state)
+    assert state["_smart_difficulty"] == "high"      # baseline IS the floor
+
+
+def test_de_escalation_inert_without_escalation(monkeypatch):
+    state = _plan_state(monkeypatch)
+    state.update(_smart_cohort="coding", _smart_difficulty="mid",
+                 _smart_escalations=0, _smart_clean_hops=9)
+    cli._smart_de_escalate(state)
+    assert state["_smart_difficulty"] == "mid"
+
+
+def test_de_escalation_respects_pinned_effort(monkeypatch):
+    state = _plan_state(monkeypatch, effort="max")
+    state.update(_smart_cohort="coding", _smart_difficulty="max",
+                 _smart_base_difficulty="low", _smart_escalations=1,
+                 _smart_clean_hops=9)
+    cli._smart_de_escalate(state)
+    assert state["_smart_difficulty"] == "max"       # user pinned it

@@ -634,6 +634,7 @@ def _smart_escalate(state: dict, reason: str) -> bool:
             return False
         prev = state.get("_smart_pick")
         state["_smart_escalations"] = state.get("_smart_escalations", 0) + 1
+        state["_smart_clean_hops"] = 0
         state["_smart_difficulty"] = nxt
         info["difficulty"] = nxt
         info["escalated"] = True
@@ -651,6 +652,61 @@ def _smart_escalate(state: dict, reason: str) -> bool:
         return True
     except Exception:
         return False
+
+
+def _smart_de_escalate(state: dict) -> None:
+    """Walk an escalation back down after sustained clean progress.
+
+    A turn that opened hard usually settles (design the thing, then write six
+    boilerplate files). Without this, one escalation taxes the whole rest of
+    the turn at frontier prices. Never drops below the turn's originally
+    predicted difficulty, and only after CLEAN_HOPS consecutive hops with no
+    failure signal, so it can't oscillate against the cascade.
+    """
+    CLEAN_HOPS = 3
+    cfg = state["cfg"]
+    if cfg.get("route_mode") != "smart" or not state.get("_smart_escalations"):
+        return
+    if cfg.get("route_effort", "auto") != "auto":
+        return                       # user pinned the effort; don't touch it
+    if state.get("_smart_clean_hops", 0) < CLEAN_HOPS:
+        return
+    floor = state.get("_smart_base_difficulty") or "low"
+    cur = state.get("_smart_difficulty") or "mid"
+    nxt = router.de_escalate(cur, floor=floor)
+    if nxt == cur:
+        return
+    try:
+        table = router.load_table()
+        catalog = state.get("models_cache")
+        if not table or not catalog:
+            return
+        cohort = state.get("_smart_cohort") or "chat"
+        weights = router.effective_weights(cfg.get("route_weights"), nxt)
+        needs_ctx = int(compact.est_history_tokens(state.get("messages") or [])
+                        * 1.3) + 4096
+        info = router.pick(cohort, weights, table, catalog, needs_tools=True,
+                           needs_ctx=needs_ctx,
+                           incumbent=state.get("_smart_last"),
+                           exclude=state.get("_smart_bad"),
+                           incumbent_bonus=_switch_cost_bonus(state))
+        if not info or not info.get("model"):
+            return
+        prev = state.get("_smart_pick")
+        state["_smart_difficulty"] = nxt
+        state["_smart_escalations"] = max(0, state.get("_smart_escalations", 1) - 1)
+        state["_smart_clean_hops"] = 0
+        info["difficulty"] = nxt
+        state["_smart_pick_info"] = info
+        state["_smart_pick"] = info["model"]
+        state["_smart_last"] = info["model"]
+        if info["model"] != prev:
+            console.print(
+                f"[{BRAND_DIM}]⚙ settling: {CLEAN_HOPS} clean hops → effort "
+                f"{nxt}, back to {info['model']}[/{BRAND_DIM}]"
+            )
+    except Exception:
+        pass
 
 
 def _smart_reroute_step(state: dict, step_title: str) -> None:
@@ -788,6 +844,7 @@ def _smart_route_turn(state: dict, user_input: str, had_image: bool = False) -> 
             cohort = state["_smart_cohort"]
         state["_smart_cohort"] = cohort
         state["_smart_difficulty"] = difficulty
+        state["_smart_base_difficulty"] = difficulty   # de-escalation floor
         needs_ctx = int(compact.est_history_tokens(state.get("messages") or []) * 1.3) + 4096
         weights = router.effective_weights(cfg.get("route_weights"), difficulty)
         info = router.pick(cohort, weights, table, catalog,
@@ -2537,6 +2594,9 @@ def main() -> None:
         turn_started_iso = _utc_now_iso()
         state["_compact_exhausted"] = False  # re-arm compaction each user turn
         state["_smart_escalations"] = 0       # cascade budget, per user turn
+        state["_smart_clean_hops"] = 0        # consecutive hops with no failure
+        state["_turn_tool_calls"] = 0         # verifier: did it actually act?
+        state["_verify_fired"] = False        # one verifier escalation/turn
         state["_drop_reasoning"] = False      # re-test reasoning support each turn
         # Quality guard resets: new turn, new deliverables. Suppressed for
         # the whole turn when the user explicitly asked for scaffolding.
@@ -2757,6 +2817,22 @@ def main() -> None:
                     )
                     break
                 if not tool_calls:
+                    # Verify the answer before accepting it. A refusal, or a
+                    # claim of work with no tool call behind it, is a routing
+                    # failure the pick itself can't predict — escalate and let
+                    # a stronger model answer instead of shipping it.
+                    _weak = router.verify_reply(
+                        reply,
+                        tool_calls_this_turn=state.get("_turn_tool_calls", 0),
+                        user_asked_action=router.asks_for_action(user_input))
+                    if (_weak and state.get("_smart_pick")
+                            and not state.get("_verify_fired")):
+                        state["_verify_fired"] = True
+                        if _smart_escalate(state, _weak):
+                            console.print(
+                                f"[yellow]⚙ answer rejected ({_weak}) — "
+                                "retrying with a stronger model[/yellow]")
+                            continue
                     state["messages"].append({"role": "assistant", "content": reply})
                     # Quality guard: the model ended its turn but files it
                     # wrote still carry stub markers. Spend ONE fix-it hop
@@ -2804,7 +2880,17 @@ def main() -> None:
                     break
 
                 # Model called tools — execute and loop.
+                state["_turn_tool_calls"] = (state.get("_turn_tool_calls", 0)
+                                             + len(tool_calls))
                 _report = handle_tool_calls(tool_calls, state)
+                # A hop that executed real tools without tripping a failure
+                # signal counts as clean; enough of them and the turn settles
+                # back down the effort ladder.
+                if _report["doomed"] == 0 and not state.get("stub_files"):
+                    state["_smart_clean_hops"] = state.get("_smart_clean_hops", 0) + 1
+                    _smart_de_escalate(state)
+                else:
+                    state["_smart_clean_hops"] = 0
                 _action = state["stall"].observe(
                     loopguard.batch_signature(tool_calls),
                     all_doomed=(

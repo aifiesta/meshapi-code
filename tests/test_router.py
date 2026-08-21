@@ -376,3 +376,46 @@ def test_bundled_table_has_no_inflated_prior_only_scores():
             if conf <= 0.35:
                 assert score <= 75, (
                     f"{mid} tops {cohort} at {score} on borrowed conf {conf}")
+
+
+# ---------------------------------------------------------------------------
+# De-escalation + reply verification (closing the last optimality gaps)
+# ---------------------------------------------------------------------------
+
+from meshapi.router import asks_for_action, de_escalate, verify_reply
+
+
+def test_de_escalate_walks_down_and_respects_floor():
+    assert de_escalate("max") == "xhigh"
+    assert de_escalate("high") == "mid"
+    assert de_escalate("low") == "low"                 # already at the bottom
+    assert de_escalate("high", floor="high") == "high"  # floor honored
+    assert de_escalate("xhigh", floor="mid") == "high"
+
+
+def test_escalate_and_de_escalate_are_inverse():
+    from meshapi.router import escalate
+    for lvl in ("low", "mid", "high", "xhigh"):
+        assert de_escalate(escalate(lvl)) == lvl
+
+
+@pytest.mark.parametrize("reply, tools, action, expect_flag", [
+    ("I don't have the tools needed to write an essay for you.", 1, True, True),
+    ("I'm sorry, but I can't help with that.", 0, True, True),
+    ("As an AI language model, I am unable to create files.", 0, True, True),
+    ("I've created auth.js with the login logic.", 0, True, True),   # hallucinated
+    ("I've created auth.js with the login logic.", 2, True, False),  # actually did it
+    ("The file has been created successfully.", 0, True, True),
+    ("The capital of France is Paris.", 0, False, False),
+    ("Here is the essay you asked for: rivers are...", 0, True, False),
+    ("", 0, True, False),                                            # empty: other path
+])
+def test_verify_reply(reply, tools, action, expect_flag):
+    got = verify_reply(reply, tool_calls_this_turn=tools, user_asked_action=action)
+    assert (got is not None) is expect_flag
+
+
+def test_asks_for_action():
+    assert asks_for_action("create a file called x.txt")
+    assert asks_for_action("fix the failing test")
+    assert not asks_for_action("what is the capital of France?")
