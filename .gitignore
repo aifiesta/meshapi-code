@@ -24,3 +24,6 @@ TESTING.md
 
 # Private routing lab — trade secret, never shipped (has its own local git)
 meshroute-lab/
+
+# Internal routing reference (models + criteria) — not shipped
+ROUTING.md
