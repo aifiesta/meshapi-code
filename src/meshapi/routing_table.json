@@ -1,5 +1,5 @@
 {
- "built_at": "2026-08-20T10:01:34Z",
+ "built_at": "2026-08-21T02:23:16Z",
  "cohorts": [
   "coding",
   "agentic",
@@ -19,19 +19,19 @@
   "audio-in"
  ],
  "defaults": {
-  "agentic": "xai/grok-4.1-fast-non-reasoning",
+  "agentic": "deepseek/deepseek-v4-flash",
   "audio-in": "bytedance/seed-asr-2.0",
   "chat": "xai/grok-4.1-fast-non-reasoning",
   "cheap-bulk": "xai/grok-4.1-fast-non-reasoning",
-  "coding": "deepseek/deepseek-v3-turbo",
-  "embedding": "google/embeddinggemma-300m",
+  "coding": "deepseek/deepseek-v4-flash",
+  "embedding": "cohere/embed-v4",
   "extraction": "xai/grok-4.1-fast-non-reasoning",
-  "image-gen": "stabilityai/sdxl-turbo",
-  "long-context": "openai/gpt-oss-120b-ultra",
+  "image-gen": "openai/gpt-image-2-developer",
+  "long-context": "deepseek/deepseek-v4-flash",
   "reasoning-math": "nvidia/nemotron-nano-9b-v2",
-  "stt": "ilmu/ilmu-asr-v4.2",
-  "tts": "hexgrad/kokoro-82m",
-  "video-gen": "fastvideo/fastwan-qad-fp8-1.3b",
+  "stt": "openai/whisper-large-v3-turbo",
+  "tts": "elevenlabs/eleven_flash_v2_5",
+  "video-gen": "google/veo3.1-lite",
   "vision": "x-ai/grok-build-0.1",
   "web-research": "xai/grok-4.1-fast-non-reasoning",
   "writing": "xai/grok-4.1-fast-non-reasoning"
@@ -44,7 +44,6 @@
    "google/gemini-3.1-pro",
    "openai/gpt-4o-2024-05-13",
    "deepseek/deepseek-v4-pro",
-   "deepseek/deepseek-v3-turbo",
    "deepseek/deepseek-v4-flash",
    "xai/grok-4.1-fast-non-reasoning",
    "openai/gpt-3.5-turbo-1106",
@@ -56,7 +55,8 @@
    "nvidia/nemotron-3.5-asr-streaming-multilingual-0.6b",
    "qwen/qwen3-asr-0.6b",
    "bytedance/seed-audio-1.0",
-   "inworld-ai/realtime-tts-1.5-mini"
+   "inworld-ai/realtime-tts-1.5-mini",
+   "qwen/qwen3-asr-1.7b"
   ],
   "chat": [
    "anthropic/claude-opus-4.8",
@@ -81,6 +81,7 @@
    "openai/gpt-5.6-terra",
    "openai/gpt-4o-2024-05-13",
    "x-ai/grok-4.3",
+   "deepseek/deepseek-v4-pro",
    "xai/grok-4.1-fast-non-reasoning",
    "openai/gpt-3.5-turbo-1106",
    "nvidia/nemotron-nano-9b-v2"
@@ -91,7 +92,6 @@
    "deepseek/deepseek-v4-pro",
    "openai/gpt-5.6-terra",
    "openai/gpt-4o-2024-05-13",
-   "deepseek/deepseek-v3-turbo",
    "deepseek/deepseek-v4-flash",
    "xai/grok-4.1-fast-non-reasoning",
    "openai/gpt-3.5-turbo-1106",
@@ -99,11 +99,21 @@
    "nvidia/nemotron-nano-9b-v2"
   ],
   "embedding": [
+   "cohere/embed-v4",
+   "baai/bge-m3",
+   "baai/bge-m3-multi",
    "google/embeddinggemma-300m",
-   "baai/bge-base-en-v1.5",
+   "baai/bge-large-en-v1.5",
+   "google/gemini-embedding-2-preview",
    "intfloat/e5-base-v2",
+   "intfloat/e5-large-v2",
+   "intfloat/multilingual-e5-large",
+   "intfloat/multilingual-e5-large-instruct",
    "sentence-transformers/all-minilm-l12-v2",
-   "sentence-transformers/all-minilm-l6-v2"
+   "sentence-transformers/all-minilm-l6-v2",
+   "sentence-transformers/all-mpnet-base-v2",
+   "sentence-transformers/clip-vit-b-32",
+   "sentence-transformers/clip-vit-b-32-multilingual-v1"
   ],
   "extraction": [
    "anthropic/claude-opus-4.8",
@@ -113,16 +123,27 @@
    "openai/gpt-5.6-terra",
    "openai/gpt-4o-2024-05-13",
    "x-ai/grok-4.3",
+   "deepseek/deepseek-v4-pro",
    "xai/grok-4.1-fast-non-reasoning",
    "openai/gpt-3.5-turbo-1106",
    "nvidia/nemotron-nano-9b-v2"
   ],
   "image-gen": [
-   "stabilityai/sdxl-turbo",
-   "black-forest-labs/flux.1-schnell",
-   "deepseek-ai/janus-pro-1b",
+   "openai/gpt-image-2-developer",
+   "runware/flux-2-klein-9b-kv",
+   "runware/flux-2-klein-4b-base",
+   "runware/flux-2-klein-9b-base",
+   "black-forest-labs/flux.2-dev",
+   "black-forest-labs/flux-2-klein-4b",
+   "black-forest-labs/flux-2-klein-9b",
+   "black-forest-labs/flux.2-pro",
+   "black-forest-labs/flux.2-flex",
+   "google/imagen-3-fast",
    "runware/twinflow-z-image-turbo",
-   "runware/flux-2-klein-9b-kv"
+   "rundiffusion/juggernaut-lightning-flux",
+   "stabilityai/stable-diffusion-xl-base-1.0",
+   "rundiffusion/juggernaut-z-fast",
+   "alibaba/z-image-turbo"
   ],
   "long-context": [
    "anthropic/claude-opus-4.8",
@@ -135,8 +156,6 @@
    "openai/gpt-5.4-mini",
    "x-ai/grok-4.20",
    "deepseek/deepseek-v4-flash",
-   "openai/gpt-oss-120b-ultra",
-   "openai/gpt-5.4-nano",
    "bytedance-seed/seed-1.6-flash",
    "nvidia/nemotron-nano-9b-v2"
   ],
@@ -147,36 +166,63 @@
    "openai/gpt-5.6-terra",
    "openai/gpt-4o-2024-05-13",
    "deepseek/deepseek-v4-pro",
-   "moonshotai/kimi-k2.5",
    "moonshotai/kimi-k2.7-code",
    "openai/gpt-3.5-turbo-1106",
-   "deepseek/deepseek-v3-turbo",
    "deepseek/deepseek-v4-flash",
-   "openai/gpt-oss-120b-ultra",
-   "openai/gpt-5.4-nano",
-   "google/gemma-2-27b-it",
-   "nvidia/nemotron-nano-9b-v2"
+   "nvidia/nemotron-nano-9b-v2",
+   "xai/grok-4.1-fast-non-reasoning",
+   "amazon/nova-2-lite-v1",
+   "qwen/qwen-2.5-7b-instruct",
+   "bytedance-seed/seed-1.6-flash",
+   "deepseek/deepseek-v3.2-speciale"
   ],
   "stt": [
+   "openai/whisper-large-v3-turbo",
+   "openai/whisper-large-v3",
+   "elevenlabs/scribe_v2",
+   "elevenlabs/scribe_v1",
+   "elevenlabs/scribe_v2_realtime",
+   "gpt-4o-mini-transcribe",
+   "gpt-4o-transcribe",
    "ilmu/ilmu-asr-v4.2",
    "nvidia/nemotron-3-asr-streaming-0.6b",
    "nvidia/nemotron-3.5-asr-streaming-0.6b",
-   "openai/whisper-large-v3-turbo",
-   "mistralai/voxtral-mini-3b-2507"
+   "mistralai/voxtral-mini-3b-2507",
+   "nvidia/parakeet-tdt-0.6b-v3"
   ],
   "tts": [
-   "hexgrad/kokoro-82m",
+   "elevenlabs/eleven_flash_v2_5",
+   "elevenlabs/eleven_turbo_v2_5",
+   "elevenlabs/eleven_multilingual_v2",
+   "elevenlabs/eleven_multilingual_v3",
+   "inworld-ai/tts-1.5-max",
+   "sarvam/bulbul:v2",
+   "inworld/inworld-tts-1-5-mini",
+   "sarvam/bulbul:v3",
+   "alibaba/qwen3-tts-1-7b-base",
+   "alibaba/qwen3-tts-1-7b-customvoice",
    "resembleai/chatterbox-multilingual",
    "resembleai/chatterbox-turbo",
    "sesame/csm-1b",
-   "fishaudio/fish-speech-1.5"
+   "fishaudio/fish-speech-1.5",
+   "funaudiollm/cosyvoice2-0.5b"
   ],
   "video-gen": [
-   "fastvideo/fastwan-qad-fp8-1.3b",
+   "google/veo3.1-lite",
+   "klingai/klingai-lip-sync",
+   "kling/kling-1.0",
+   "openai/sora-2",
+   "klingai/klingai-1-6-standard",
+   "klingai/klingai-2-1-standard",
+   "klingai/klingai-2-5-turbo-standard",
+   "kling/kling-2.5-turbo",
+   "kling/kling-2.6",
+   "klingai/klingai-avatar-2-0-standard",
    "bytedance/bytedance-video-upscaler",
    "bria/bria-video-background-removal",
-   "klingai/klingai-lip-sync",
-   "veed/lipsync"
+   "veed/lipsync",
+   "atlascloud/video-upscaler",
+   "prunaai/p-video"
   ],
   "vision": [
    "anthropic/claude-opus-4.8",
@@ -199,6 +245,7 @@
    "openai/gpt-5.6-terra",
    "openai/gpt-4o-2024-05-13",
    "x-ai/grok-4.3",
+   "deepseek/deepseek-v4-pro",
    "xai/grok-4.1-fast-non-reasoning",
    "openai/gpt-3.5-turbo-1106",
    "nvidia/nemotron-nano-9b-v2"
@@ -299,7 +346,7 @@
   },
   "alibaba/happyhorse-1.0": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -317,7 +364,7 @@
   },
   "alibaba/happyhorse-1.1": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -335,205 +382,205 @@
   },
   "alibaba/qwen-image-2512": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": true
    },
    "conf": {
-    "image-gen": 0.2
+    "image-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "image-gen": 50
+    "image-gen": 82
    },
    "speed": null
   },
   "alibaba/qwen-image-edit-2511": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": true
    },
    "conf": {
-    "image-gen": 0.2
+    "image-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "image-gen": 50
+    "image-gen": 82
    },
    "speed": null
   },
   "alibaba/qwen-image-layered": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": true
    },
    "conf": {
-    "image-gen": 0.2
+    "image-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "image-gen": 50
+    "image-gen": 82
    },
    "speed": null
   },
   "alibaba/qwen3-tts-1-7b-base": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "tts": 0.2
+    "tts": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "tts": 50
+    "tts": 72
    },
    "speed": null
   },
   "alibaba/qwen3-tts-1-7b-customvoice": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "tts": 0.2
+    "tts": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "tts": 50
+    "tts": 72
    },
    "speed": null
   },
   "alibaba/qwen3-tts-1-7b-voicedesign": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "tts": 0.2
+    "tts": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "tts": 50
+    "tts": 72
    },
    "speed": null
   },
   "alibaba/wan-2.2": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 78
    },
    "speed": null
   },
   "alibaba/wan-2.2-spicy": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 78
    },
    "speed": null
   },
   "alibaba/wan-2.5": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 78
    },
    "speed": null
   },
   "alibaba/wan-2.6": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 78
    },
    "speed": null
   },
   "alibaba/wan-2.7": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 78
    },
    "speed": null
   },
   "alibaba/wan-2.7-pro": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -551,7 +598,7 @@
   },
   "alibaba/wan2-6-image": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -569,7 +616,7 @@
   },
   "alibaba/wan2-7-image": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -587,7 +634,7 @@
   },
   "alibaba/wan2-7-image-pro": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -605,7 +652,7 @@
   },
   "alibaba/z-image-turbo": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -1524,7 +1571,7 @@
   },
   "atlascloud/image-upscaler": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -1542,7 +1589,7 @@
   },
   "atlascloud/infinitetalk": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -1560,7 +1607,7 @@
   },
   "atlascloud/van-2.5": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -1578,7 +1625,7 @@
   },
   "atlascloud/van-2.6": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -1596,7 +1643,7 @@
   },
   "atlascloud/video-upscaler": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -1614,107 +1661,109 @@
   },
   "atlascloud/wan-2.2-turbo": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 78
    },
    "speed": null
   },
   "atlascloud/wan-2.2-turbo-spicy": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 78
    },
    "speed": null
   },
   "atlascloud/wan-2.6-spicy": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 78
    },
    "speed": null
   },
   "atlascloud/wan-2.7-spicy": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 78
    },
    "speed": null
   },
   "baai/bge-base-en-v1.5": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "embedding": 0.2
+    "embedding": 0.7
    },
    "ctx": 512,
-   "meta_only": true,
+   "dims": 768,
+   "meta_only": false,
    "scores": {
-    "embedding": 50
+    "embedding": 72
    },
    "speed": null
   },
   "baai/bge-en-icl": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "embedding": 0.2
+    "embedding": 0.35
    },
    "ctx": 8192,
-   "meta_only": true,
+   "dims": 4096,
+   "meta_only": false,
    "scores": {
     "embedding": 50
    },
@@ -1722,55 +1771,58 @@
   },
   "baai/bge-large-en-v1.5": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "embedding": 0.2
+    "embedding": 0.7
    },
    "ctx": 512,
-   "meta_only": true,
+   "dims": 1024,
+   "meta_only": false,
    "scores": {
-    "embedding": 50
+    "embedding": 78
    },
    "speed": null
   },
   "baai/bge-m3": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "embedding": 0.2
+    "embedding": 0.7
    },
    "ctx": 8192,
-   "meta_only": true,
+   "dims": 1024,
+   "meta_only": false,
    "scores": {
-    "embedding": 50
+    "embedding": 82
    },
    "speed": null
   },
   "baai/bge-m3-multi": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "embedding": 0.2
+    "embedding": 0.7
    },
    "ctx": 8192,
-   "meta_only": true,
+   "dims": 1024,
+   "meta_only": false,
    "scores": {
-    "embedding": 50
+    "embedding": 82
    },
    "speed": null
   },
@@ -1789,7 +1841,7 @@
   },
   "baidu/ernie-image": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -1807,17 +1859,17 @@
   },
   "baidu/ernie-image-turbo": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "image-gen": 0.2
+    "image-gen": 0.35
    },
    "ctx": 0,
-   "meta_only": true,
+   "meta_only": false,
    "scores": {
     "image-gen": 50
    },
@@ -1825,7 +1877,7 @@
   },
   "bfl/flux-1-fill-pro": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -1843,7 +1895,7 @@
   },
   "bfl/flux-erase": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -1861,7 +1913,7 @@
   },
   "bfl/flux-outpainting": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -1879,7 +1931,7 @@
   },
   "bfl/flux-virtual-try-on": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -1897,25 +1949,7 @@
   },
   "black-forest-labs/flux-1-dev": {
    "caps": {
-    "alive": null,
-    "reasoning_with_tools": false,
-    "structured": false,
-    "tools": false,
-    "vision": false
-   },
-   "conf": {
-    "image-gen": 0.2
-   },
-   "ctx": 0,
-   "meta_only": true,
-   "scores": {
-    "image-gen": 50
-   },
-   "speed": null
-  },
-  "black-forest-labs/flux-1-redux-dev": {
-   "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -1933,7 +1967,7 @@
   },
   "black-forest-labs/flux-1.1-pro-ultra": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -1951,43 +1985,43 @@
   },
   "black-forest-labs/flux-2-klein-4b": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "image-gen": 0.2
+    "image-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "image-gen": 50
+    "image-gen": 92
    },
    "speed": null
   },
   "black-forest-labs/flux-2-klein-9b": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "image-gen": 0.2
+    "image-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "image-gen": 50
+    "image-gen": 92
    },
    "speed": null
   },
   "black-forest-labs/flux-dev": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -2005,7 +2039,7 @@
   },
   "black-forest-labs/flux-dev-lora": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -2023,7 +2057,7 @@
   },
   "black-forest-labs/flux-kontext-dev-lora": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -2041,25 +2075,25 @@
   },
   "black-forest-labs/flux-pro": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "image-gen": 0.2
+    "image-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "image-gen": 50
+    "image-gen": 88
    },
    "speed": null
   },
   "black-forest-labs/flux.1-kontext-dev": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -2077,7 +2111,7 @@
   },
   "black-forest-labs/flux.1-kontext-max": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -2095,7 +2129,7 @@
   },
   "black-forest-labs/flux.1-kontext-pro": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -2113,25 +2147,25 @@
   },
   "black-forest-labs/flux.1-schnell": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "image-gen": 0.2
+    "image-gen": 0.7
    },
    "ctx": 0,
-   "meta_only": true,
+   "meta_only": false,
    "scores": {
-    "image-gen": 50
+    "image-gen": 70
    },
    "speed": null
   },
   "black-forest-labs/flux.1.1-pro": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -2149,79 +2183,79 @@
   },
   "black-forest-labs/flux.2-dev": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "image-gen": 0.2
+    "image-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "image-gen": 50
+    "image-gen": 92
    },
    "speed": null
   },
   "black-forest-labs/flux.2-flex": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "image-gen": 0.2
+    "image-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "image-gen": 50
+    "image-gen": 92
    },
    "speed": null
   },
   "black-forest-labs/flux.2-max": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "image-gen": 0.2
+    "image-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "image-gen": 50
+    "image-gen": 92
    },
    "speed": null
   },
   "black-forest-labs/flux.2-pro": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "image-gen": 0.2
+    "image-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "image-gen": 50
+    "image-gen": 92
    },
    "speed": null
   },
   "bosonai/higgsaudiov2.5": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -2237,27 +2271,9 @@
    },
    "speed": null
   },
-  "bria/blur_background": {
-   "caps": {
-    "alive": null,
-    "reasoning_with_tools": false,
-    "structured": false,
-    "tools": false,
-    "vision": false
-   },
-   "conf": {
-    "image-gen": 0.2
-   },
-   "ctx": 0,
-   "meta_only": true,
-   "scores": {
-    "image-gen": 50
-   },
-   "speed": null
-  },
   "bria/bria-3.2": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -2275,7 +2291,7 @@
   },
   "bria/bria-3.2-vector": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -2293,7 +2309,7 @@
   },
   "bria/bria-bg-remover": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -2311,7 +2327,7 @@
   },
   "bria/bria-fibo-edit": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -2329,7 +2345,7 @@
   },
   "bria/bria-fibo-edit-tools": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -2347,7 +2363,7 @@
   },
   "bria/bria-fibo-lite": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -2365,7 +2381,7 @@
   },
   "bria/bria-image-increase-resolution": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -2383,7 +2399,7 @@
   },
   "bria/bria-rmbg-v2-0": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -2401,7 +2417,7 @@
   },
   "bria/bria-video-background-removal": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -2414,84 +2430,12 @@
    "meta_only": true,
    "scores": {
     "video-gen": 50
-   },
-   "speed": null
-  },
-  "bria/enhance": {
-   "caps": {
-    "alive": null,
-    "reasoning_with_tools": false,
-    "structured": false,
-    "tools": false,
-    "vision": false
-   },
-   "conf": {
-    "image-gen": 0.2
-   },
-   "ctx": 0,
-   "meta_only": true,
-   "scores": {
-    "image-gen": 50
-   },
-   "speed": null
-  },
-  "bria/erase": {
-   "caps": {
-    "alive": null,
-    "reasoning_with_tools": false,
-    "structured": false,
-    "tools": false,
-    "vision": false
-   },
-   "conf": {
-    "image-gen": 0.2
-   },
-   "ctx": 0,
-   "meta_only": true,
-   "scores": {
-    "image-gen": 50
-   },
-   "speed": null
-  },
-  "bria/erase_foreground": {
-   "caps": {
-    "alive": null,
-    "reasoning_with_tools": false,
-    "structured": false,
-    "tools": false,
-    "vision": false
-   },
-   "conf": {
-    "image-gen": 0.2
-   },
-   "ctx": 0,
-   "meta_only": true,
-   "scores": {
-    "image-gen": 50
-   },
-   "speed": null
-  },
-  "bria/expand": {
-   "caps": {
-    "alive": null,
-    "reasoning_with_tools": false,
-    "structured": false,
-    "tools": false,
-    "vision": false
-   },
-   "conf": {
-    "image-gen": 0.2
-   },
-   "ctx": 0,
-   "meta_only": true,
-   "scores": {
-    "image-gen": 50
    },
    "speed": null
   },
   "bria/fibo": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -2504,168 +2448,6 @@
    "meta_only": true,
    "scores": {
     "image-gen": 50
-   },
-   "speed": null
-  },
-  "bria/gen_fill": {
-   "caps": {
-    "alive": null,
-    "reasoning_with_tools": false,
-    "structured": false,
-    "tools": false,
-    "vision": false
-   },
-   "conf": {
-    "image-gen": 0.2
-   },
-   "ctx": 0,
-   "meta_only": true,
-   "scores": {
-    "image-gen": 50
-   },
-   "speed": null
-  },
-  "bria/remove_background": {
-   "caps": {
-    "alive": null,
-    "reasoning_with_tools": false,
-    "structured": false,
-    "tools": false,
-    "vision": false
-   },
-   "conf": {
-    "image-gen": 0.2
-   },
-   "ctx": 0,
-   "meta_only": true,
-   "scores": {
-    "image-gen": 50
-   },
-   "speed": null
-  },
-  "bria/replace_background": {
-   "caps": {
-    "alive": null,
-    "reasoning_with_tools": false,
-    "structured": false,
-    "tools": false,
-    "vision": false
-   },
-   "conf": {
-    "image-gen": 0.2
-   },
-   "ctx": 0,
-   "meta_only": true,
-   "scores": {
-    "image-gen": 50
-   },
-   "speed": null
-  },
-  "bria/video_eraser": {
-   "caps": {
-    "alive": null,
-    "reasoning_with_tools": false,
-    "structured": false,
-    "tools": false,
-    "vision": false
-   },
-   "conf": {
-    "video-gen": 0.2
-   },
-   "ctx": 0,
-   "meta_only": true,
-   "scores": {
-    "video-gen": 50
-   },
-   "speed": null
-  },
-  "bria/video_foreground_mask": {
-   "caps": {
-    "alive": null,
-    "reasoning_with_tools": false,
-    "structured": false,
-    "tools": false,
-    "vision": false
-   },
-   "conf": {
-    "video-gen": 0.2
-   },
-   "ctx": 0,
-   "meta_only": true,
-   "scores": {
-    "video-gen": 50
-   },
-   "speed": null
-  },
-  "bria/video_increase_resolution": {
-   "caps": {
-    "alive": null,
-    "reasoning_with_tools": false,
-    "structured": false,
-    "tools": false,
-    "vision": false
-   },
-   "conf": {
-    "video-gen": 0.2
-   },
-   "ctx": 0,
-   "meta_only": true,
-   "scores": {
-    "video-gen": 50
-   },
-   "speed": null
-  },
-  "bria/video_mask_by_key_points": {
-   "caps": {
-    "alive": null,
-    "reasoning_with_tools": false,
-    "structured": false,
-    "tools": false,
-    "vision": false
-   },
-   "conf": {
-    "video-gen": 0.2
-   },
-   "ctx": 0,
-   "meta_only": true,
-   "scores": {
-    "video-gen": 50
-   },
-   "speed": null
-  },
-  "bria/video_mask_by_prompt": {
-   "caps": {
-    "alive": null,
-    "reasoning_with_tools": false,
-    "structured": false,
-    "tools": false,
-    "vision": false
-   },
-   "conf": {
-    "video-gen": 0.2
-   },
-   "ctx": 0,
-   "meta_only": true,
-   "scores": {
-    "video-gen": 50
-   },
-   "speed": null
-  },
-  "bria/video_remove_background": {
-   "caps": {
-    "alive": null,
-    "reasoning_with_tools": false,
-    "structured": false,
-    "tools": false,
-    "vision": false
-   },
-   "conf": {
-    "video-gen": 0.2
-   },
-   "ctx": 0,
-   "meta_only": true,
-   "scores": {
-    "video-gen": 50
    },
    "speed": null
   },
@@ -2754,43 +2536,43 @@
   },
   "bytedance-seed/seedream-3.0": {
    "caps": {
-    "alive": null,
+    "alive": false,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "image-gen": 0.2
+    "image-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "image-gen": 50
+    "image-gen": 86
    },
    "speed": null
   },
   "bytedance-seed/seedream-4.0": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "image-gen": 0.2
+    "image-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "image-gen": 50
+    "image-gen": 86
    },
    "speed": null
   },
   "bytedance/avatar-omni-human-v1.5": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -2808,7 +2590,7 @@
   },
   "bytedance/bytedance-video-upscaler": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -2826,7 +2608,7 @@
   },
   "bytedance/byteplus-video-enhancement-pro": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -2844,7 +2626,7 @@
   },
   "bytedance/byteplus-video-enhancement-standard": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -3010,7 +2792,7 @@
   },
   "bytedance/omnihuman-1-5": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -3067,25 +2849,25 @@
   },
   "bytedance/seed-asr-2.0": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "audio-in": 0.2
+    "audio-in": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "audio-in": 50
+    "audio-in": 76
    },
    "speed": null
   },
   "bytedance/seed-audio-1.0": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -3103,235 +2885,235 @@
   },
   "bytedance/seedance-1.0-lite": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 86
    },
    "speed": null
   },
   "bytedance/seedance-1.0-pro": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 86
    },
    "speed": null
   },
   "bytedance/seedance-2.0": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 86
    },
    "speed": null
   },
   "bytedance/seedance-2.0-mini": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 86
    },
    "speed": null
   },
   "bytedance/seedance-v1-pro-i2v-1080p": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 86
    },
    "speed": null
   },
   "bytedance/seedance-v1-pro-i2v-480p": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 86
    },
    "speed": null
   },
   "bytedance/seedance-v1-pro-i2v-720p": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 86
    },
    "speed": null
   },
   "bytedance/seedance-v1-pro-t2v-1080p": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 86
    },
    "speed": null
   },
   "bytedance/seedance-v1-pro-t2v-480p": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 86
    },
    "speed": null
   },
   "bytedance/seedance-v1-pro-t2v-720p": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 86
    },
    "speed": null
   },
   "bytedance/seedream-4.5": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "image-gen": 0.2
+    "image-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "image-gen": 50
+    "image-gen": 86
    },
    "speed": null
   },
   "bytedance/seedream-5-lite": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": true
    },
    "conf": {
-    "image-gen": 0.2
+    "image-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "image-gen": 50
+    "image-gen": 86
    },
    "speed": null
   },
   "bytedance/seedream-5.0-pro": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": true
    },
    "conf": {
-    "image-gen": 0.2
+    "image-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "image-gen": 50
+    "image-gen": 86
    },
    "speed": null
   },
@@ -3350,115 +3132,115 @@
   },
   "byteplus/dreamina-seedance-2-0": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 86
    },
    "speed": null
   },
   "byteplus/dreamina-seedance-2-0-fast": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 86
    },
    "speed": null
   },
   "byteplus/dreamina-seedance-2-5": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": true
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 86
    },
    "speed": null
   },
   "byteplus/seedance-1-0-pro-fast": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 86
    },
    "speed": null
   },
   "byteplus/seedance-1-5-pro": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 86
    },
    "speed": null
   },
   "byteplus/seedream-5-0": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": true
    },
    "conf": {
-    "image-gen": 0.2
+    "image-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "image-gen": 50
+    "image-gen": 86
    },
    "speed": null
   },
   "canopylabs/orpheus-3b-0.1-ft": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -3476,7 +3258,7 @@
   },
   "cartesia/sonic-2": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -3494,7 +3276,7 @@
   },
   "cartesia/sonic-3": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -3512,7 +3294,7 @@
   },
   "character-ai/ovi": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -3525,60 +3307,6 @@
    "meta_only": true,
    "scores": {
     "video-gen": 50
-   },
-   "speed": null
-  },
-  "clarityai/creative": {
-   "caps": {
-    "alive": null,
-    "reasoning_with_tools": false,
-    "structured": false,
-    "tools": false,
-    "vision": false
-   },
-   "conf": {
-    "image-gen": 0.2
-   },
-   "ctx": 0,
-   "meta_only": true,
-   "scores": {
-    "image-gen": 50
-   },
-   "speed": null
-  },
-  "clarityai/crystal": {
-   "caps": {
-    "alive": null,
-    "reasoning_with_tools": false,
-    "structured": false,
-    "tools": false,
-    "vision": false
-   },
-   "conf": {
-    "image-gen": 0.2
-   },
-   "ctx": 0,
-   "meta_only": true,
-   "scores": {
-    "image-gen": 50
-   },
-   "speed": null
-  },
-  "clarityai/flux": {
-   "caps": {
-    "alive": null,
-    "reasoning_with_tools": false,
-    "structured": false,
-    "tools": false,
-    "vision": false
-   },
-   "conf": {
-    "image-gen": 0.2
-   },
-   "ctx": 0,
-   "meta_only": true,
-   "scores": {
-    "image-gen": 50
    },
    "speed": null
   },
@@ -3982,17 +3710,18 @@
   },
   "cohere/embed-english-light-v3.0": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "embedding": 0.2
+    "embedding": 0.35
    },
    "ctx": 512,
-   "meta_only": true,
+   "dims": 384,
+   "meta_only": false,
    "scores": {
     "embedding": 50
    },
@@ -4000,17 +3729,18 @@
   },
   "cohere/embed-multilingual-light-v3.0": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "embedding": 0.2
+    "embedding": 0.35
    },
    "ctx": 512,
-   "meta_only": true,
+   "dims": 384,
+   "meta_only": false,
    "scores": {
     "embedding": 50
    },
@@ -4018,25 +3748,25 @@
   },
   "cohere/embed-v4": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": true
    },
    "conf": {
-    "embedding": 0.2
+    "embedding": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "embedding": 50
+    "embedding": 90
    },
    "speed": null
   },
   "creatify/aurora-v1": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -4054,7 +3784,7 @@
   },
   "creatify/aurora-v1-fast": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -4190,37 +3920,37 @@
   },
   "deepseek-ai/janus-pro-1b": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "image-gen": 0.2
+    "image-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "image-gen": 50
+    "image-gen": 52
    },
    "speed": null
   },
   "deepseek-ai/janus-pro-7b": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "image-gen": 0.2
+    "image-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "image-gen": 50
+    "image-gen": 52
    },
    "speed": null
   },
@@ -4246,16 +3976,16 @@
    },
    "ctx": 0,
    "scores": {
-    "agentic": 38,
-    "chat": 38,
-    "cheap-bulk": 38,
-    "coding": 38,
-    "extraction": 38,
-    "long-context": 38,
-    "reasoning-math": 38,
-    "vision": 38,
-    "web-research": 38,
-    "writing": 38
+    "agentic": 85,
+    "chat": 86,
+    "cheap-bulk": 74,
+    "coding": 89,
+    "extraction": 74,
+    "long-context": 74,
+    "reasoning-math": 89,
+    "vision": 74,
+    "web-research": 74,
+    "writing": 84
    },
    "speed": 47
   },
@@ -4526,16 +4256,16 @@
    },
    "ctx": 64000,
    "scores": {
-    "agentic": 53,
-    "chat": 72,
-    "cheap-bulk": 38,
-    "coding": 58,
-    "extraction": 38,
-    "long-context": 38,
-    "reasoning-math": 55,
-    "vision": 38,
-    "web-research": 38,
-    "writing": 67
+    "agentic": 91,
+    "chat": 94,
+    "cheap-bulk": 83,
+    "coding": 94,
+    "extraction": 83,
+    "long-context": 83,
+    "reasoning-math": 94,
+    "vision": 83,
+    "web-research": 83,
+    "writing": 93
    },
    "speed": 8
   },
@@ -4596,16 +4326,16 @@
    },
    "ctx": 64000,
    "scores": {
-    "agentic": 85,
-    "chat": 86,
-    "cheap-bulk": 74,
-    "coding": 89,
-    "extraction": 74,
-    "long-context": 74,
-    "reasoning-math": 89,
-    "vision": 74,
-    "web-research": 74,
-    "writing": 84
+    "agentic": 40,
+    "chat": 40,
+    "cheap-bulk": 40,
+    "coding": 40,
+    "extraction": 40,
+    "long-context": 40,
+    "reasoning-math": 40,
+    "vision": 40,
+    "web-research": 40,
+    "writing": 40
    },
    "speed": 50
   },
@@ -4856,133 +4586,133 @@
   },
   "elevenlabs/eleven_flash_v2_5": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "tts": 0.2
+    "tts": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "tts": 50
+    "tts": 92
    },
    "speed": null
   },
   "elevenlabs/eleven_multilingual_v2": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "tts": 0.2
+    "tts": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "tts": 50
+    "tts": 92
    },
    "speed": null
   },
   "elevenlabs/eleven_multilingual_v3": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "tts": 0.2
+    "tts": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "tts": 50
+    "tts": 92
    },
    "speed": null
   },
   "elevenlabs/eleven_turbo_v2_5": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "tts": 0.2
+    "tts": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "tts": 50
+    "tts": 92
    },
    "speed": null
   },
   "elevenlabs/scribe_v1": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "stt": 0.2
+    "stt": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "stt": 50
+    "stt": 90
    },
    "speed": null
   },
   "elevenlabs/scribe_v2": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "stt": 0.2
+    "stt": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "stt": 50
+    "stt": 92
    },
    "speed": null
   },
   "elevenlabs/scribe_v2_realtime": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "stt": 0.2
+    "stt": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "stt": 50
+    "stt": 92
    },
    "speed": null
   },
   "elevenlabs/v3": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -5000,7 +4730,7 @@
   },
   "exactly/exactly-bold-chromatics": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -5018,7 +4748,7 @@
   },
   "exactly/exactly-bright-pulse": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -5036,7 +4766,7 @@
   },
   "exactly/exactly-dark-comics": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -5054,7 +4784,7 @@
   },
   "exactly/exactly-distant-reality": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -5072,7 +4802,7 @@
   },
   "exactly/exactly-earthy-elegance": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -5090,7 +4820,7 @@
   },
   "exactly/exactly-editorial-line": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -5108,7 +4838,7 @@
   },
   "exactly/exactly-extreme-contrast": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -5126,7 +4856,7 @@
   },
   "exactly/exactly-grain-film-look": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -5144,7 +4874,7 @@
   },
   "exactly/exactly-graphic-harmony": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -5162,7 +4892,7 @@
   },
   "exactly/exactly-graphic-novel": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -5180,7 +4910,7 @@
   },
   "exactly/exactly-graphite-creature": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -5198,7 +4928,7 @@
   },
   "exactly/exactly-journey": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -5216,7 +4946,7 @@
   },
   "exactly/exactly-monochrome-caf": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -5234,7 +4964,7 @@
   },
   "exactly/exactly-muted-modern": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -5252,7 +4982,7 @@
   },
   "exactly/exactly-playful-line-adventures": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -5270,7 +5000,7 @@
   },
   "exactly/exactly-warm-light": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -5288,7 +5018,7 @@
   },
   "fal-ai/wizper": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -5304,45 +5034,27 @@
    },
    "speed": null
   },
-  "fastvideo/fastwan-qad-fp8-1.3b": {
-   "caps": {
-    "alive": null,
-    "reasoning_with_tools": false,
-    "structured": false,
-    "tools": false,
-    "vision": false
-   },
-   "conf": {
-    "video-gen": 0.2
-   },
-   "ctx": 0,
-   "meta_only": true,
-   "scores": {
-    "video-gen": 50
-   },
-   "speed": null
-  },
   "fastvideo/ltx-2.3-distilled-diffusers": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 68
    },
    "speed": null
   },
   "fireredteam/firered-image-edit": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -5360,17 +5072,17 @@
   },
   "fishaudio/fish-speech": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "tts": 0.2
+    "tts": 0.35
    },
    "ctx": 0,
-   "meta_only": true,
+   "meta_only": false,
    "scores": {
     "tts": 50
    },
@@ -5378,7 +5090,7 @@
   },
   "fishaudio/fish-speech-1.5": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -5396,7 +5108,7 @@
   },
   "funaudiollm/cosyvoice2-0.5b": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -5414,19 +5126,20 @@
   },
   "google/embeddinggemma-300m": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "embedding": 0.2
+    "embedding": 0.7
    },
    "ctx": 2048,
-   "meta_only": true,
+   "dims": 768,
+   "meta_only": false,
    "scores": {
-    "embedding": 50
+    "embedding": 80
    },
    "speed": null
   },
@@ -5467,7 +5180,7 @@
   },
   "google/gemini-2.5-flash-image": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -5660,7 +5373,7 @@
   },
   "google/gemini-3-1-flash-lite": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -5678,7 +5391,7 @@
   },
   "google/gemini-3-1-pro": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -5696,7 +5409,7 @@
   },
   "google/gemini-3-5-flash": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -5714,7 +5427,7 @@
   },
   "google/gemini-3-flash": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -5767,7 +5480,7 @@
   },
   "google/gemini-3-pro-image": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -5785,7 +5498,7 @@
   },
   "google/gemini-3.1-flash-image": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -5838,7 +5551,7 @@
   },
   "google/gemini-3.1-flash-lite-image": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -5891,7 +5604,7 @@
   },
   "google/gemini-3.1-flash-tts": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -6154,25 +5867,26 @@
   },
   "google/gemini-embedding-2-preview": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "embedding": 0.2
+    "embedding": 0.7
    },
    "ctx": 0,
-   "meta_only": true,
+   "dims": 3072,
+   "meta_only": false,
    "scores": {
-    "embedding": 50
+    "embedding": 89
    },
    "speed": null
   },
   "google/gemini-omni-flash": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -6190,7 +5904,7 @@
   },
   "google/gemini-omni-flash-preview": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -6208,7 +5922,7 @@
   },
   "google/gemini-omni-flash-video": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -6646,115 +6360,115 @@
   },
   "google/imagen-3": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": true
    },
    "conf": {
-    "image-gen": 0.2
+    "image-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "image-gen": 50
+    "image-gen": 90
    },
    "speed": null
   },
   "google/imagen-3-fast": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": true
    },
    "conf": {
-    "image-gen": 0.2
+    "image-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "image-gen": 50
+    "image-gen": 90
    },
    "speed": null
   },
   "google/imagen-3-v1": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": true
    },
    "conf": {
-    "image-gen": 0.2
+    "image-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "image-gen": 50
+    "image-gen": 90
    },
    "speed": null
   },
   "google/imagen-4": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "image-gen": 0.2
+    "image-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "image-gen": 50
+    "image-gen": 90
    },
    "speed": null
   },
   "google/imagen-4-fast": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "image-gen": 0.2
+    "image-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "image-gen": 50
+    "image-gen": 90
    },
    "speed": null
   },
   "google/imagen-4-ultra": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "image-gen": 0.2
+    "image-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "image-gen": 50
+    "image-gen": 90
    },
    "speed": null
   },
   "google/nano-banana": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -6772,7 +6486,7 @@
   },
   "google/nano-banana-2": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -6790,7 +6504,7 @@
   },
   "google/nano-banana-2-lite": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -6808,7 +6522,7 @@
   },
   "google/nano-banana-pro": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -6826,151 +6540,151 @@
   },
   "google/veo-3.0": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 94
    },
    "speed": null
   },
   "google/veo-3.0-fast": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 94
    },
    "speed": null
   },
   "google/veo-3.1": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 94
    },
    "speed": null
   },
   "google/veo-3.1-fast": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 94
    },
    "speed": null
   },
   "google/veo3.1-lite": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 94
    },
    "speed": null
   },
   "gpt-4o-mini-transcribe": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "stt": 0.2
+    "stt": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "stt": 50
+    "stt": 92
    },
    "speed": null
   },
   "gpt-4o-mini-tts": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "tts": 0.2
+    "tts": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "tts": 50
+    "tts": 86
    },
    "speed": null
   },
   "gpt-4o-transcribe": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "stt": 0.2
+    "stt": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "stt": 50
+    "stt": 88
    },
    "speed": null
   },
   "gradium/gradium-tts-v1": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -7001,25 +6715,25 @@
   },
   "hexgrad/kokoro-82m": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "tts": 0.2
+    "tts": 0.7
    },
    "ctx": 0,
-   "meta_only": true,
+   "meta_only": false,
    "scores": {
-    "tts": 50
+    "tts": 66
    },
    "speed": null
   },
   "heygen/heygen-avatar-iv": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -7037,7 +6751,7 @@
   },
   "heygen/heygen-avatar-v": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -7055,7 +6769,7 @@
   },
   "heygen/heygen-video-agent": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -7073,7 +6787,7 @@
   },
   "hidream-o1-1.5/edit": {
    "caps": {
-    "alive": null,
+    "alive": false,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -7091,7 +6805,7 @@
   },
   "hidream-o1-1.5/text-to-image": {
    "caps": {
-    "alive": null,
+    "alive": false,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -7135,187 +6849,187 @@
   },
   "ideogram/ideogram-2-0": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "image-gen": 0.2
+    "image-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "image-gen": 50
+    "image-gen": 82
    },
    "speed": null
   },
   "ideogram/ideogram-2-0-remix": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": true
    },
    "conf": {
-    "image-gen": 0.2
+    "image-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "image-gen": 50
+    "image-gen": 82
    },
    "speed": null
   },
   "ideogram/ideogram-2a": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "image-gen": 0.2
+    "image-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "image-gen": 50
+    "image-gen": 82
    },
    "speed": null
   },
   "ideogram/ideogram-3-0": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "image-gen": 0.2
+    "image-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "image-gen": 50
+    "image-gen": 82
    },
    "speed": null
   },
   "ideogram/ideogram-3-0-edit": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": true
    },
    "conf": {
-    "image-gen": 0.2
+    "image-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "image-gen": 50
+    "image-gen": 82
    },
    "speed": null
   },
   "ideogram/ideogram-3-0-remix": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": true
    },
    "conf": {
-    "image-gen": 0.2
+    "image-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "image-gen": 50
+    "image-gen": 82
    },
    "speed": null
   },
   "ideogram/ideogram-4-0": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "image-gen": 0.2
+    "image-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "image-gen": 50
+    "image-gen": 82
    },
    "speed": null
   },
   "ideogram/ideogram-4-0-remix": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": true
    },
    "conf": {
-    "image-gen": 0.2
+    "image-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "image-gen": 50
+    "image-gen": 82
    },
    "speed": null
   },
   "ideogram/v4/quality": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "image-gen": 0.2
+    "image-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "image-gen": 50
+    "image-gen": 82
    },
    "speed": null
   },
   "ideogram/v4/turbo": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "image-gen": 0.2
+    "image-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "image-gen": 50
+    "image-gen": 82
    },
    "speed": null
   },
   "ilmu/ilmu-asr-v4.2": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -7333,17 +7047,18 @@
   },
   "ilmu/ilmu-embedding-v1": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "embedding": 0.2
+    "embedding": 0.35
    },
    "ctx": 32000,
-   "meta_only": true,
+   "dims": 4096,
+   "meta_only": false,
    "scores": {
     "embedding": 50
    },
@@ -7364,7 +7079,7 @@
   },
   "ilmu/ilmu-tts-v2": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -7408,7 +7123,7 @@
   },
   "imagineart/imagineart-1-5": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -7426,7 +7141,7 @@
   },
   "imagineart/imagineart-1.5-pro": {
    "caps": {
-    "alive": null,
+    "alive": false,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -7444,7 +7159,7 @@
   },
   "imagineart/imagineart-2-0": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -7562,7 +7277,7 @@
   },
   "indexteam/indextts-2": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -7580,79 +7295,83 @@
   },
   "intfloat/e5-base-v2": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "embedding": 0.2
+    "embedding": 0.7
    },
    "ctx": 512,
-   "meta_only": true,
+   "dims": 768,
+   "meta_only": false,
    "scores": {
-    "embedding": 50
+    "embedding": 74
    },
    "speed": null
   },
   "intfloat/e5-large-v2": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "embedding": 0.2
+    "embedding": 0.7
    },
    "ctx": 512,
-   "meta_only": true,
+   "dims": 1024,
+   "meta_only": false,
    "scores": {
-    "embedding": 50
+    "embedding": 74
    },
    "speed": null
   },
   "intfloat/multilingual-e5-large": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "embedding": 0.2
+    "embedding": 0.7
    },
    "ctx": 512,
-   "meta_only": true,
+   "dims": 1024,
+   "meta_only": false,
    "scores": {
-    "embedding": 50
+    "embedding": 74
    },
    "speed": null
   },
   "intfloat/multilingual-e5-large-instruct": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "embedding": 0.2
+    "embedding": 0.7
    },
    "ctx": 514,
-   "meta_only": true,
+   "dims": 1024,
+   "meta_only": false,
    "scores": {
-    "embedding": 50
+    "embedding": 74
    },
    "speed": null
   },
   "inworld-ai/realtime-tts-1.5-max": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -7670,7 +7389,7 @@
   },
   "inworld-ai/realtime-tts-1.5-mini": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -7688,7 +7407,7 @@
   },
   "inworld-ai/realtime-tts-2": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -7706,305 +7425,305 @@
   },
   "inworld-ai/tts-1.5-max": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "tts": 0.2
+    "tts": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "tts": 50
+    "tts": 76
    },
    "speed": null
   },
   "inworld/inworld-tts-1-5-mini": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "tts": 0.2
+    "tts": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "tts": 50
+    "tts": 76
    },
    "speed": null
   },
   "kling/kling-1.0": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": true
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 88
    },
    "speed": null
   },
   "kling/kling-1.5": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": true
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 88
    },
    "speed": null
   },
   "kling/kling-1.6": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": true
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 88
    },
    "speed": null
   },
   "kling/kling-2.0-master": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": true
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 88
    },
    "speed": null
   },
   "kling/kling-2.1-master": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": true
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 88
    },
    "speed": null
   },
   "kling/kling-2.1-pro": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": true
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 88
    },
    "speed": null
   },
   "kling/kling-2.5-turbo": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": true
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 88
    },
    "speed": null
   },
   "kling/kling-2.5-turbo-pro": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": true
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 88
    },
    "speed": null
   },
   "kling/kling-2.6": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": true
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 88
    },
    "speed": null
   },
   "kling/kling-2.6-pro": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": true
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 88
    },
    "speed": null
   },
   "kling/kling-3.0": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": true
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 88
    },
    "speed": null
   },
   "kling/kling-3.0-omni": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": true
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 88
    },
    "speed": null
   },
   "kling/kling-3.0-turbo": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": true
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 88
    },
    "speed": null
   },
   "kling/kling-effects": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 88
    },
    "speed": null
   },
   "kling/kling-image-1.0": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": true
    },
    "conf": {
-    "image-gen": 0.2
+    "image-gen": 0.35
    },
    "ctx": 0,
-   "meta_only": true,
+   "meta_only": false,
    "scores": {
     "image-gen": 50
    },
@@ -8012,7 +7731,7 @@
   },
   "kling/kling-image-1.5": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -8030,7 +7749,7 @@
   },
   "kling/kling-image-2.0": {
    "caps": {
-    "alive": null,
+    "alive": false,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -8048,7 +7767,7 @@
   },
   "kling/kling-image-2.0-new": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -8066,7 +7785,7 @@
   },
   "kling/kling-image-2.1": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -8084,7 +7803,7 @@
   },
   "kling/kling-image-3.0": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -8102,7 +7821,7 @@
   },
   "kling/kling-image-3.0-omni": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -8120,7 +7839,7 @@
   },
   "kling/kling-image-o1": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -8138,457 +7857,457 @@
   },
   "kling/kling-o3-4k": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": true
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 88
    },
    "speed": null
   },
   "kling/kling-o3-pro": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": true
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 88
    },
    "speed": null
   },
   "kling/kling-o3-standard": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": true
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 88
    },
    "speed": null
   },
   "kling/kling-v1.6-i2v-pro": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 88
    },
    "speed": null
   },
   "kling/kling-v1.6-i2v-standard": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 88
    },
    "speed": null
   },
   "kling/kling-v1.6-multi-i2v-pro": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 88
    },
    "speed": null
   },
   "kling/kling-v1.6-multi-i2v-standard": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 88
    },
    "speed": null
   },
   "kling/kling-v1.6-t2v-standard": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 88
    },
    "speed": null
   },
   "kling/kling-v2.0-i2v-master": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 88
    },
    "speed": null
   },
   "kling/kling-v2.0-t2v-master": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 88
    },
    "speed": null
   },
   "kling/kling-v2.1-i2v-master": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 88
    },
    "speed": null
   },
   "kling/kling-v2.1-i2v-pro": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 88
    },
    "speed": null
   },
   "kling/kling-v2.1-i2v-standard": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 88
    },
    "speed": null
   },
   "kling/kling-v2.1-t2v-master": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 88
    },
    "speed": null
   },
   "kling/kling-v2.6-std": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 88
    },
    "speed": null
   },
   "kling/kling-v3-standard": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": true
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 88
    },
    "speed": null
   },
   "kling/kling-v3-turbo-pro": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": true
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 88
    },
    "speed": null
   },
   "kling/kling-v3-turbo-standard": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": true
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 88
    },
    "speed": null
   },
   "kling/kling-v3.0-4k": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 88
    },
    "speed": null
   },
   "kling/kling-v3.0-pro": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 88
    },
    "speed": null
   },
   "kling/kling-v3.0-std": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 88
    },
    "speed": null
   },
   "kling/kling-video-o1": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": true
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 88
    },
    "speed": null
   },
   "kling/kling-video-o3-4k": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 88
    },
    "speed": null
   },
   "kling/kling-video-o3-pro": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 88
    },
    "speed": null
   },
   "kling/kling-video-o3-std": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 88
    },
    "speed": null
   },
   "klingai/kling-image-o3": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -8606,403 +8325,403 @@
   },
   "klingai/kling-video-2-6-pro": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": true
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 88
    },
    "speed": null
   },
   "klingai/kling-video-2-6-standard": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": true
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 88
    },
    "speed": null
   },
   "klingai/kling-video-3-0-4k": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": true
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 88
    },
    "speed": null
   },
   "klingai/kling-video-3-0-omni-4k": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": true
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 88
    },
    "speed": null
   },
   "klingai/kling-video-3-0-omni-pro": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": true
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 88
    },
    "speed": null
   },
   "klingai/kling-video-3-0-omni-standard": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": true
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 88
    },
    "speed": null
   },
   "klingai/kling-video-3-0-pro": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": true
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 88
    },
    "speed": null
   },
   "klingai/kling-video-3-0-standard": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": true
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 88
    },
    "speed": null
   },
   "klingai/kling-video-3-0-turbo": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": true
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 88
    },
    "speed": null
   },
   "klingai/kling-video-o1-pro": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": true
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 88
    },
    "speed": null
   },
   "klingai/kling-video-o1-standard": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": true
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 88
    },
    "speed": null
   },
   "klingai/klingai-1-5-pro": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": true
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 88
    },
    "speed": null
   },
   "klingai/klingai-1-6-standard": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": true
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 88
    },
    "speed": null
   },
   "klingai/klingai-2-0-master": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": true
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 88
    },
    "speed": null
   },
   "klingai/klingai-2-1-master": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": true
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 88
    },
    "speed": null
   },
   "klingai/klingai-2-1-pro": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": true
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 88
    },
    "speed": null
   },
   "klingai/klingai-2-1-standard": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": true
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 88
    },
    "speed": null
   },
   "klingai/klingai-2-5-turbo-pro": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": true
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 88
    },
    "speed": null
   },
   "klingai/klingai-2-5-turbo-standard": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": true
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 88
    },
    "speed": null
   },
   "klingai/klingai-avatar-2-0-pro": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": true
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 88
    },
    "speed": null
   },
   "klingai/klingai-avatar-2-0-standard": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": true
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 88
    },
    "speed": null
   },
   "klingai/klingai-lip-sync": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 88
    },
    "speed": null
   },
   "krea/krea-2-large": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -9020,7 +8739,7 @@
   },
   "krea/krea-2-medium": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -9038,7 +8757,7 @@
   },
   "krea/krea-2-medium-turbo": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -9056,7 +8775,7 @@
   },
   "krea/krea-2-turbo": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -9126,187 +8845,187 @@
   },
   "lightricks/ltx-2": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": true
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 68
    },
    "speed": null
   },
   "lightricks/ltx-2-19b": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": true
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 68
    },
    "speed": null
   },
   "lightricks/ltx-2-19b-distilled": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": true
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 68
    },
    "speed": null
   },
   "lightricks/ltx-2-3": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": true
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 68
    },
    "speed": null
   },
   "lightricks/ltx-2-fast": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": true
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 68
    },
    "speed": null
   },
   "lightricks/ltx-2-full": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": true
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 68
    },
    "speed": null
   },
   "lightricks/ltx-2-pro": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": true
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 68
    },
    "speed": null
   },
   "lightricks/ltx-2-retake": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 68
    },
    "speed": null
   },
   "lightricks/ltx-2.3-fast": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": true
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 68
    },
    "speed": null
   },
   "lightricks/ltx-2.3-full": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": true
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 68
    },
    "speed": null
   },
   "lodestones/chroma": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -9324,7 +9043,7 @@
   },
   "luma/luma-uni-1": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -9342,7 +9061,7 @@
   },
   "luma/luma-uni-1-max": {
    "caps": {
-    "alive": null,
+    "alive": false,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -9360,7 +9079,7 @@
   },
   "luma/ray3-2": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -9391,7 +9110,7 @@
   },
   "meituan/longcat-video": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -9409,7 +9128,7 @@
   },
   "meituan/longcat-video-distilled": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -9987,7 +9706,7 @@
   },
   "microsoft/mai-image-2.5": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -10005,7 +9724,7 @@
   },
   "microsoft/mai-image-2.5-flash": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -10198,55 +9917,55 @@
   },
   "minimax/hailuo-02": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 82
    },
    "speed": null
   },
   "minimax/hailuo-2.3": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": true
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 82
    },
    "speed": null
   },
   "minimax/hailuo-2.3-fast": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": true
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 82
    },
    "speed": null
   },
@@ -10322,19 +10041,19 @@
   },
   "minimax/minimax-01-live": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": true
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 82
    },
    "speed": null
   },
@@ -10655,7 +10374,7 @@
   },
   "minimax/minimax-speech-2-8": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -10673,7 +10392,7 @@
   },
   "minimax/music-2.6": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -10691,7 +10410,7 @@
   },
   "minimax/speech-02-hd": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -10709,7 +10428,7 @@
   },
   "minimax/speech-02-turbo": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -10727,7 +10446,7 @@
   },
   "minimax/speech-2.5-hd-preview": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -10745,7 +10464,7 @@
   },
   "minimax/speech-2.6-hd": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -10763,7 +10482,7 @@
   },
   "minimax/speech-2.8-hd": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -10781,19 +10500,19 @@
   },
   "minimax/video-01-director": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 82
    },
    "speed": null
   },
@@ -11289,17 +11008,18 @@
   },
   "mistralai/codestral-embed": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "embedding": 0.2
+    "embedding": 0.35
    },
    "ctx": 8192,
-   "meta_only": true,
+   "dims": 1536,
+   "meta_only": false,
    "scores": {
     "embedding": 50
    },
@@ -11412,17 +11132,18 @@
   },
   "mistralai/mistral-embed": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "embedding": 0.2
+    "embedding": 0.35
    },
    "ctx": 8192,
-   "meta_only": true,
+   "dims": 1024,
+   "meta_only": false,
    "scores": {
     "embedding": 50
    },
@@ -11920,7 +11641,7 @@
   },
   "mistralai/voxtral-mini-3b-2507": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -11938,7 +11659,7 @@
   },
   "mistralai/voxtral-small-24b-2507": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -12375,7 +12096,7 @@
   },
   "nvidia/cosmos-3-super": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -12428,17 +12149,18 @@
   },
   "nvidia/llama-nemotron-embed-vl-1b-v2": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "embedding": 0.2
+    "embedding": 0.35
    },
    "ctx": 10240,
-   "meta_only": true,
+   "dims": 2048,
+   "meta_only": false,
    "scores": {
     "embedding": 50
    },
@@ -12446,7 +12168,7 @@
   },
   "nvidia/nemotron-3-asr-streaming-0.6b": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -12464,17 +12186,18 @@
   },
   "nvidia/nemotron-3-embed-1b-bf16": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "embedding": 0.2
+    "embedding": 0.35
    },
    "ctx": 32768,
-   "meta_only": true,
+   "dims": 2048,
+   "meta_only": false,
    "scores": {
     "embedding": 50
    },
@@ -12482,17 +12205,18 @@
   },
   "nvidia/nemotron-3-embed-1b-nvfp4": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "embedding": 0.2
+    "embedding": 0.35
    },
    "ctx": 32768,
-   "meta_only": true,
+   "dims": 2048,
+   "meta_only": false,
    "scores": {
     "embedding": 50
    },
@@ -12500,17 +12224,18 @@
   },
   "nvidia/nemotron-3-embed-8b": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "embedding": 0.2
+    "embedding": 0.35
    },
    "ctx": 32768,
-   "meta_only": true,
+   "dims": 4096,
+   "meta_only": false,
    "scores": {
     "embedding": 50
    },
@@ -12623,7 +12348,7 @@
   },
   "nvidia/nemotron-3.5-asr-streaming-0.6b": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -12641,7 +12366,7 @@
   },
   "nvidia/nemotron-3.5-asr-streaming-multilingual-0.6b": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -12834,7 +12559,7 @@
   },
   "nvidia/parakeet-tdt-0.6b-v3": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -13880,7 +13605,7 @@
   },
   "openai/gpt-5.4-image": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -13898,7 +13623,7 @@
   },
   "openai/gpt-5.4-image-2": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -13916,7 +13641,7 @@
   },
   "openai/gpt-5.4-image-mini": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -14249,7 +13974,7 @@
   },
   "openai/gpt-audio": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -14267,7 +13992,7 @@
   },
   "openai/gpt-audio-1.5": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -14285,7 +14010,7 @@
   },
   "openai/gpt-audio-mini": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -14303,91 +14028,91 @@
   },
   "openai/gpt-image-1": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": true
    },
    "conf": {
-    "image-gen": 0.2
+    "image-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "image-gen": 50
+    "image-gen": 94
    },
    "speed": null
   },
   "openai/gpt-image-1-mini": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": true
    },
    "conf": {
-    "image-gen": 0.2
+    "image-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "image-gen": 50
+    "image-gen": 94
    },
    "speed": null
   },
   "openai/gpt-image-1.5": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": true
    },
    "conf": {
-    "image-gen": 0.2
+    "image-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "image-gen": 50
+    "image-gen": 94
    },
    "speed": null
   },
   "openai/gpt-image-2": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": true
    },
    "conf": {
-    "image-gen": 0.2
+    "image-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "image-gen": 50
+    "image-gen": 94
    },
    "speed": null
   },
   "openai/gpt-image-2-developer": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "image-gen": 0.2
+    "image-gen": 0.7
    },
    "ctx": 0,
-   "meta_only": true,
+   "meta_only": false,
    "scores": {
-    "image-gen": 50
+    "image-gen": 94
    },
    "speed": null
   },
@@ -14638,7 +14363,7 @@
   },
   "openai/gpt-realtime": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -14656,7 +14381,7 @@
   },
   "openai/gpt-realtime-1.5": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -14674,7 +14399,7 @@
   },
   "openai/gpt-realtime-2": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -14692,7 +14417,7 @@
   },
   "openai/gpt-realtime-2.1": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -14710,7 +14435,7 @@
   },
   "openai/gpt-realtime-2.1-mini": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -14728,7 +14453,7 @@
   },
   "openai/gpt-realtime-mini": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -14746,7 +14471,7 @@
   },
   "openai/gpt-realtime-translate": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -14764,19 +14489,19 @@
   },
   "openai/gpt-realtime-whisper": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "audio-in": 0.2
+    "audio-in": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "audio-in": 50
+    "audio-in": 78
    },
    "speed": null
   },
@@ -14992,73 +14717,73 @@
   },
   "openai/sora-2": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 92
    },
    "speed": null
   },
   "openai/sora-2-pro": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 92
    },
    "speed": null
   },
   "openai/whisper-large-v3": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "stt": 0.2
+    "stt": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "stt": 50
+    "stt": 86
    },
    "speed": null
   },
   "openai/whisper-large-v3-turbo": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "stt": 0.2
+    "stt": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "stt": 50
+    "stt": 86
    },
    "speed": null
   },
@@ -15090,253 +14815,235 @@
   },
   "pixverse/c1": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
-   },
-   "speed": null
-  },
-  "pixverse/pixverse-6-i2v": {
-   "caps": {
-    "alive": null,
-    "reasoning_with_tools": false,
-    "structured": false,
-    "tools": false,
-    "vision": false
-   },
-   "conf": {
-    "video-gen": 0.2
-   },
-   "ctx": 0,
-   "meta_only": true,
-   "scores": {
-    "video-gen": 50
+    "video-gen": 74
    },
    "speed": null
   },
   "pixverse/pixverse-6-t2v": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 74
    },
    "speed": null
   },
   "pixverse/pixverse-c1": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": true
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 74
    },
    "speed": null
   },
   "pixverse/pixverse-lipsync": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 74
    },
    "speed": null
   },
   "pixverse/pixverse-modify": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 74
    },
    "speed": null
   },
   "pixverse/pixverse-v3-5": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 74
    },
    "speed": null
   },
   "pixverse/pixverse-v4": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": true
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 74
    },
    "speed": null
   },
   "pixverse/pixverse-v4-5": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": true
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 74
    },
    "speed": null
   },
   "pixverse/pixverse-v5": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 74
    },
    "speed": null
   },
   "pixverse/pixverse-v5-5": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 74
    },
    "speed": null
   },
   "pixverse/pixverse-v5-fast": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": true
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 74
    },
    "speed": null
   },
   "pixverse/pixverse-v5.6": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": true
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 74
    },
    "speed": null
   },
   "pixverse/v6": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 74
    },
    "speed": null
   },
@@ -15355,17 +15062,17 @@
   },
   "prunaai/p-image": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "image-gen": 0.2
+    "image-gen": 0.35
    },
    "ctx": 0,
-   "meta_only": true,
+   "meta_only": false,
    "scores": {
     "image-gen": 50
    },
@@ -15373,7 +15080,7 @@
   },
   "prunaai/p-image-edit": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -15391,7 +15098,7 @@
   },
   "prunaai/p-image-try-on": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -15409,7 +15116,7 @@
   },
   "prunaai/p-image-upscale": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -15427,7 +15134,7 @@
   },
   "prunaai/p-video": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -15445,7 +15152,7 @@
   },
   "prunaai/p-video-animate": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -15463,7 +15170,7 @@
   },
   "prunaai/p-video-avatar": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -15481,7 +15188,7 @@
   },
   "prunaai/p-video-replace": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -15639,109 +15346,109 @@
   },
   "qwen/qwen-image": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "image-gen": 0.2
+    "image-gen": 0.7
    },
    "ctx": 0,
-   "meta_only": true,
+   "meta_only": false,
    "scores": {
-    "image-gen": 50
+    "image-gen": 82
    },
    "speed": null
   },
   "qwen/qwen-image-2.0": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "image-gen": 0.2
+    "image-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "image-gen": 50
+    "image-gen": 82
    },
    "speed": null
   },
   "qwen/qwen-image-2.0-pro": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "image-gen": 0.2
+    "image-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "image-gen": 50
+    "image-gen": 82
    },
    "speed": null
   },
   "qwen/qwen-image-edit": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": true
    },
    "conf": {
-    "image-gen": 0.2
+    "image-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "image-gen": 50
+    "image-gen": 82
    },
    "speed": null
   },
   "qwen/qwen-image-edit-max": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": true
    },
    "conf": {
-    "image-gen": 0.2
+    "image-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "image-gen": 50
+    "image-gen": 82
    },
    "speed": null
   },
   "qwen/qwen-image-max": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "image-gen": 0.2
+    "image-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "image-gen": 50
+    "image-gen": 82
    },
    "speed": null
   },
@@ -17077,7 +16784,7 @@
   },
   "qwen/qwen3-asr-0.6b": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -17095,7 +16802,7 @@
   },
   "qwen/qwen3-asr-1.7b": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -17498,17 +17205,18 @@
   },
   "qwen/qwen3-embedding-0.6b": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "embedding": 0.2
+    "embedding": 0.35
    },
    "ctx": 32768,
-   "meta_only": true,
+   "dims": 1024,
+   "meta_only": false,
    "scores": {
     "embedding": 50
    },
@@ -17516,17 +17224,18 @@
   },
   "qwen/qwen3-embedding-4b": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "embedding": 0.2
+    "embedding": 0.35
    },
    "ctx": 32768,
-   "meta_only": true,
+   "dims": 2560,
+   "meta_only": false,
    "scores": {
     "embedding": 50
    },
@@ -17534,17 +17243,18 @@
   },
   "qwen/qwen3-embedding-8b": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "embedding": 0.2
+    "embedding": 0.35
    },
    "ctx": 32768,
-   "meta_only": true,
+   "dims": 4096,
+   "meta_only": false,
    "scores": {
     "embedding": 50
    },
@@ -17902,55 +17612,55 @@
   },
   "qwen/qwen3-tts": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "tts": 0.2
+    "tts": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "tts": 50
+    "tts": 72
    },
    "speed": null
   },
   "qwen/qwen3-tts-0.6b": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "tts": 0.2
+    "tts": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "tts": 50
+    "tts": 72
    },
    "speed": null
   },
   "qwen/qwen3-tts-1.7b": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "tts": 0.2
+    "tts": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "tts": 50
+    "tts": 72
    },
    "speed": null
   },
@@ -19146,145 +18856,145 @@
   },
   "recraft/recraft-v4": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "image-gen": 0.2
+    "image-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "image-gen": 50
+    "image-gen": 80
    },
    "speed": null
   },
   "recraft/recraft-v4-1": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "image-gen": 0.2
+    "image-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "image-gen": 50
+    "image-gen": 80
    },
    "speed": null
   },
   "recraft/recraft-v4-1-pro": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "image-gen": 0.2
+    "image-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "image-gen": 50
+    "image-gen": 80
    },
    "speed": null
   },
   "recraft/recraft-v4-1-utility": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "image-gen": 0.2
+    "image-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "image-gen": 50
+    "image-gen": 80
    },
    "speed": null
   },
   "recraft/recraft-v4-1-utility-pro": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "image-gen": 0.2
+    "image-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "image-gen": 50
+    "image-gen": 80
    },
    "speed": null
   },
   "recraft/recraft-v4-pro": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "image-gen": 0.2
+    "image-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "image-gen": 50
+    "image-gen": 80
    },
    "speed": null
   },
   "recraft/recraft-v4-pro-vector": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "image-gen": 0.2
+    "image-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "image-gen": 50
+    "image-gen": 80
    },
    "speed": null
   },
   "recraft/recraft-v4-vector": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "image-gen": 0.2
+    "image-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "image-gen": 50
+    "image-gen": 80
    },
    "speed": null
   },
@@ -19329,7 +19039,7 @@
   },
   "resembleai/chatterbox-hd": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -19347,7 +19057,7 @@
   },
   "resembleai/chatterbox-multilingual": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -19365,7 +19075,7 @@
   },
   "resembleai/chatterbox-turbo": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -19383,7 +19093,7 @@
   },
   "rundiffusion/juggernaut-base-flux": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -19401,17 +19111,17 @@
   },
   "rundiffusion/juggernaut-lightning-flux": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": true
    },
    "conf": {
-    "image-gen": 0.2
+    "image-gen": 0.35
    },
    "ctx": 0,
-   "meta_only": true,
+   "meta_only": false,
    "scores": {
     "image-gen": 50
    },
@@ -19419,7 +19129,7 @@
   },
   "rundiffusion/juggernaut-pro-flux": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -19437,7 +19147,7 @@
   },
   "rundiffusion/juggernaut-z": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -19455,7 +19165,7 @@
   },
   "rundiffusion/juggernaut-z-fast": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -19473,7 +19183,7 @@
   },
   "runware/clarity": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -19491,7 +19201,7 @@
   },
   "runware/flux-1-krea-dev": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -19509,71 +19219,71 @@
   },
   "runware/flux-2-klein-4b-base": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": true
    },
    "conf": {
-    "image-gen": 0.2
+    "image-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "image-gen": 50
+    "image-gen": 92
    },
    "speed": null
   },
   "runware/flux-2-klein-9b-base": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": true
    },
    "conf": {
-    "image-gen": 0.2
+    "image-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "image-gen": 50
+    "image-gen": 92
    },
    "speed": null
   },
   "runware/flux-2-klein-9b-kv": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": true
    },
    "conf": {
-    "image-gen": 0.2
+    "image-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "image-gen": 50
+    "image-gen": 92
    },
    "speed": null
   },
   "runware/hidream-i1-dev": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "image-gen": 0.2
+    "image-gen": 0.35
    },
    "ctx": 0,
-   "meta_only": true,
+   "meta_only": false,
    "scores": {
     "image-gen": 50
    },
@@ -19581,7 +19291,7 @@
   },
   "runware/hidream-i1-fast": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -19599,7 +19309,7 @@
   },
   "runware/hidream-i1-full": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -19617,17 +19327,17 @@
   },
   "runware/kandinsky-5-0-image-lite": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": true
    },
    "conf": {
-    "image-gen": 0.2
+    "image-gen": 0.35
    },
    "ctx": 0,
-   "meta_only": true,
+   "meta_only": false,
    "scores": {
     "image-gen": 50
    },
@@ -19635,53 +19345,53 @@
   },
   "runware/qwen-image-edit-plus": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": true
    },
    "conf": {
-    "image-gen": 0.2
+    "image-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "image-gen": 50
+    "image-gen": 82
    },
    "speed": null
   },
   "runware/stable-diffusion-3": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": true
    },
    "conf": {
-    "image-gen": 0.2
+    "image-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "image-gen": 50
+    "image-gen": 68
    },
    "speed": null
   },
   "runware/twinflow-z-image-turbo": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "image-gen": 0.2
+    "image-gen": 0.35
    },
    "ctx": 0,
-   "meta_only": true,
+   "meta_only": false,
    "scores": {
     "image-gen": 50
    },
@@ -19689,7 +19399,7 @@
   },
   "runware/wan2-5-preview-image": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -19707,7 +19417,7 @@
   },
   "runware/z-image": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -19725,7 +19435,7 @@
   },
   "runway/runway-aleph-2-0": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -19743,7 +19453,7 @@
   },
   "runway/runway-gen-4-image": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -19761,7 +19471,7 @@
   },
   "runway/runway-gen-4-image-turbo": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -19779,7 +19489,7 @@
   },
   "runwayml/gen-4-turbo": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -19797,7 +19507,7 @@
   },
   "runwayml/gen-4.5": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -19906,43 +19616,43 @@
   },
   "sarvam/bulbul:v2": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "tts": 0.2
+    "tts": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "tts": 50
+    "tts": 76
    },
    "speed": null
   },
   "sarvam/bulbul:v3": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "tts": 0.2
+    "tts": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "tts": 50
+    "tts": 76
    },
    "speed": null
   },
   "sarvam/saaras:v3": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -19960,17 +19670,18 @@
   },
   "sentence-transformers/all-minilm-l12-v2": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "embedding": 0.2
+    "embedding": 0.35
    },
    "ctx": 512,
-   "meta_only": true,
+   "dims": 384,
+   "meta_only": false,
    "scores": {
     "embedding": 50
    },
@@ -19978,17 +19689,18 @@
   },
   "sentence-transformers/all-minilm-l6-v2": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "embedding": 0.2
+    "embedding": 0.35
    },
    "ctx": 512,
-   "meta_only": true,
+   "dims": 384,
+   "meta_only": false,
    "scores": {
     "embedding": 50
    },
@@ -19996,17 +19708,18 @@
   },
   "sentence-transformers/all-mpnet-base-v2": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "embedding": 0.2
+    "embedding": 0.35
    },
    "ctx": 512,
-   "meta_only": true,
+   "dims": 768,
+   "meta_only": false,
    "scores": {
     "embedding": 50
    },
@@ -20014,17 +19727,18 @@
   },
   "sentence-transformers/clip-vit-b-32": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "embedding": 0.2
+    "embedding": 0.35
    },
    "ctx": 77,
-   "meta_only": true,
+   "dims": 512,
+   "meta_only": false,
    "scores": {
     "embedding": 50
    },
@@ -20032,17 +19746,18 @@
   },
   "sentence-transformers/clip-vit-b-32-multilingual-v1": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "embedding": 0.2
+    "embedding": 0.35
    },
    "ctx": 512,
-   "meta_only": true,
+   "dims": 512,
+   "meta_only": false,
    "scores": {
     "embedding": 50
    },
@@ -20050,17 +19765,18 @@
   },
   "sentence-transformers/multi-qa-mpnet-base-dot-v1": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "embedding": 0.2
+    "embedding": 0.35
    },
    "ctx": 512,
-   "meta_only": true,
+   "dims": 768,
+   "meta_only": false,
    "scores": {
     "embedding": 50
    },
@@ -20068,17 +19784,18 @@
   },
   "sentence-transformers/paraphrase-minilm-l6-v2": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "embedding": 0.2
+    "embedding": 0.35
    },
    "ctx": 512,
-   "meta_only": true,
+   "dims": 384,
+   "meta_only": false,
    "scores": {
     "embedding": 50
    },
@@ -20086,7 +19803,7 @@
   },
   "sesame/csm-1b": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -20104,17 +19821,18 @@
   },
   "shibing624/text2vec-base-chinese": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "embedding": 0.2
+    "embedding": 0.35
    },
    "ctx": 512,
-   "meta_only": true,
+   "dims": 768,
+   "meta_only": false,
    "scores": {
     "embedding": 50
    },
@@ -20122,7 +19840,7 @@
   },
   "skywork/skyreels-v4": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -20140,7 +19858,7 @@
   },
   "sourceful/riverflow-2-0-fast": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -20158,7 +19876,7 @@
   },
   "sourceful/riverflow-2-0-pro": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -20176,7 +19894,7 @@
   },
   "sourceful/riverflow-2-5-fast": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -20194,7 +19912,7 @@
   },
   "sourceful/riverflow-2-5-pro": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -20212,25 +19930,25 @@
   },
   "stabilityai/sdxl-turbo": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "image-gen": 0.2
+    "image-gen": 0.7
    },
    "ctx": 0,
-   "meta_only": true,
+   "meta_only": false,
    "scores": {
-    "image-gen": 50
+    "image-gen": 58
    },
    "speed": null
   },
   "stabilityai/stable-diffusion-xl-base-1.0": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -20274,7 +19992,7 @@
   },
   "suno/chirp-auk": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -20292,7 +20010,7 @@
   },
   "suno/chirp-fenix": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -20310,7 +20028,7 @@
   },
   "suno/chirp-v3-0": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -20328,7 +20046,7 @@
   },
   "suno/chirp-v3-5": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -20346,7 +20064,7 @@
   },
   "suno/chirp-v3-5-tau": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -20364,7 +20082,7 @@
   },
   "suno/chirp-v4": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -20382,7 +20100,7 @@
   },
   "suno/chirp-v4-tau": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -20400,7 +20118,7 @@
   },
   "suno/chirp-v5": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -20418,7 +20136,7 @@
   },
   "sync/lipsync-2": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -20436,7 +20154,7 @@
   },
   "sync/lipsync-2-pro": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -20454,7 +20172,7 @@
   },
   "sync/lipsync-v3": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -20472,7 +20190,7 @@
   },
   "sync/react-1": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -20490,7 +20208,7 @@
   },
   "sync/sync-3": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -20521,7 +20239,7 @@
   },
   "tencent/hunyuan-image-3": {
    "caps": {
-    "alive": null,
+    "alive": false,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -20604,17 +20322,18 @@
   },
   "thenlper/gte-base": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "embedding": 0.2
+    "embedding": 0.35
    },
    "ctx": 512,
-   "meta_only": true,
+   "dims": 768,
+   "meta_only": false,
    "scores": {
     "embedding": 50
    },
@@ -20622,17 +20341,18 @@
   },
   "thenlper/gte-large": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "embedding": 0.2
+    "embedding": 0.35
    },
    "ctx": 512,
-   "meta_only": true,
+   "dims": 1024,
+   "meta_only": false,
    "scores": {
     "embedding": 50
    },
@@ -20679,7 +20399,7 @@
   },
   "topazlabs/topaz-labs-starlight-precise-2-5": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -20723,7 +20443,7 @@
   },
   "veed/fabric-1.0": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -20741,7 +20461,7 @@
   },
   "veed/fabric-1.0/fast": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -20759,7 +20479,7 @@
   },
   "veed/lipsync": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -20812,25 +20532,25 @@
   },
   "venice/lustify-sdxl": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "image-gen": 0.2
+    "image-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "image-gen": 50
+    "image-gen": 58
    },
    "speed": null
   },
   "venice/lustify-v7": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -20848,7 +20568,7 @@
   },
   "venice/lustify-v8": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -20866,7 +20586,7 @@
   },
   "venice/qwen-edit-uncensored": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -20884,7 +20604,7 @@
   },
   "venice/sd35": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -20902,7 +20622,7 @@
   },
   "venice/upscaler": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -20946,7 +20666,7 @@
   },
   "venice/wai-illustrious": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -20964,439 +20684,439 @@
   },
   "venice/wan-2.7-uncensored": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": true
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 78
    },
    "speed": null
   },
   "vidu/image-to-video-2.0": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 72
    },
    "speed": null
   },
   "vidu/q1": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 72
    },
    "speed": null
   },
   "vidu/q2": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 72
    },
    "speed": null
   },
   "vidu/q2-pro": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 72
    },
    "speed": null
   },
   "vidu/q2-pro-fast": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 72
    },
    "speed": null
   },
   "vidu/q2-turbo": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 72
    },
    "speed": null
   },
   "vidu/q3": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 72
    },
    "speed": null
   },
   "vidu/q3-mix": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 72
    },
    "speed": null
   },
   "vidu/q3-pro": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 72
    },
    "speed": null
   },
   "vidu/q3-turbo": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 72
    },
    "speed": null
   },
   "vidu/reference-to-video-2.0": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 72
    },
    "speed": null
   },
   "vidu/reference-to-video-q1": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 72
    },
    "speed": null
   },
   "vidu/start-end-to-video-2.0": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 72
    },
    "speed": null
   },
   "vidu/vidu-2-0": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": true
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 72
    },
    "speed": null
   },
   "vidu/vidu-q1": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 72
    },
    "speed": null
   },
   "vidu/vidu-q1-classic": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": true
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 72
    },
    "speed": null
   },
   "vidu/vidu-q3": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": true
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 72
    },
    "speed": null
   },
   "wan-ai/wan2.1-pro-i2v": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": true
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 78
    },
    "speed": null
   },
   "wan-ai/wan2.2-i2v-a14b": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": true
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 78
    },
    "speed": null
   },
   "wan-ai/wan2.2-t2v-a14b": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 78
    },
    "speed": null
   },
   "wan-ai/wan2.5-preview": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": true
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 78
    },
    "speed": null
   },
   "wan-ai/wan2.6-flash-i2v": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": true
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 78
    },
    "speed": null
   },
   "wan-ai/wan2.6-i2v": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": true
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 78
    },
    "speed": null
   },
   "wan-ai/wan2.6-image-edit": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -21414,7 +21134,7 @@
   },
   "wan-ai/wan2.6-t2i": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -21432,61 +21152,43 @@
   },
   "wan-ai/wan2.6-t2v": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 78
    },
    "speed": null
   },
   "wan-ai/wan2.6-v2v": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
-   },
-   "speed": null
-  },
-  "wan-ai/wan2.7-i2v": {
-   "caps": {
-    "alive": null,
-    "reasoning_with_tools": false,
-    "structured": false,
-    "tools": false,
-    "vision": false
-   },
-   "conf": {
-    "video-gen": 0.2
-   },
-   "ctx": 0,
-   "meta_only": true,
-   "scores": {
-    "video-gen": 50
+    "video-gen": 78
    },
    "speed": null
   },
   "wan-ai/wan2.7-image-edit": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -21504,7 +21206,7 @@
   },
   "wan-ai/wan2.7-pro-t2i": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -21520,27 +21222,9 @@
    },
    "speed": null
   },
-  "wan-ai/wan2.7-r2v": {
-   "caps": {
-    "alive": null,
-    "reasoning_with_tools": false,
-    "structured": false,
-    "tools": false,
-    "vision": false
-   },
-   "conf": {
-    "video-gen": 0.2
-   },
-   "ctx": 0,
-   "meta_only": true,
-   "scores": {
-    "video-gen": 50
-   },
-   "speed": null
-  },
   "wan-ai/wan2.7-t2i": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -21558,19 +21242,19 @@
   },
   "wan-ai/wan2.7-t2v": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
     "vision": false
    },
    "conf": {
-    "video-gen": 0.2
+    "video-gen": 0.55
    },
    "ctx": 0,
    "meta_only": true,
    "scores": {
-    "video-gen": 50
+    "video-gen": 78
    },
    "speed": null
   },
@@ -21895,7 +21579,7 @@
   },
   "xai/grok-imagine": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -21913,7 +21597,7 @@
   },
   "xai/grok-imagine-1.5-video": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -21931,7 +21615,7 @@
   },
   "xai/grok-imagine-image-quality": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -21949,7 +21633,7 @@
   },
   "xai/grok-imagine-pro": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -21967,7 +21651,7 @@
   },
   "xai/grok-imagine-video": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -21985,7 +21669,7 @@
   },
   "xai/grok-imagine-video-1-5": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -22003,7 +21687,7 @@
   },
   "xai/stt-v1": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -22021,7 +21705,7 @@
   },
   "xai/tts-v1": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -22039,7 +21723,7 @@
   },
   "xai/xai-text-to-speech": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
@@ -22083,7 +21767,7 @@
   },
   "youchuan/v8.1": {
    "caps": {
-    "alive": null,
+    "alive": true,
     "reasoning_with_tools": false,
     "structured": false,
     "tools": false,
