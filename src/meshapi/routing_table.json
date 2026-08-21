@@ -1,5 +1,5 @@
 {
- "built_at": "2026-08-21T02:31:45Z",
+ "built_at": "2026-08-21T02:54:07Z",
  "cohorts": [
   "coding",
   "agentic",
@@ -21,9 +21,9 @@
  "defaults": {
   "agentic": "xai/grok-4.1-fast-non-reasoning",
   "audio-in": "bytedance/seed-asr-2.0",
-  "chat": "xai/grok-4.1-fast-non-reasoning",
+  "chat": "qwen/qwen-2.5-7b-instruct",
   "cheap-bulk": "xai/grok-4.1-fast-non-reasoning",
-  "coding": "deepseek/deepseek-v3-turbo",
+  "coding": "xai/grok-4.1-fast-non-reasoning",
   "embedding": "cohere/embed-v4",
   "extraction": "xai/grok-4.1-fast-non-reasoning",
   "image-gen": "openai/gpt-image-2-developer",
@@ -32,23 +32,20 @@
   "stt": "openai/whisper-large-v3-turbo",
   "tts": "elevenlabs/eleven_flash_v2_5",
   "video-gen": "google/veo3.1-lite",
-  "vision": "x-ai/grok-build-0.1",
+  "vision": "nvidia/nemotron-nano-12b-v2",
   "web-research": "xai/grok-4.1-fast-non-reasoning",
-  "writing": "xai/grok-4.1-fast-non-reasoning"
+  "writing": "qwen/qwen-2.5-7b-instruct"
  },
  "frontiers": {
   "agentic": [
    "anthropic/claude-opus-4.8",
-   "openai/gpt-4-turbo",
    "anthropic/claude-opus-4.7",
-   "google/gemini-3.1-pro",
-   "openai/gpt-5.6-terra",
-   "openai/gpt-4o-2024-05-13",
-   "deepseek/deepseek-v4-pro",
-   "deepseek/deepseek-v3-turbo",
+   "anthropic/claude-sonnet-4.6",
    "deepseek/deepseek-v4-flash",
+   "x-ai/grok-4.20",
    "xai/grok-4.1-fast-non-reasoning",
    "openai/gpt-3.5-turbo-1106",
+   "openai/gpt-4o-2024-05-13",
    "bytedance-seed/seed-1.6-flash",
    "nvidia/nemotron-nano-9b-v2"
   ],
@@ -62,41 +59,37 @@
   ],
   "chat": [
    "anthropic/claude-opus-4.8",
-   "openai/gpt-4-turbo",
-   "google/gemini-3.1-pro",
-   "openai/gpt-5.6-terra",
-   "openai/gpt-4o-2024-05-13",
-   "deepseek/deepseek-v4-pro",
-   "xai/grok-4.1-fast-non-reasoning",
+   "anthropic/claude-opus-4.7",
+   "deepseek/deepseek-v4-flash",
    "x-ai/grok-4.20",
-   "openai/gpt-3.5-turbo-16k",
-   "openai/gpt-3.5-turbo-1106",
+   "qwen/qwen3.5-flash-02-23",
+   "google/gemini-3.1-flash-lite",
+   "openai/gpt-5.4-nano",
    "qwen/qwen-2.5-7b-instruct",
+   "xai/grok-4.1-fast-non-reasoning",
+   "openai/gpt-3.5-turbo-1106",
+   "openai/gpt-4o-2024-05-13",
    "deepseek/deepseek-v3.2-speciale",
    "bytedance-seed/seed-1.6-flash"
   ],
   "cheap-bulk": [
    "anthropic/claude-opus-4.8",
-   "openai/gpt-4-turbo",
    "anthropic/claude-opus-4.7",
-   "google/gemini-3.1-pro",
-   "openai/gpt-5.6-terra",
-   "openai/gpt-4o-2024-05-13",
    "x-ai/grok-4.3",
+   "openai/gpt-5.4",
+   "x-ai/grok-4.20",
    "xai/grok-4.1-fast-non-reasoning",
    "openai/gpt-3.5-turbo-1106",
+   "openai/gpt-4o-2024-05-13",
    "nvidia/nemotron-nano-9b-v2"
   ],
   "coding": [
    "anthropic/claude-opus-4.7",
-   "google/gemini-3.1-pro",
-   "deepseek/deepseek-v4-pro",
-   "openai/gpt-5.6-terra",
-   "openai/gpt-4o-2024-05-13",
-   "deepseek/deepseek-v3-turbo",
    "deepseek/deepseek-v4-flash",
+   "x-ai/grok-4.20",
    "xai/grok-4.1-fast-non-reasoning",
    "openai/gpt-3.5-turbo-1106",
+   "openai/gpt-4o-2024-05-13",
    "deepseek/deepseek-v3.2-speciale",
    "nvidia/nemotron-nano-9b-v2"
   ],
@@ -119,14 +112,13 @@
   ],
   "extraction": [
    "anthropic/claude-opus-4.8",
-   "openai/gpt-4-turbo",
    "anthropic/claude-opus-4.7",
-   "google/gemini-3.1-pro",
-   "openai/gpt-5.6-terra",
-   "openai/gpt-4o-2024-05-13",
    "x-ai/grok-4.3",
+   "openai/gpt-5.4",
+   "x-ai/grok-4.20",
    "xai/grok-4.1-fast-non-reasoning",
    "openai/gpt-3.5-turbo-1106",
+   "openai/gpt-4o-2024-05-13",
    "nvidia/nemotron-nano-9b-v2"
   ],
   "image-gen": [
@@ -148,33 +140,31 @@
   ],
   "long-context": [
    "anthropic/claude-opus-4.8",
-   "openai/gpt-4-turbo",
    "anthropic/claude-opus-4.7",
-   "google/gemini-3.1-pro",
-   "openai/gpt-5.6-terra",
-   "openai/gpt-4o-2024-05-13",
    "x-ai/grok-4.3",
-   "xai/grok-4.1-fast-non-reasoning",
+   "openai/gpt-5.4",
+   "openai/gpt-5.4-mini",
    "x-ai/grok-4.20",
+   "xai/grok-4.1-fast-non-reasoning",
+   "openai/gpt-4o-2024-05-13",
    "bytedance-seed/seed-1.6-flash",
    "nvidia/nemotron-nano-9b-v2"
   ],
   "reasoning-math": [
    "anthropic/claude-opus-4.8",
    "anthropic/claude-opus-4.7",
-   "google/gemini-3.1-pro",
-   "openai/gpt-5.6-terra",
-   "openai/gpt-4o-2024-05-13",
-   "deepseek/deepseek-v4-pro",
-   "moonshotai/kimi-k2.5",
-   "moonshotai/kimi-k2.7-code",
-   "openai/gpt-3.5-turbo-1106",
-   "deepseek/deepseek-v3-turbo",
    "deepseek/deepseek-v4-flash",
-   "openai/gpt-oss-120b-ultra",
    "openai/gpt-5.4-nano",
-   "google/gemma-2-27b-it",
-   "nvidia/nemotron-nano-9b-v2"
+   "x-ai/grok-4.20",
+   "nvidia/nemotron-nano-9b-v2",
+   "xai/grok-4.1-fast-non-reasoning",
+   "openai/gpt-3.5-turbo-1106",
+   "openai/gpt-4o-2024-05-13",
+   "amazon/nova-2-lite-v1",
+   "qwen/qwen-2.5-7b-instruct",
+   "bytedance-seed/seed-1.6-flash",
+   "deepseek/deepseek-v3.2-speciale",
+   "meta-llama/llama-4-maverick"
   ],
   "stt": [
    "openai/whisper-large-v3-turbo",
@@ -226,8 +216,6 @@
   ],
   "vision": [
    "anthropic/claude-opus-4.8",
-   "google/gemini-3.1-pro",
-   "openai/gpt-5.6-terra",
    "x-ai/grok-build-0.1",
    "x-ai/grok-4.5",
    "moonshotai/kimi-k2.7-code",
@@ -238,28 +226,26 @@
    "google/gemini-3.5-flash-lite"
   ],
   "web-research": [
-   "anthropic/claude-opus-4.8",
-   "openai/gpt-4-turbo",
-   "anthropic/claude-opus-4.7",
-   "google/gemini-3.1-pro",
-   "openai/gpt-5.6-terra",
-   "openai/gpt-4o-2024-05-13",
    "x-ai/grok-4.3",
+   "openai/gpt-5.4",
+   "x-ai/grok-4.20",
    "xai/grok-4.1-fast-non-reasoning",
    "openai/gpt-3.5-turbo-1106",
+   "openai/gpt-4o-2024-05-13",
    "nvidia/nemotron-nano-9b-v2"
   ],
   "writing": [
    "anthropic/claude-opus-4.8",
-   "openai/gpt-4-turbo",
-   "google/gemini-3.1-pro",
-   "openai/gpt-5.6-terra",
-   "openai/gpt-4o-2024-05-13",
-   "deepseek/deepseek-v4-pro",
-   "xai/grok-4.1-fast-non-reasoning",
+   "anthropic/claude-opus-4.7",
+   "moonshotai/kimi-k2.5",
    "x-ai/grok-4.20",
-   "openai/gpt-3.5-turbo-1106",
+   "deepseek/deepseek-v4-flash",
+   "qwen/qwen3.5-flash-02-23",
+   "openai/gpt-5.4-nano",
    "qwen/qwen-2.5-7b-instruct",
+   "xai/grok-4.1-fast-non-reasoning",
+   "openai/gpt-3.5-turbo-1106",
+   "openai/gpt-4o-2024-05-13",
    "deepseek/deepseek-v3.2-speciale",
    "bytedance-seed/seed-1.6-flash"
   ]
@@ -1164,8 +1150,8 @@
     "extraction": 95,
     "long-context": 94,
     "reasoning-math": 99,
-    "vision": 93,
-    "web-research": 93,
+    "vision": 85,
+    "web-research": 85,
     "writing": 95
    },
    "speed": 64
@@ -1234,8 +1220,8 @@
     "extraction": 100,
     "long-context": 100,
     "reasoning-math": 100,
-    "vision": 100,
-    "web-research": 100,
+    "vision": 85,
+    "web-research": 85,
     "writing": 100
    },
    "speed": 54
@@ -4327,7 +4313,7 @@
     "coding": 45,
     "extraction": 36,
     "long-context": 36,
-    "reasoning-math": 76,
+    "reasoning-math": 75,
     "vision": 36,
     "web-research": 36,
     "writing": 62
@@ -4356,16 +4342,16 @@
    },
    "ctx": 64000,
    "scores": {
-    "agentic": 85,
-    "chat": 86,
+    "agentic": 75,
+    "chat": 75,
     "cheap-bulk": 74,
-    "coding": 89,
+    "coding": 75,
     "extraction": 74,
     "long-context": 74,
-    "reasoning-math": 89,
+    "reasoning-math": 75,
     "vision": 74,
     "web-research": 74,
-    "writing": 84
+    "writing": 75
    },
    "speed": 50
   },
@@ -4567,12 +4553,12 @@
    "ctx": 1048576,
    "scores": {
     "agentic": 85,
-    "chat": 86,
+    "chat": 85,
     "cheap-bulk": 74,
-    "coding": 89,
+    "coding": 85,
     "extraction": 74,
     "long-context": 74,
-    "reasoning-math": 89,
+    "reasoning-math": 85,
     "vision": 74,
     "web-research": 74,
     "writing": 84
@@ -4601,16 +4587,16 @@
    },
    "ctx": 1050000,
    "scores": {
-    "agentic": 91,
-    "chat": 94,
+    "agentic": 85,
+    "chat": 85,
     "cheap-bulk": 83,
-    "coding": 94,
+    "coding": 85,
     "extraction": 83,
     "long-context": 83,
-    "reasoning-math": 94,
+    "reasoning-math": 85,
     "vision": 83,
     "web-research": 83,
-    "writing": 93
+    "writing": 85
    },
    "speed": 50
   },
@@ -5214,15 +5200,15 @@
    "ctx": 1048576,
    "scores": {
     "agentic": 72,
-    "chat": 85,
+    "chat": 75,
     "cheap-bulk": 51,
-    "coding": 81,
+    "coding": 75,
     "extraction": 51,
     "long-context": 51,
-    "reasoning-math": 84,
+    "reasoning-math": 75,
     "vision": 51,
     "web-research": 51,
-    "writing": 80
+    "writing": 75
    },
    "speed": 34
   },
@@ -5337,15 +5323,15 @@
    "ctx": 1048576,
    "scores": {
     "agentic": 52,
-    "chat": 82,
+    "chat": 75,
     "cheap-bulk": 51,
     "coding": 53,
     "extraction": 51,
     "long-context": 51,
-    "reasoning-math": 82,
+    "reasoning-math": 75,
     "vision": 51,
     "web-research": 51,
-    "writing": 78
+    "writing": 75
    },
    "speed": 31
   },
@@ -5638,12 +5624,12 @@
    "ctx": 1048576,
    "scores": {
     "agentic": 49,
-    "chat": 79,
+    "chat": 75,
     "cheap-bulk": 49,
     "coding": 49,
     "extraction": 49,
     "long-context": 49,
-    "reasoning-math": 80,
+    "reasoning-math": 75,
     "vision": 49,
     "web-research": 49,
     "writing": 74
@@ -5690,16 +5676,16 @@
    },
    "ctx": 1000000,
    "scores": {
-    "agentic": 96,
-    "chat": 98,
-    "cheap-bulk": 92,
-    "coding": 97,
-    "extraction": 92,
-    "long-context": 92,
-    "reasoning-math": 97,
-    "vision": 92,
-    "web-research": 92,
-    "writing": 97
+    "agentic": 75,
+    "chat": 75,
+    "cheap-bulk": 75,
+    "coding": 75,
+    "extraction": 75,
+    "long-context": 75,
+    "reasoning-math": 75,
+    "vision": 75,
+    "web-research": 75,
+    "writing": 75
    },
    "speed": 56
   },
@@ -5725,16 +5711,16 @@
    },
    "ctx": 1048576,
    "scores": {
-    "agentic": 96,
-    "chat": 98,
-    "cheap-bulk": 92,
-    "coding": 97,
-    "extraction": 92,
-    "long-context": 92,
-    "reasoning-math": 97,
-    "vision": 92,
-    "web-research": 92,
-    "writing": 97
+    "agentic": 85,
+    "chat": 85,
+    "cheap-bulk": 85,
+    "coding": 85,
+    "extraction": 85,
+    "long-context": 85,
+    "reasoning-math": 85,
+    "vision": 85,
+    "web-research": 85,
+    "writing": 85
    },
    "speed": 27
   },
@@ -5760,16 +5746,16 @@
    },
    "ctx": 1048576,
    "scores": {
-    "agentic": 96,
-    "chat": 98,
-    "cheap-bulk": 92,
-    "coding": 97,
-    "extraction": 92,
-    "long-context": 92,
-    "reasoning-math": 97,
-    "vision": 92,
-    "web-research": 92,
-    "writing": 97
+    "agentic": 75,
+    "chat": 75,
+    "cheap-bulk": 75,
+    "coding": 75,
+    "extraction": 75,
+    "long-context": 75,
+    "reasoning-math": 75,
+    "vision": 75,
+    "web-research": 75,
+    "writing": 75
    },
    "speed": 27
   },
@@ -5796,15 +5782,15 @@
    "ctx": 1048576,
    "scores": {
     "agentic": 52,
-    "chat": 82,
+    "chat": 75,
     "cheap-bulk": 51,
     "coding": 53,
     "extraction": 51,
     "long-context": 51,
-    "reasoning-math": 82,
+    "reasoning-math": 75,
     "vision": 51,
     "web-research": 51,
-    "writing": 78
+    "writing": 75
    },
    "speed": 31
   },
@@ -5831,15 +5817,15 @@
    "ctx": 1048576,
    "scores": {
     "agentic": 72,
-    "chat": 85,
+    "chat": 75,
     "cheap-bulk": 51,
-    "coding": 81,
+    "coding": 75,
     "extraction": 51,
     "long-context": 51,
-    "reasoning-math": 84,
+    "reasoning-math": 75,
     "vision": 51,
     "web-research": 51,
-    "writing": 80
+    "writing": 75
    },
    "speed": 53
   },
@@ -5866,15 +5852,15 @@
    "ctx": 1048576,
    "scores": {
     "agentic": 52,
-    "chat": 82,
+    "chat": 75,
     "cheap-bulk": 51,
     "coding": 53,
     "extraction": 51,
     "long-context": 51,
-    "reasoning-math": 82,
+    "reasoning-math": 75,
     "vision": 51,
     "web-research": 51,
-    "writing": 78
+    "writing": 75
    },
    "speed": 34
   },
@@ -5901,15 +5887,15 @@
    "ctx": 1048576,
    "scores": {
     "agentic": 72,
-    "chat": 85,
+    "chat": 75,
     "cheap-bulk": 51,
-    "coding": 81,
+    "coding": 75,
     "extraction": 51,
     "long-context": 51,
-    "reasoning-math": 84,
+    "reasoning-math": 75,
     "vision": 51,
     "web-research": 51,
-    "writing": 80
+    "writing": 75
    },
    "speed": 29
   },
@@ -6028,12 +6014,12 @@
    "ctx": 8192,
    "scores": {
     "agentic": 49,
-    "chat": 79,
+    "chat": 75,
     "cheap-bulk": 49,
     "coding": 49,
     "extraction": 49,
     "long-context": 49,
-    "reasoning-math": 80,
+    "reasoning-math": 75,
     "vision": 49,
     "web-research": 49,
     "writing": 74
@@ -11831,15 +11817,15 @@
    "ctx": 131072,
    "scores": {
     "agentic": 71,
-    "chat": 82,
+    "chat": 75,
     "cheap-bulk": 62,
     "coding": 74,
     "extraction": 62,
     "long-context": 62,
-    "reasoning-math": 86,
+    "reasoning-math": 75,
     "vision": 62,
     "web-research": 62,
-    "writing": 79
+    "writing": 75
    },
    "speed": 57
   },
@@ -11906,7 +11892,7 @@
     "coding": 74,
     "extraction": 62,
     "long-context": 62,
-    "reasoning-math": 86,
+    "reasoning-math": 85,
     "vision": 62,
     "web-research": 62,
     "writing": 79
@@ -11936,15 +11922,15 @@
    "ctx": 262144,
    "scores": {
     "agentic": 82,
-    "chat": 90,
+    "chat": 85,
     "cheap-bulk": 74,
-    "coding": 86,
+    "coding": 85,
     "extraction": 74,
     "long-context": 74,
-    "reasoning-math": 91,
+    "reasoning-math": 85,
     "vision": 74,
     "web-research": 74,
-    "writing": 87
+    "writing": 85
    },
    "speed": 49
   },
@@ -11970,16 +11956,16 @@
    },
    "ctx": 262144,
    "scores": {
-    "agentic": 82,
-    "chat": 90,
+    "agentic": 75,
+    "chat": 75,
     "cheap-bulk": 74,
-    "coding": 86,
+    "coding": 75,
     "extraction": 74,
     "long-context": 74,
-    "reasoning-math": 91,
+    "reasoning-math": 75,
     "vision": 74,
     "web-research": 74,
-    "writing": 87
+    "writing": 75
    },
    "speed": null
   },
@@ -12005,16 +11991,16 @@
    },
    "ctx": 262144,
    "scores": {
-    "agentic": 82,
-    "chat": 90,
+    "agentic": 75,
+    "chat": 75,
     "cheap-bulk": 74,
-    "coding": 86,
+    "coding": 75,
     "extraction": 74,
     "long-context": 74,
-    "reasoning-math": 91,
+    "reasoning-math": 75,
     "vision": 74,
     "web-research": 74,
-    "writing": 87
+    "writing": 75
    },
    "speed": 57
   },
@@ -12040,16 +12026,16 @@
    },
    "ctx": 262144,
    "scores": {
-    "agentic": 82,
-    "chat": 90,
+    "agentic": 75,
+    "chat": 75,
     "cheap-bulk": 74,
-    "coding": 86,
+    "coding": 75,
     "extraction": 74,
     "long-context": 74,
-    "reasoning-math": 91,
+    "reasoning-math": 75,
     "vision": 74,
     "web-research": 74,
-    "writing": 87
+    "writing": 75
    },
    "speed": 44
   },
@@ -12075,16 +12061,16 @@
    },
    "ctx": 1000000,
    "scores": {
-    "agentic": 82,
-    "chat": 90,
+    "agentic": 75,
+    "chat": 75,
     "cheap-bulk": 74,
-    "coding": 86,
+    "coding": 75,
     "extraction": 74,
     "long-context": 74,
-    "reasoning-math": 91,
+    "reasoning-math": 75,
     "vision": 74,
     "web-research": 74,
-    "writing": 87
+    "writing": 75
    },
    "speed": 41
   },
@@ -12238,7 +12224,7 @@
     "coding": 55,
     "extraction": 53,
     "long-context": 53,
-    "reasoning-math": 79,
+    "reasoning-math": 75,
     "vision": 53,
     "web-research": 53,
     "writing": 53
@@ -12276,7 +12262,7 @@
     "embedding": 50,
     "extraction": 53,
     "long-context": 53,
-    "reasoning-math": 79,
+    "reasoning-math": 75,
     "vision": 53,
     "web-research": 53,
     "writing": 53
@@ -12332,7 +12318,7 @@
     "embedding": 50,
     "extraction": 53,
     "long-context": 53,
-    "reasoning-math": 79,
+    "reasoning-math": 75,
     "vision": 53,
     "web-research": 53,
     "writing": 53
@@ -12370,7 +12356,7 @@
     "embedding": 50,
     "extraction": 53,
     "long-context": 53,
-    "reasoning-math": 79,
+    "reasoning-math": 75,
     "vision": 53,
     "web-research": 53,
     "writing": 53
@@ -12408,7 +12394,7 @@
     "embedding": 50,
     "extraction": 53,
     "long-context": 53,
-    "reasoning-math": 79,
+    "reasoning-math": 75,
     "vision": 53,
     "web-research": 53,
     "writing": 53
@@ -12443,7 +12429,7 @@
     "coding": 55,
     "extraction": 53,
     "long-context": 53,
-    "reasoning-math": 79,
+    "reasoning-math": 75,
     "vision": 53,
     "web-research": 53,
     "writing": 53
@@ -12478,7 +12464,7 @@
     "coding": 55,
     "extraction": 53,
     "long-context": 53,
-    "reasoning-math": 79,
+    "reasoning-math": 75,
     "vision": 53,
     "web-research": 53,
     "writing": 53
@@ -12513,7 +12499,7 @@
     "coding": 55,
     "extraction": 53,
     "long-context": 53,
-    "reasoning-math": 79,
+    "reasoning-math": 75,
     "vision": 53,
     "web-research": 53,
     "writing": 53
@@ -12584,7 +12570,7 @@
     "coding": 55,
     "extraction": 53,
     "long-context": 53,
-    "reasoning-math": 79,
+    "reasoning-math": 75,
     "vision": 53,
     "web-research": 53,
     "writing": 53
@@ -12619,7 +12605,7 @@
     "coding": 55,
     "extraction": 53,
     "long-context": 53,
-    "reasoning-math": 79,
+    "reasoning-math": 75,
     "vision": 53,
     "web-research": 53,
     "writing": 53
@@ -12654,7 +12640,7 @@
     "coding": 55,
     "extraction": 53,
     "long-context": 53,
-    "reasoning-math": 79,
+    "reasoning-math": 75,
     "vision": 53,
     "web-research": 53,
     "writing": 53
@@ -12689,7 +12675,7 @@
     "coding": 55,
     "extraction": 53,
     "long-context": 53,
-    "reasoning-math": 79,
+    "reasoning-math": 75,
     "vision": 53,
     "web-research": 53,
     "writing": 53
@@ -12724,7 +12710,7 @@
     "coding": 55,
     "extraction": 53,
     "long-context": 53,
-    "reasoning-math": 79,
+    "reasoning-math": 75,
     "vision": 53,
     "web-research": 53,
     "writing": 53
@@ -12784,16 +12770,16 @@
    },
    "ctx": 400000,
    "scores": {
-    "agentic": 99,
-    "chat": 99,
-    "cheap-bulk": 98,
-    "coding": 99,
-    "extraction": 98,
-    "long-context": 98,
-    "reasoning-math": 99,
-    "vision": 98,
-    "web-research": 98,
-    "writing": 99
+    "agentic": 75,
+    "chat": 75,
+    "cheap-bulk": 75,
+    "coding": 75,
+    "extraction": 75,
+    "long-context": 75,
+    "reasoning-math": 75,
+    "vision": 75,
+    "web-research": 75,
+    "writing": 75
    },
    "speed": 48
   },
@@ -12889,16 +12875,16 @@
    },
    "ctx": 4095,
    "scores": {
-    "agentic": 77,
-    "chat": 91,
-    "cheap-bulk": 77,
-    "coding": 77,
-    "extraction": 77,
-    "long-context": 77,
-    "reasoning-math": 90,
-    "vision": 77,
-    "web-research": 77,
-    "writing": 89
+    "agentic": 75,
+    "chat": 75,
+    "cheap-bulk": 75,
+    "coding": 75,
+    "extraction": 75,
+    "long-context": 75,
+    "reasoning-math": 75,
+    "vision": 75,
+    "web-research": 75,
+    "writing": 75
    },
    "speed": 81
   },
@@ -12924,16 +12910,16 @@
    },
    "ctx": 16385,
    "scores": {
-    "agentic": 77,
-    "chat": 91,
-    "cheap-bulk": 77,
-    "coding": 77,
-    "extraction": 77,
-    "long-context": 77,
-    "reasoning-math": 90,
-    "vision": 77,
-    "web-research": 77,
-    "writing": 89
+    "agentic": 75,
+    "chat": 75,
+    "cheap-bulk": 75,
+    "coding": 75,
+    "extraction": 75,
+    "long-context": 75,
+    "reasoning-math": 75,
+    "vision": 75,
+    "web-research": 75,
+    "writing": 75
    },
    "speed": 94
   },
@@ -12960,7 +12946,7 @@
    "ctx": 16385,
    "scores": {
     "agentic": 75,
-    "chat": 92,
+    "chat": 75,
     "cheap-bulk": 75,
     "coding": 75,
     "extraction": 75,
@@ -12968,7 +12954,7 @@
     "reasoning-math": 75,
     "vision": 75,
     "web-research": 75,
-    "writing": 89
+    "writing": 75
    },
    "speed": 93
   },
@@ -12994,16 +12980,16 @@
    },
    "ctx": 4095,
    "scores": {
-    "agentic": 77,
-    "chat": 91,
-    "cheap-bulk": 77,
-    "coding": 77,
-    "extraction": 77,
-    "long-context": 77,
-    "reasoning-math": 90,
-    "vision": 77,
-    "web-research": 77,
-    "writing": 89
+    "agentic": 75,
+    "chat": 75,
+    "cheap-bulk": 75,
+    "coding": 75,
+    "extraction": 75,
+    "long-context": 75,
+    "reasoning-math": 75,
+    "vision": 75,
+    "web-research": 75,
+    "writing": 75
    },
    "speed": 61
   },
@@ -13099,16 +13085,16 @@
    },
    "ctx": 128000,
    "scores": {
-    "agentic": 99,
-    "chat": 99,
-    "cheap-bulk": 98,
-    "coding": 99,
-    "extraction": 98,
-    "long-context": 98,
-    "reasoning-math": 99,
-    "vision": 98,
-    "web-research": 98,
-    "writing": 99
+    "agentic": 75,
+    "chat": 75,
+    "cheap-bulk": 75,
+    "coding": 75,
+    "extraction": 75,
+    "long-context": 75,
+    "reasoning-math": 75,
+    "vision": 75,
+    "web-research": 75,
+    "writing": 75
    },
    "speed": 56
   },
@@ -13134,16 +13120,16 @@
    },
    "ctx": 128000,
    "scores": {
-    "agentic": 99,
-    "chat": 99,
-    "cheap-bulk": 98,
-    "coding": 99,
-    "extraction": 98,
-    "long-context": 98,
-    "reasoning-math": 99,
-    "vision": 98,
-    "web-research": 98,
-    "writing": 99
+    "agentic": 75,
+    "chat": 75,
+    "cheap-bulk": 75,
+    "coding": 75,
+    "extraction": 75,
+    "long-context": 75,
+    "reasoning-math": 75,
+    "vision": 75,
+    "web-research": 75,
+    "writing": 75
    },
    "speed": 44
   },
@@ -13309,16 +13295,16 @@
    },
    "ctx": 128000,
    "scores": {
-    "agentic": 93,
-    "chat": 98,
-    "cheap-bulk": 92,
-    "coding": 93,
-    "extraction": 92,
-    "long-context": 92,
-    "reasoning-math": 97,
-    "vision": 92,
-    "web-research": 92,
-    "writing": 97
+    "agentic": 75,
+    "chat": 75,
+    "cheap-bulk": 75,
+    "coding": 75,
+    "extraction": 75,
+    "long-context": 75,
+    "reasoning-math": 75,
+    "vision": 75,
+    "web-research": 75,
+    "writing": 75
    },
    "speed": 97
   },
@@ -13485,7 +13471,7 @@
    "ctx": 400000,
    "scores": {
     "agentic": 75,
-    "chat": 92,
+    "chat": 75,
     "cheap-bulk": 75,
     "coding": 75,
     "extraction": 75,
@@ -13493,7 +13479,7 @@
     "reasoning-math": 75,
     "vision": 75,
     "web-research": 75,
-    "writing": 89
+    "writing": 75
    },
    "speed": null
   },
@@ -13519,16 +13505,16 @@
    },
    "ctx": 400000,
    "scores": {
-    "agentic": 99,
-    "chat": 99,
-    "cheap-bulk": 98,
-    "coding": 99,
-    "extraction": 98,
-    "long-context": 98,
-    "reasoning-math": 99,
-    "vision": 98,
-    "web-research": 98,
-    "writing": 99
+    "agentic": 75,
+    "chat": 75,
+    "cheap-bulk": 75,
+    "coding": 75,
+    "extraction": 75,
+    "long-context": 75,
+    "reasoning-math": 75,
+    "vision": 75,
+    "web-research": 75,
+    "writing": 75
    },
    "speed": null
   },
@@ -13660,7 +13646,7 @@
    "ctx": 400000,
    "scores": {
     "agentic": 75,
-    "chat": 92,
+    "chat": 75,
     "cheap-bulk": 75,
     "coding": 75,
     "extraction": 75,
@@ -13668,7 +13654,7 @@
     "reasoning-math": 75,
     "vision": 75,
     "web-research": 75,
-    "writing": 89
+    "writing": 75
    },
    "speed": null
   },
@@ -13764,16 +13750,16 @@
    },
    "ctx": 1050000,
    "scores": {
-    "agentic": 93,
-    "chat": 98,
-    "cheap-bulk": 92,
-    "coding": 93,
-    "extraction": 92,
-    "long-context": 92,
-    "reasoning-math": 97,
-    "vision": 92,
-    "web-research": 92,
-    "writing": 97
+    "agentic": 85,
+    "chat": 85,
+    "cheap-bulk": 85,
+    "coding": 85,
+    "extraction": 85,
+    "long-context": 85,
+    "reasoning-math": 85,
+    "vision": 85,
+    "web-research": 85,
+    "writing": 85
    },
    "speed": 64
   },
@@ -13854,15 +13840,15 @@
    "ctx": 400000,
    "scores": {
     "agentic": 77,
-    "chat": 91,
+    "chat": 85,
     "cheap-bulk": 77,
     "coding": 77,
     "extraction": 77,
     "long-context": 77,
-    "reasoning-math": 90,
+    "reasoning-math": 85,
     "vision": 77,
     "web-research": 77,
-    "writing": 89
+    "writing": 85
    },
    "speed": 52
   },
@@ -13923,16 +13909,16 @@
    },
    "ctx": 1050000,
    "scores": {
-    "agentic": 99,
-    "chat": 99,
-    "cheap-bulk": 98,
-    "coding": 99,
-    "extraction": 98,
-    "long-context": 98,
-    "reasoning-math": 99,
-    "vision": 98,
-    "web-research": 98,
-    "writing": 99
+    "agentic": 85,
+    "chat": 85,
+    "cheap-bulk": 85,
+    "coding": 85,
+    "extraction": 85,
+    "long-context": 85,
+    "reasoning-math": 85,
+    "vision": 85,
+    "web-research": 85,
+    "writing": 85
    },
    "speed": 52
   },
@@ -13994,7 +13980,7 @@
    "ctx": 1000000,
    "scores": {
     "agentic": 75,
-    "chat": 92,
+    "chat": 75,
     "cheap-bulk": 75,
     "coding": 75,
     "extraction": 75,
@@ -14002,7 +13988,7 @@
     "reasoning-math": 75,
     "vision": 75,
     "web-research": 75,
-    "writing": 89
+    "writing": 75
    },
    "speed": 14
   },
@@ -14028,16 +14014,16 @@
    },
    "ctx": 1050000,
    "scores": {
-    "agentic": 99,
-    "chat": 99,
-    "cheap-bulk": 98,
-    "coding": 99,
-    "extraction": 98,
-    "long-context": 98,
-    "reasoning-math": 99,
-    "vision": 98,
-    "web-research": 98,
-    "writing": 99
+    "agentic": 75,
+    "chat": 75,
+    "cheap-bulk": 75,
+    "coding": 75,
+    "extraction": 75,
+    "long-context": 75,
+    "reasoning-math": 75,
+    "vision": 75,
+    "web-research": 75,
+    "writing": 75
    },
    "speed": 54
   },
@@ -14063,16 +14049,16 @@
    },
    "ctx": 1000000,
    "scores": {
-    "agentic": 99,
-    "chat": 99,
-    "cheap-bulk": 98,
-    "coding": 99,
-    "extraction": 98,
-    "long-context": 98,
-    "reasoning-math": 99,
-    "vision": 98,
-    "web-research": 98,
-    "writing": 99
+    "agentic": 75,
+    "chat": 75,
+    "cheap-bulk": 75,
+    "coding": 75,
+    "extraction": 75,
+    "long-context": 75,
+    "reasoning-math": 75,
+    "vision": 75,
+    "web-research": 75,
+    "writing": 75
    },
    "speed": 12
   },
@@ -14098,16 +14084,16 @@
    },
    "ctx": 1050000,
    "scores": {
-    "agentic": 93,
-    "chat": 98,
-    "cheap-bulk": 92,
-    "coding": 93,
-    "extraction": 92,
-    "long-context": 92,
-    "reasoning-math": 97,
-    "vision": 92,
-    "web-research": 92,
-    "writing": 97
+    "agentic": 75,
+    "chat": 75,
+    "cheap-bulk": 75,
+    "coding": 75,
+    "extraction": 75,
+    "long-context": 75,
+    "reasoning-math": 75,
+    "vision": 75,
+    "web-research": 75,
+    "writing": 75
    },
    "speed": 69
   },
@@ -14133,16 +14119,16 @@
    },
    "ctx": 1000000,
    "scores": {
-    "agentic": 93,
-    "chat": 98,
-    "cheap-bulk": 92,
-    "coding": 93,
-    "extraction": 92,
-    "long-context": 92,
-    "reasoning-math": 97,
-    "vision": 92,
-    "web-research": 92,
-    "writing": 97
+    "agentic": 75,
+    "chat": 75,
+    "cheap-bulk": 75,
+    "coding": 75,
+    "extraction": 75,
+    "long-context": 75,
+    "reasoning-math": 75,
+    "vision": 75,
+    "web-research": 75,
+    "writing": 75
    },
    "speed": 33
   },
@@ -14437,15 +14423,15 @@
    "ctx": 131072,
    "scores": {
     "agentic": 68,
-    "chat": 77,
+    "chat": 75,
     "cheap-bulk": 68,
     "coding": 68,
     "extraction": 68,
     "long-context": 68,
-    "reasoning-math": 81,
+    "reasoning-math": 75,
     "vision": 68,
     "web-research": 68,
-    "writing": 76
+    "writing": 75
    },
    "speed": 2
   },
@@ -15419,7 +15405,7 @@
    "ctx": 32768,
    "scores": {
     "agentic": 32,
-    "chat": 79,
+    "chat": 75,
     "cheap-bulk": 32,
     "coding": 32,
     "extraction": 32,
@@ -15427,7 +15413,7 @@
     "reasoning-math": 65,
     "vision": 32,
     "web-research": 32,
-    "writing": 79
+    "writing": 75
    },
    "speed": 73
   },
@@ -15489,7 +15475,7 @@
    "ctx": 1000000,
    "scores": {
     "agentic": 32,
-    "chat": 79,
+    "chat": 75,
     "cheap-bulk": 32,
     "coding": 32,
     "extraction": 32,
@@ -15497,7 +15483,7 @@
     "reasoning-math": 65,
     "vision": 32,
     "web-research": 32,
-    "writing": 79
+    "writing": 75
    },
    "speed": 58
   },
@@ -15524,7 +15510,7 @@
    "ctx": 131072,
    "scores": {
     "agentic": 32,
-    "chat": 79,
+    "chat": 75,
     "cheap-bulk": 32,
     "coding": 32,
     "extraction": 32,
@@ -15532,7 +15518,7 @@
     "reasoning-math": 65,
     "vision": 32,
     "web-research": 32,
-    "writing": 79
+    "writing": 75
    },
    "speed": 50
   },
@@ -15560,7 +15546,7 @@
    "ctx": 0,
    "scores": {
     "agentic": 32,
-    "chat": 79,
+    "chat": 75,
     "cheap-bulk": 32,
     "coding": 32,
     "extraction": 32,
@@ -15569,7 +15555,7 @@
     "reasoning-math": 65,
     "vision": 32,
     "web-research": 32,
-    "writing": 79
+    "writing": 75
    },
    "speed": null
   },
@@ -15721,7 +15707,7 @@
    "ctx": 131072,
    "scores": {
     "agentic": 32,
-    "chat": 79,
+    "chat": 75,
     "cheap-bulk": 32,
     "coding": 32,
     "extraction": 32,
@@ -15729,7 +15715,7 @@
     "reasoning-math": 65,
     "vision": 32,
     "web-research": 32,
-    "writing": 79
+    "writing": 75
    },
    "speed": 92
   },
@@ -16246,7 +16232,7 @@
    "ctx": 40960,
    "scores": {
     "agentic": 32,
-    "chat": 79,
+    "chat": 75,
     "cheap-bulk": 32,
     "coding": 32,
     "extraction": 32,
@@ -16254,7 +16240,7 @@
     "reasoning-math": 65,
     "vision": 32,
     "web-research": 32,
-    "writing": 79
+    "writing": 75
    },
    "speed": 53
   },
@@ -16771,7 +16757,7 @@
    "ctx": 40960,
    "scores": {
     "agentic": 32,
-    "chat": 79,
+    "chat": 75,
     "cheap-bulk": 32,
     "coding": 32,
     "extraction": 32,
@@ -16779,7 +16765,7 @@
     "reasoning-math": 65,
     "vision": 32,
     "web-research": 32,
-    "writing": 79
+    "writing": 75
    },
    "speed": null
   },
@@ -17367,7 +17353,7 @@
    "ctx": 131072,
    "scores": {
     "agentic": 43,
-    "chat": 77,
+    "chat": 75,
     "cheap-bulk": 43,
     "coding": 43,
     "extraction": 43,
@@ -17375,7 +17361,7 @@
     "reasoning-math": 43,
     "vision": 43,
     "web-research": 43,
-    "writing": 77
+    "writing": 75
    },
    "speed": 53
   },
@@ -17402,7 +17388,7 @@
    "ctx": 131072,
    "scores": {
     "agentic": 43,
-    "chat": 77,
+    "chat": 75,
     "cheap-bulk": 43,
     "coding": 43,
     "extraction": 43,
@@ -17410,7 +17396,7 @@
     "reasoning-math": 43,
     "vision": 43,
     "web-research": 43,
-    "writing": 77
+    "writing": 75
    },
    "speed": 57
   },
@@ -17439,7 +17425,7 @@
    "dims": 1024,
    "scores": {
     "agentic": 32,
-    "chat": 79,
+    "chat": 75,
     "cheap-bulk": 32,
     "coding": 32,
     "embedding": 50,
@@ -17448,7 +17434,7 @@
     "reasoning-math": 65,
     "vision": 32,
     "web-research": 32,
-    "writing": 79
+    "writing": 75
    },
    "speed": null
   },
@@ -17477,7 +17463,7 @@
    "dims": 2560,
    "scores": {
     "agentic": 32,
-    "chat": 79,
+    "chat": 75,
     "cheap-bulk": 32,
     "coding": 32,
     "embedding": 50,
@@ -17486,7 +17472,7 @@
     "reasoning-math": 65,
     "vision": 32,
     "web-research": 32,
-    "writing": 79
+    "writing": 75
    },
    "speed": null
   },
@@ -17515,7 +17501,7 @@
    "dims": 4096,
    "scores": {
     "agentic": 32,
-    "chat": 79,
+    "chat": 75,
     "cheap-bulk": 32,
     "coding": 32,
     "embedding": 50,
@@ -17524,7 +17510,7 @@
     "reasoning-math": 65,
     "vision": 32,
     "web-research": 32,
-    "writing": 79
+    "writing": 75
    },
    "speed": null
   },
@@ -17586,7 +17572,7 @@
    "ctx": 131072,
    "scores": {
     "agentic": 43,
-    "chat": 77,
+    "chat": 75,
     "cheap-bulk": 43,
     "coding": 43,
     "extraction": 43,
@@ -17621,7 +17607,7 @@
    "ctx": 262144,
    "scores": {
     "agentic": 43,
-    "chat": 77,
+    "chat": 75,
     "cheap-bulk": 43,
     "coding": 43,
     "extraction": 43,
@@ -18375,7 +18361,7 @@
    "ctx": 131072,
    "scores": {
     "agentic": 32,
-    "chat": 79,
+    "chat": 75,
     "cheap-bulk": 32,
     "coding": 32,
     "extraction": 32,
@@ -18383,7 +18369,7 @@
     "reasoning-math": 65,
     "vision": 32,
     "web-research": 32,
-    "writing": 79
+    "writing": 75
    },
    "speed": 62
   },
@@ -18620,7 +18606,7 @@
    "ctx": 262144,
    "scores": {
     "agentic": 32,
-    "chat": 79,
+    "chat": 75,
     "cheap-bulk": 32,
     "coding": 32,
     "extraction": 32,
@@ -18628,7 +18614,7 @@
     "reasoning-math": 65,
     "vision": 32,
     "web-research": 32,
-    "writing": 79
+    "writing": 75
    },
    "speed": null
   },
@@ -18655,7 +18641,7 @@
    "ctx": 1000000,
    "scores": {
     "agentic": 32,
-    "chat": 79,
+    "chat": 75,
     "cheap-bulk": 32,
     "coding": 32,
     "extraction": 32,
@@ -18663,7 +18649,7 @@
     "reasoning-math": 65,
     "vision": 32,
     "web-research": 32,
-    "writing": 79
+    "writing": 75
    },
    "speed": 11
   },
@@ -18970,7 +18956,7 @@
    "ctx": 262144,
    "scores": {
     "agentic": 43,
-    "chat": 77,
+    "chat": 75,
     "cheap-bulk": 43,
     "coding": 43,
     "extraction": 43,
@@ -19075,7 +19061,7 @@
    "ctx": 1000000,
    "scores": {
     "agentic": 32,
-    "chat": 79,
+    "chat": 75,
     "cheap-bulk": 32,
     "coding": 32,
     "extraction": 32,
@@ -19083,7 +19069,7 @@
     "reasoning-math": 65,
     "vision": 32,
     "web-research": 32,
-    "writing": 79
+    "writing": 75
    },
    "speed": 19
   },
@@ -21573,7 +21559,7 @@
    "ctx": 2000000,
    "scores": {
     "agentic": 77,
-    "chat": 93,
+    "chat": 85,
     "cheap-bulk": 77,
     "coding": 77,
     "extraction": 77,
@@ -21581,7 +21567,7 @@
     "reasoning-math": 77,
     "vision": 77,
     "web-research": 77,
-    "writing": 91
+    "writing": 85
    },
    "speed": 79
   },
@@ -21642,16 +21628,16 @@
    },
    "ctx": 500000,
    "scores": {
-    "agentic": 77,
-    "chat": 93,
-    "cheap-bulk": 77,
-    "coding": 77,
-    "extraction": 77,
-    "long-context": 77,
-    "reasoning-math": 77,
-    "vision": 77,
-    "web-research": 77,
-    "writing": 91
+    "agentic": 75,
+    "chat": 75,
+    "cheap-bulk": 75,
+    "coding": 75,
+    "extraction": 75,
+    "long-context": 75,
+    "reasoning-math": 75,
+    "vision": 75,
+    "web-research": 75,
+    "writing": 75
    },
    "speed": 70
   },
@@ -21677,16 +21663,16 @@
    },
    "ctx": 256000,
    "scores": {
-    "agentic": 77,
-    "chat": 93,
-    "cheap-bulk": 77,
-    "coding": 77,
-    "extraction": 77,
-    "long-context": 77,
-    "reasoning-math": 77,
-    "vision": 77,
-    "web-research": 77,
-    "writing": 91
+    "agentic": 75,
+    "chat": 75,
+    "cheap-bulk": 75,
+    "coding": 75,
+    "extraction": 75,
+    "long-context": 75,
+    "reasoning-math": 75,
+    "vision": 75,
+    "web-research": 75,
+    "writing": 75
    },
    "speed": 40
   },
@@ -21712,16 +21698,16 @@
    },
    "ctx": 2000000,
    "scores": {
-    "agentic": 77,
-    "chat": 93,
-    "cheap-bulk": 77,
-    "coding": 77,
-    "extraction": 77,
-    "long-context": 77,
-    "reasoning-math": 77,
-    "vision": 77,
-    "web-research": 77,
-    "writing": 91
+    "agentic": 75,
+    "chat": 75,
+    "cheap-bulk": 75,
+    "coding": 75,
+    "extraction": 75,
+    "long-context": 75,
+    "reasoning-math": 75,
+    "vision": 75,
+    "web-research": 75,
+    "writing": 75
    },
    "speed": 74
   },
@@ -21747,16 +21733,16 @@
    },
    "ctx": 2000000,
    "scores": {
-    "agentic": 77,
-    "chat": 93,
-    "cheap-bulk": 77,
-    "coding": 77,
-    "extraction": 77,
-    "long-context": 77,
-    "reasoning-math": 77,
-    "vision": 77,
-    "web-research": 77,
-    "writing": 91
+    "agentic": 75,
+    "chat": 75,
+    "cheap-bulk": 75,
+    "coding": 75,
+    "extraction": 75,
+    "long-context": 75,
+    "reasoning-math": 75,
+    "vision": 75,
+    "web-research": 75,
+    "writing": 75
    },
    "speed": 70
   },
@@ -21782,16 +21768,16 @@
    },
    "ctx": 1000000,
    "scores": {
-    "agentic": 77,
-    "chat": 93,
-    "cheap-bulk": 77,
-    "coding": 77,
-    "extraction": 77,
-    "long-context": 77,
-    "reasoning-math": 77,
-    "vision": 77,
-    "web-research": 77,
-    "writing": 91
+    "agentic": 75,
+    "chat": 75,
+    "cheap-bulk": 75,
+    "coding": 75,
+    "extraction": 75,
+    "long-context": 75,
+    "reasoning-math": 75,
+    "vision": 75,
+    "web-research": 75,
+    "writing": 75
    },
    "speed": 59
   },
@@ -21817,16 +21803,16 @@
    },
    "ctx": 1000000,
    "scores": {
-    "agentic": 77,
-    "chat": 93,
-    "cheap-bulk": 77,
-    "coding": 77,
-    "extraction": 77,
-    "long-context": 77,
-    "reasoning-math": 77,
-    "vision": 77,
-    "web-research": 77,
-    "writing": 91
+    "agentic": 75,
+    "chat": 75,
+    "cheap-bulk": 75,
+    "coding": 75,
+    "extraction": 75,
+    "long-context": 75,
+    "reasoning-math": 75,
+    "vision": 75,
+    "web-research": 75,
+    "writing": 75
    },
    "speed": 15
   },

@@ -345,3 +345,34 @@ def test_effort_levels_change_the_pick():
 
 def test_effort_levels_constant_is_complete():
     assert EFFORT_LEVELS == ("auto", "low", "medium", "high", "xhigh", "max")
+
+
+def test_engineering_verbs_are_coding_not_math():
+    """'implement a scheduler, prove correctness' is coding work — the bare
+    word 'prove' must not drag engineering tasks into reasoning-math."""
+    for t in ("design and implement a concurrent job scheduler, prove correctness",
+              "implement an LRU cache class", "build the payment module",
+              "port the auth service to the new api"):
+        assert classify(t, has_tools=True)[0] == "agentic"
+        assert classify(t)[0] == "coding"
+    for t in ("prove that sqrt(2) is irrational", "solve 3x + 4 = 19"):
+        assert classify(t, has_tools=True)[0] == "reasoning-math"
+
+
+def test_bundled_table_has_no_inflated_prior_only_scores():
+    """A model with no eval evidence must never top a frontier off a family
+    prior alone (gpt-3.5-turbo-1106 once scored 90 on reasoning-math)."""
+    table = router.load_table()
+    if table is None:
+        pytest.skip("no bundled table")
+    for cohort, mids in (table.get("frontiers") or {}).items():
+        for mid in mids[:1]:                      # the top of each frontier
+            row = table["models"][mid]
+            conf = (row.get("conf") or {}).get(cohort, 0)
+            score = (row.get("scores") or {}).get(cohort, 0)
+            # The real invariant: sibling-borrowed scores (conf 0.35, no
+            # evidence of any kind) are capped at 75 by the compiler, so they
+            # can never top a frontier at a high score.
+            if conf <= 0.35:
+                assert score <= 75, (
+                    f"{mid} tops {cohort} at {score} on borrowed conf {conf}")

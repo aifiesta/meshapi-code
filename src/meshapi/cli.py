@@ -581,6 +581,63 @@ def _maybe_drop_reasoning(state: dict, message: str) -> bool:
     return True
 
 
+def _smart_reroute_step(state: dict, step_title: str) -> None:
+    """Re-pick the model when a plan step starts.
+
+    A 13-step plan is 13 different tasks: "create styles.css" is boilerplate,
+    "create checkout.js" is real logic. Holding one model for the whole turn
+    either overpays for the easy steps or under-powers the hard ones, so each
+    step gets its own cohort + difficulty read and its own pick.
+
+    Only fires under route_mode="smart". Anything unavailable leaves the
+    current pick untouched — a re-route is an optimization, never a
+    requirement, and it must not disturb a running turn.
+    """
+    cfg = state["cfg"]
+    if cfg.get("route_mode") != "smart" or not step_title:
+        return
+    try:
+        table = router.load_table()
+        catalog = state.get("models_cache")
+        if not table or not catalog:
+            return
+        cohort, _ = router.classify(step_title, has_tools=True)
+        forced = cfg.get("route_effort", "auto")
+        difficulty = (forced if forced != "auto"
+                      else router.estimate_difficulty(step_title))
+        weights = router.effective_weights(cfg.get("route_weights"), difficulty)
+        needs_ctx = int(compact.est_history_tokens(state.get("messages") or [])
+                        * 1.3) + 4096
+        # Stickiness deliberately does NOT apply across a difficulty change:
+        # keeping a cheap incumbent for a step that just got hard is exactly
+        # the mistake per-step routing exists to prevent. Same difficulty →
+        # stickiness still holds, so easy steps don't flap.
+        prev_difficulty = state.get("_smart_difficulty")
+        incumbent = (state.get("_smart_last")
+                     if prev_difficulty == difficulty else None)
+        info = router.pick(cohort, weights, table, catalog, needs_tools=True,
+                           needs_ctx=needs_ctx, incumbent=incumbent,
+                           exclude=state.get("_smart_bad"))
+        if not info or not info.get("model"):
+            return
+        prev = state.get("_smart_pick")
+        info["difficulty"] = difficulty
+        state["_smart_pick_info"] = info
+        state["_smart_pick"] = info["model"]
+        state["_smart_last"] = info["model"]
+        state["_smart_cohort"] = cohort
+        state["_smart_difficulty"] = difficulty
+        if info["model"] != prev:
+            # Only announce an actual switch — stickiness means most steps
+            # keep the same model, and a line per step would be noise.
+            console.print(
+                f"[{BRAND_DIM}]⚙ step re-route: {cohort}/{difficulty} → "
+                f"{info['model']}[/{BRAND_DIM}]"
+            )
+    except Exception:
+        pass  # never let re-routing disturb a running plan
+
+
 def _smart_route_abandon(state: dict, reason: str) -> bool:
     """The smart pick failed LIVE (empty replies / fatal error) — blacklist
     it for the session and fall back to the pinned model, keeping the turn
@@ -1573,6 +1630,15 @@ def _handle_plan_tool(name: str, args: dict, state: dict) -> str:
             return f"Error: {err}"
         console.print(f"[{BRAND_DIM}]⚙ {summarize_call(name, args)}[/{BRAND_DIM}]")
         state["plan"].render()
+        # A step starting is the one moment mid-turn where the TASK changes —
+        # re-route for the step's own cohort/difficulty (see _smart_reroute_step).
+        if str(args.get("status")) == "in_progress":
+            try:
+                idx = int(args.get("index"))
+                title = state["plan"].steps[idx - 1].title
+            except (TypeError, ValueError, IndexError, AttributeError):
+                title = ""
+            _smart_reroute_step(state, title)
         return f"Step {args['index']} → {args['status']}. {state['plan'].summary()}"
 
     return f"Error: unknown plan tool `{name}`"

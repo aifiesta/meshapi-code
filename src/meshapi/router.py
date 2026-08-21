@@ -71,7 +71,13 @@ def load_table(path: "str | None" = None) -> "dict | None":
 _CODE_RE = re.compile(
     r"```|\bdef \w+\(|\bfunction\s+\w+\(|\bclass \w+|\bimport \w+|</?\w+>|"
     r"\btraceback\b|\bstack trace\b|\bcompil(?:e|er|ation)\b|\bsyntax error\b|"
-    r"\b(?:refactor|debug|unit test|regex|bug|lint)\b|\.(?:py|js|ts|go|rs|java|c|cpp|rb|sh)\b",
+    r"\b(?:refactor|debug|unit test|regex|bug|lint)\b|"
+    # Build/implement verbs paired with an engineering noun: "implement a
+    # scheduler, prove correctness" is CODING work, but the bare word
+    # "prove" would otherwise drag it into reasoning-math.
+    r"\b(?:implement|build|scaffold|port|migrate)\b.{0,40}"
+    r"\b(?:class|module|function|service|api|endpoint|parser|cache|scheduler"
+    r"|queue|server|client|component|schema|pipeline|library|cli|handler)\b|\.(?:py|js|ts|go|rs|java|c|cpp|rb|sh)\b",
     re.I)
 _EXTRACT_RE = re.compile(
     r"\b(?:extract|parse|json|csv|structured|schema|fields?|scrape)\b", re.I)

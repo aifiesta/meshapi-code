@@ -893,3 +893,119 @@ def test_smart_offline_fetch_is_bounded(monkeypatch):
     for i in range(6):
         cli._smart_route_turn(state, f"prompt {i}")
     assert calls["n"] <= 3
+
+
+# ---------------------------------------------------------------------------
+# Per-step re-routing: a 13-step plan is 13 tasks, not one
+# ---------------------------------------------------------------------------
+
+_STEP_COHORTS = ("coding", "agentic", "chat", "writing", "extraction",
+                 "reasoning-math", "cheap-bulk", "long-context")
+STEP_TABLE = {
+    "models": {
+        "cheap/fast": {"caps": {"tools": True}, "ctx": 200000, "speed": 90,
+                       "scores": {c: 55 for c in _STEP_COHORTS}},
+        "strong/slow": {"caps": {"tools": True}, "ctx": 200000, "speed": 40,
+                        "scores": {c: 95 for c in _STEP_COHORTS}},
+    },
+    "frontiers": {c: ["strong/slow", "cheap/fast"] for c in _STEP_COHORTS},
+    "defaults": {c: "cheap/fast" for c in _STEP_COHORTS},
+}
+STEP_CATALOG = [
+    {"id": "cheap/fast", "pricing": {"prompt_usd_per_1m": "0.10",
+                                     "completion_usd_per_1m": "0.40"}},
+    {"id": "strong/slow", "pricing": {"prompt_usd_per_1m": "5.00",
+                                      "completion_usd_per_1m": "25.00"}},
+]
+
+
+def _plan_state(monkeypatch, effort="auto"):
+    monkeypatch.setattr(cli.router, "load_table", lambda path=None: STEP_TABLE)
+    state = make_state()
+    state["cfg"].update(route_mode="smart", route_effort=effort)
+    state["models_cache"] = STEP_CATALOG
+    return state
+
+
+def test_step_reroute_escalates_for_a_hard_step(monkeypatch):
+    state = _plan_state(monkeypatch)
+    state["_smart_pick"] = "cheap/fast"
+    state["_smart_last"] = "cheap/fast"
+    cli._smart_reroute_step(
+        state, "design the distributed checkout module, prove correctness, "
+               "handle every edge case and race condition")
+    assert state["_smart_pick"] == "strong/slow"
+    assert state["_smart_pick_info"]["difficulty"] == "high"
+
+
+def test_step_reroute_stays_cheap_for_boilerplate(monkeypatch):
+    state = _plan_state(monkeypatch)
+    state["_smart_pick"] = "cheap/fast"
+    state["_smart_last"] = "cheap/fast"
+    cli._smart_reroute_step(state, "create styles.css")
+    assert state["_smart_pick"] == "cheap/fast"
+
+
+def test_step_reroute_respects_forced_effort(monkeypatch):
+    state = _plan_state(monkeypatch, effort="max")
+    cli._smart_reroute_step(state, "create styles.css")   # trivial step…
+    assert state["_smart_pick"] == "strong/slow"          # …but effort is pinned
+
+
+def test_step_reroute_inert_when_not_smart(monkeypatch):
+    state = _plan_state(monkeypatch)
+    state["cfg"]["route_mode"] = "off"
+    state["_smart_pick"] = None
+    cli._smart_reroute_step(state, "create checkout.js with full logic")
+    assert state["_smart_pick"] is None
+
+
+def test_step_reroute_never_raises(monkeypatch):
+    monkeypatch.setattr(cli.router, "load_table",
+                        lambda path=None: (_ for _ in ()).throw(RuntimeError("x")))
+    state = _plan_state(monkeypatch)
+    state["_smart_pick"] = "cheap/fast"
+    cli._smart_reroute_step(state, "anything")            # must not raise
+    assert state["_smart_pick"] == "cheap/fast"           # untouched
+
+
+def test_step_reroute_honors_blacklist(monkeypatch):
+    state = _plan_state(monkeypatch)
+    state["_smart_bad"] = {"strong/slow"}
+    cli._smart_reroute_step(state, "design a distributed system, prove correctness, "
+                                   "cover every edge case and trade-off")
+    assert state["_smart_pick"] == "cheap/fast"           # banned model skipped
+
+
+def test_update_step_in_progress_triggers_reroute(monkeypatch):
+    """The real seam: update_step(i,'in_progress') is where a task changes."""
+    monkeypatch.setattr(cli.statusbar, "print_line", lambda state: None)
+    state = _plan_state(monkeypatch)
+    state["plan"] = cli.Plan(["create styles.css",
+                              "design the concurrent checkout engine, prove "
+                              "correctness across every edge case"])
+    cli._handle_plan_tool("update_step", {"index": 1, "status": "in_progress"}, state)
+    easy = state["_smart_pick"]
+    cli._handle_plan_tool("update_step", {"index": 1, "status": "completed"}, state)
+    cli._handle_plan_tool("update_step", {"index": 2, "status": "in_progress"}, state)
+    hard = state["_smart_pick"]
+    assert easy == "cheap/fast" and hard == "strong/slow"
+
+
+def test_completed_status_does_not_reroute(monkeypatch):
+    monkeypatch.setattr(cli.statusbar, "print_line", lambda state: None)
+    state = _plan_state(monkeypatch)
+    state["plan"] = cli.Plan(["create styles.css"])
+    state["_smart_pick"] = "strong/slow"
+    cli._handle_plan_tool("update_step", {"index": 1, "status": "completed"}, state)
+    assert state["_smart_pick"] == "strong/slow"   # only in_progress re-routes
+
+
+def test_step_reroute_stickiness_holds_at_equal_difficulty(monkeypatch):
+    """Same difficulty across steps → keep the incumbent (no flapping)."""
+    state = _plan_state(monkeypatch)
+    state["_smart_pick"] = state["_smart_last"] = "cheap/fast"
+    state["_smart_difficulty"] = "low"
+    cli._smart_reroute_step(state, "create utils.js")      # also low
+    assert state["_smart_pick"] == "cheap/fast"
+    assert state["_smart_pick_info"].get("sticky") is True
