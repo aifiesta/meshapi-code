@@ -267,8 +267,17 @@ def pick(cohort: str, weights: "dict | None", table: "dict | None",
         if qualified:
             cands = qualified
         if not cands:
+            # The fail-safe default obeys the SAME feasibility rules — a
+            # default that can't hold tools or fit the context is worse
+            # than falling back to the caller's pinned model.
             default = (table.get("defaults") or {}).get(cohort)
             if not default or default in exclude:
+                return None
+            drow = models.get(default) or {}
+            dcaps = drow.get("caps") or {}
+            if needs_tools and not dcaps.get("tools"):
+                return None
+            if needs_ctx and (drow.get("ctx") or 0) < needs_ctx:
                 return None
             return {"model": default, "cohort": cohort, "ranked": [],
                     "sticky": False}

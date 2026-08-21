@@ -603,7 +603,7 @@ def _smart_route_abandon(state: dict, reason: str) -> bool:
     return True
 
 
-def _smart_route_turn(state: dict, user_input: str) -> None:
+def _smart_route_turn(state: dict, user_input: str, had_image: bool = False) -> None:
     """Compute this turn's smart pick (route_mode == "smart"). Fail-open:
     any miss leaves state["_smart_pick"] unset and the pinned model rides.
 
@@ -622,7 +622,10 @@ def _smart_route_turn(state: dict, user_input: str) -> None:
         if table is None:
             return
         if not state.get("models_cache"):
-            fetch_models_quiet(state)
+            if state.get("_models_fetch_attempts", 0) < 3:
+                state["_models_fetch_attempts"] = \
+                    state.get("_models_fetch_attempts", 0) + 1
+                fetch_models_quiet(state)  # bounded: offline must not stall every turn
         catalog = state.get("models_cache")
         if not catalog:
             return
@@ -631,7 +634,7 @@ def _smart_route_turn(state: dict, user_input: str) -> None:
             for m in state.get("messages") or [])
         cohort, _conf = router.classify(
             user_input,
-            has_image=bool(state.get("pending_attachments")),
+            has_image=had_image,
             has_tools=True,
             history_chars=history_chars,
         )
@@ -641,11 +644,13 @@ def _smart_route_turn(state: dict, user_input: str) -> None:
         forced = cfg.get("route_effort", "auto")
         if forced != "auto":
             difficulty = forced                      # user pinned the effort
-        elif len(user_input.strip()) < 25 and state.get("_smart_cohort"):
+        elif (len(user_input.strip()) < 25 and state.get("_smart_cohort")
+                and not had_image):
             difficulty = state.get("_smart_difficulty") or "mid"
         else:
             difficulty = router.estimate_difficulty(user_input)
-        if len(user_input.strip()) < 25 and state.get("_smart_cohort"):
+        if (len(user_input.strip()) < 25 and state.get("_smart_cohort")
+                and not had_image):
             cohort = state["_smart_cohort"]
         state["_smart_cohort"] = cohort
         state["_smart_difficulty"] = difficulty
@@ -689,22 +694,23 @@ def _effective_cfg(state: dict) -> dict:
         # Smart routing: this turn's locally-picked model replaces the pin;
         # auto_route is forced off so build_payload sends the concrete id.
         cfg = {**cfg, "model": state["_smart_pick"], "auto_route": False}
-        # The probes already MEASURED whether this model accepts
-        # reasoning_effort with tools present — ask the table instead of
-        # paying a doomed call + retry to rediscover it per session.
-        if cfg.get("reasoning_effort"):
-            try:
-                row = (router.load_table() or {}).get("models", {}).get(cfg["model"])
-                if row and not row.get("caps", {}).get("reasoning_with_tools"):
-                    if state.get("_reasoning_noted_for") != cfg["model"]:
-                        state["_reasoning_noted_for"] = cfg["model"]
-                        console.print(
-                            f"[dim](reasoning off for {cfg['model']} — probed "
-                            "unsupported with tools)[/dim]"
-                        )
-                    cfg = {**cfg, "reasoning_effort": None}
-            except Exception:
-                pass
+    # The probes already MEASURED whether the EFFECTIVE model (pick or pin)
+    # accepts reasoning_effort with tools — ask the table instead of paying
+    # a doomed call + retry to rediscover it. Applies to pinned models too:
+    # every probed model's evidence is in the same table.
+    if cfg.get("reasoning_effort") and not cfg.get("auto_route"):
+        try:
+            row = (router.load_table() or {}).get("models", {}).get(cfg["model"])
+            if row and not row.get("caps", {}).get("reasoning_with_tools"):
+                if state.get("_reasoning_noted_for") != cfg["model"]:
+                    state["_reasoning_noted_for"] = cfg["model"]
+                    console.print(
+                        f"[dim](reasoning off for {cfg['model']} — probed "
+                        "unsupported with tools)[/dim]"
+                    )
+                cfg = {**cfg, "reasoning_effort": None}
+        except Exception:
+            pass
     if not cfg.get("reasoning_effort"):
         return cfg
     rejected = state.get("_reasoning_rejected") or set()
@@ -2367,7 +2373,9 @@ def main() -> None:
             state["pending_attachments"] = []
         else:
             state["messages"].append({"role": "user", "content": user_input})
-        _smart_route_turn(state, user_input)
+        # NOTE: attachments were consumed above — pass the fact along, or the
+        # router classifies an image turn as chat and picks a blind model.
+        _smart_route_turn(state, user_input, had_image=bool(all_attachments))
         console.print()
 
         # Tool-calling loop: keep streaming until the model returns text

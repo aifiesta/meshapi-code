@@ -34,6 +34,33 @@ def _model_suggestions(query: str, known: set, n: int = 3) -> list:
         return []
 
 
+def _local_route_preview(state: dict) -> None:
+    """What OUR router would do with the last user message — free, instant."""
+    from . import router as _router
+    last = next((m for m in reversed(state.get("messages") or [])
+                 if m.get("role") == "user" and isinstance(m.get("content"), str)),
+                None)
+    if not last:
+        console.print("[dim]No conversation yet — send a prompt first.[/dim]")
+        return
+    text = last["content"]
+    cohort, _ = _router.classify(text, has_tools=True)
+    effort = state["cfg"].get("route_effort", "auto")
+    level = effort if effort != "auto" else _router.estimate_difficulty(text)
+    w = _router.effective_weights(state["cfg"].get("route_weights"), level)
+    table = _router.load_table()
+    catalog = state.get("models_cache") or fetch_models_quiet(state)
+    got = _router.pick(cohort, w, table, catalog, needs_tools=True,
+                       exclude=state.get("_smart_bad"))
+    if got:
+        console.print(
+            f"[dim]local smart pick: {cohort}/{level} → "
+            f"[bold]{got['model']}[/bold] (free, no request made)[/dim]"
+        )
+    else:
+        console.print("[dim]local smart pick: unavailable — pinned model would ride.[/dim]")
+
+
 def _route_preview(state: dict) -> None:
     """POST /router/select with the conversation so far and show which
     model the Auto Router would pick — without running inference."""
@@ -418,10 +445,19 @@ def handle_command(cmd: str, state: dict) -> bool:
                 save_config(state["cfg"])
                 note = "" if known is not None else " (couldn't verify against the catalog — offline?)"
                 console.print(f"[dim]Model set to {arg}{note}[/dim]")
-                # A pinned model is inert while auto-routing is on — the gateway
-                # still picks per prompt (client sends model:"auto"). Setting a
-                # model then silently getting a different one is the single most
-                # confusing state in the CLI, so say so loudly right here.
+                # An explicit /model is the user overriding routing — honor it
+                # for the in-flight turn (mid-run steer) and say clearly what
+                # persists. Silent overrides are the most confusing state in
+                # the CLI.
+                if state["cfg"].get("route_mode") == "smart":
+                    state["_smart_pick"] = None      # this turn: your model
+                    state["_smart_last"] = None      # don't sticky the old pick
+                    console.print(
+                        f"[yellow]⚠ smart routing is on — {arg} applies to the "
+                        "current turn, but the router picks again on the next "
+                        "prompt. [bold]/route off[/bold] to pin it for "
+                        "good.[/yellow]"
+                    )
                 if state["cfg"].get("auto_route"):
                     console.print(
                         f"[yellow]⚠ auto-routing is on — prompts still go to the "
@@ -508,7 +544,10 @@ def handle_command(cmd: str, state: dict) -> bool:
             save_config(state["cfg"])
             console.print(f"[dim]Auto-routing off — pinned to {state['cfg']['model']}.[/dim]")
         elif sub == "preview":
-            _route_preview(state)
+            if state["cfg"].get("route_mode") == "smart":
+                _local_route_preview(state)   # our pick, free
+            else:
+                _route_preview(state)         # gateway's pick
         elif sub == "smart":
             from . import router as _router
             if _router.load_table() is None:
@@ -669,7 +708,10 @@ def handle_command(cmd: str, state: dict) -> bool:
                 note = (
                     "  [yellow](auto-route is on — combined semantics are "
                     "gateway-defined)[/yellow]"
-                    if state["cfg"].get("auto_route") else ""
+                    if state["cfg"].get("auto_route")
+                    else ("  [yellow](smart routing is on — the gateway may "
+                          "fall back past the router's pick)[/yellow]"
+                          if state["cfg"].get("route_mode") == "smart" else "")
                 )
                 console.print(f"[dim]fallback: {' → '.join(fb)}[/dim]{note}")
             else:

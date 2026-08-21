@@ -553,7 +553,11 @@ def test_ask_user_cancel_prints_visible_trace(monkeypatch, capsys):
 # live), so trusting it would silently disable reasoning where it works.
 # ---------------------------------------------------------------------------
 
-def test_effort_is_sent_even_when_catalog_says_no_thinking():
+def test_effort_is_sent_even_when_catalog_says_no_thinking(monkeypatch):
+    # The CATALOG's supports_thinking flag stays untrusted (it lies). Our
+    # own PROBED table is a different matter — isolate it away here; the
+    # probed-strip path is covered by test_pinned_model_reasoning_stripped.
+    monkeypatch.setattr(cli.router, "load_table", lambda path=None: None)
     state = make_state()
     state["cfg"]["reasoning_effort"] = "high"
     state["cfg"]["model"] = "openai/gpt-5.4"
@@ -561,7 +565,8 @@ def test_effort_is_sent_even_when_catalog_says_no_thinking():
     assert cli._effective_cfg(state)["reasoning_effort"] == "high"
 
 
-def test_effort_dropped_only_after_a_real_rejection():
+def test_effort_dropped_only_after_a_real_rejection(monkeypatch):
+    monkeypatch.setattr(cli.router, "load_table", lambda path=None: None)
     state = make_state()
     state["cfg"]["reasoning_effort"] = "high"
     state["cfg"]["model"] = "openai/gpt-4o-mini"
@@ -581,7 +586,10 @@ def test_rejection_is_remembered_across_turns_no_second_retry():
     assert cli._effective_cfg(state)["reasoning_effort"] is None
 
 
-def test_rejection_is_per_model_not_global():
+def test_rejection_is_per_model_not_global(monkeypatch):
+    # isolate from the bundled table (whose probed caps would also strip —
+    # that path has its own tests); this tests the blacklist alone
+    monkeypatch.setattr(cli.router, "load_table", lambda path=None: None)
     state = make_state()
     state["cfg"]["reasoning_effort"] = "high"
     state["cfg"]["model"] = "openai/gpt-4o-mini"
@@ -826,3 +834,62 @@ def test_rejection_attributed_to_smart_pick_not_pin(monkeypatch):
         state, "Unrecognized request argument supplied: reasoning_effort")
     assert "openai/gpt-3.5-turbo-1106" in state["_reasoning_rejected"]
     assert "openai/gpt-5.4" not in state["_reasoning_rejected"]
+
+
+# ---------------------------------------------------------------------------
+# Audit fixes (edge-case hunt, 2026-08-20)
+# ---------------------------------------------------------------------------
+
+def test_image_turn_classifies_vision(monkeypatch):
+    """FIX 1: attachments are consumed before routing ran — had_image must be
+    passed explicitly or every image turn classifies as chat/agentic."""
+    table = {"models": {"v/eyes": {"caps": {"tools": True, "vision": True},
+                                   "ctx": 9000, "speed": 50,
+                                   "scores": {"vision": 80}}},
+             "frontiers": {"vision": ["v/eyes"]}, "defaults": {}}
+    monkeypatch.setattr(cli.router, "load_table", lambda path=None: table)
+    monkeypatch.setattr(cli, "fetch_models_quiet", lambda state: SMART_CATALOG)
+    state = make_state()
+    state["cfg"]["route_mode"] = "smart"
+    state["models_cache"] = [{"id": "v/eyes",
+                              "pricing": {"prompt_usd_per_1m": "1",
+                                          "completion_usd_per_1m": "2"}}]
+    cli._smart_route_turn(state, "what is in this picture?", had_image=True)
+    assert state["_smart_pick_info"]["cohort"] == "vision"
+
+
+def test_image_followup_never_inherits_text_cohort(monkeypatch):
+    state = _smart_state(monkeypatch)
+    cli._smart_route_turn(state, "hello there")            # chat-ish
+    cli._smart_route_turn(state, "and this?", had_image=True)
+    # short input + image: must NOT inherit — vision pick fails open here
+    # (fixture has no vision cohort), which is correct
+    assert state["_smart_cohort"] == "vision"
+
+
+def test_pinned_model_reasoning_stripped_from_table(monkeypatch):
+    """FIX 4: probed caps apply to PINNED models too, not just smart picks."""
+    table = {"models": {"openai/gpt-3.5-turbo-1106":
+                        {"caps": {"tools": True, "reasoning_with_tools": False},
+                         "ctx": 9000, "speed": 50, "scores": {}}},
+             "frontiers": {}, "defaults": {}}
+    monkeypatch.setattr(cli.router, "load_table", lambda path=None: table)
+    state = make_state()
+    state["cfg"].update(model="openai/gpt-3.5-turbo-1106",
+                        reasoning_effort="high", route_mode="off")
+    assert cli._effective_cfg(state)["reasoning_effort"] is None
+
+
+def test_smart_offline_fetch_is_bounded(monkeypatch):
+    """FIX 5: an offline session with smart on must not stall 10s per turn."""
+    calls = {"n": 0}
+    def failing(state):
+        calls["n"] += 1
+        return None
+    monkeypatch.setattr(cli, "fetch_models_quiet", failing)
+    monkeypatch.setattr(cli.router, "load_table", lambda path=None: SMART_TABLE)
+    state = make_state()
+    state["cfg"]["route_mode"] = "smart"
+    for i in range(6):
+        cli._smart_route_turn(state, f"prompt {i}")
+    assert calls["n"] <= 3

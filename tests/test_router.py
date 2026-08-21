@@ -152,9 +152,20 @@ def test_fail_open_unknown_cohort_uses_default_then_none():
     assert pick("nope", None, TABLE, CATALOG) is None
 
 
-def test_fail_open_all_filtered_falls_to_default():
-    got = pick("chat", None, TABLE, CATALOG, needs_ctx=10_000_000)
-    assert got == {"model": "a/cheap", "cohort": "chat", "ranked": [], "sticky": False}
+def test_fail_open_all_filtered_falls_to_feasible_default():
+    # default a/cheap is feasible at modest ctx demands…
+    got = pick("chat", None, TABLE, CATALOG, needs_ctx=1_500_000)
+    assert got is None or got["model"] != "d/notool"
+    # …but the default must obey feasibility too: nothing fits 10M ctx,
+    # including the default — fall back to the caller's pin (None), never
+    # hand back a model that can't hold the conversation.
+    assert pick("chat", None, TABLE, CATALOG, needs_ctx=10_000_000) is None
+    # and a tools-incapable default is equally unpickable
+    t2 = {**TABLE, "frontiers": {"chat": []}, "defaults": {"chat": "d/notool"}}
+    assert pick("chat", None, t2, CATALOG, needs_tools=True) is None
+    t3 = {**TABLE, "frontiers": {"chat": []}, "defaults": {"chat": "a/cheap"}}
+    got = pick("chat", None, t3, CATALOG, needs_tools=True)
+    assert got["model"] == "a/cheap"      # feasible default still serves
 
 
 def test_fail_open_catalog_drift_skips_missing():
