@@ -395,7 +395,7 @@ def resolve_command(name: str) -> "tuple[str | None, list]":
     returns the candidates for a helpful message. (None, []) = unknown.
     """
     from .completer import COMMANDS  # lazy: completer imports this module
-    known = set(COMMANDS) | {"/exit", "/quit", "/q", "/effort", "/style"}
+    known = set(COMMANDS) | {"/exit", "/quit", "/q", "/effort", "/output"}
     if name in known:
         return name, [name]
     matches = sorted(c for c in known if c.startswith(name))
@@ -503,7 +503,7 @@ def handle_command(cmd: str, state: dict) -> bool:
             else:
                 console.print(f"[dim]Current model: {state['cfg']['model']}[/dim]")
 
-    elif name == "/style":
+    elif name == "/output":
         from . import styles as _styles
         sub = arg.strip()
         if not sub:
@@ -533,7 +533,7 @@ def handle_command(cmd: str, state: dict) -> bool:
             # non-tty: report, don't guess
             console.print(
                 f"[dim]Output style {_styles.label(cur)} — "
-                f"{_styles.describe(cur)}. Set with /style "
+                f"{_styles.describe(cur)}. Set with /output "
                 f"{'|'.join(_styles.ORDER)}.[/dim]")
             return True
         _set_style(state, sub)
@@ -1167,7 +1167,8 @@ def handle_command(cmd: str, state: dict) -> bool:
             "/effort <auto|low..max>    routing depth (how strong a model to pick)\n"
             "/hops <n|off>              pause turns after n tool hops (off = unlimited)\n"
             "/compact [now|auto on|off] context usage + history compaction\n"
-            "/stall pause|keep-going    what to do when the model repeats itself\n"            "/style [concise|default|explanatory|learning]  how answers are written\n"
+            "/stall pause|keep-going    what to do when the model repeats itself\n"
+            "/output [concise|default|explanatory|learning]  how answers are written\n"
             "/optimize <dial>           token savings, beta: 0 off, up to 0.95\n"
             "/memory [notes|clear|on|off]  repo memory: map + notes from past sessions\n"
             "/login                     set or replace your API key\n"

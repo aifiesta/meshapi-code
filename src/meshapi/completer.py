@@ -26,7 +26,7 @@ COMMANDS = {
     "/system": "set system prompt",
     "/cost": "session spend",
     "/effort": "routing depth: auto | low..max",
-    "/style": "output style: concise | default | explanatory | learning",
+    "/output": "output style: concise | default | explanatory | learning",
     "/hops": "hop limit: n | off (unlimited)",
     "/compact": "context usage | now | auto on/off",
     "/stall": "pause | keep-going on repeats",
@@ -42,7 +42,7 @@ COMMANDS = {
 _ARG_CHOICES = {
     "/route": ("auto", "smart", "off", "preview", "weights", "effort", "why"),
     "/effort": ("auto", "low", "medium", "high", "xhigh", "max"),
-    "/style": ("concise", "default", "explanatory", "learning"),
+    "/output": ("concise", "default", "explanatory", "learning"),
     "/mode": ("default", "accept-edits", "auto", "bypass"),
     "/reasoning": ("high", "medium", "low", "none", "off"),
     "/models": ("free", "thinking", "tools"),

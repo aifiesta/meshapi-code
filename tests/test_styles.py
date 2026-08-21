@@ -70,10 +70,10 @@ def test_set_style_rewrites_the_live_system_message(monkeypatch, tmp_path):
     cfg = dict(config.DEFAULT_CONFIG)
     state = {"cfg": cfg,
              "messages": [{"role": "system", "content": build_system_prompt(cfg)}]}
-    commands.handle_command("/style explanatory", state)
+    commands.handle_command("/output explanatory", state)
     assert "OUTPUT STYLE — EXPLANATORY" in state["messages"][0]["content"]
     assert state["cfg"]["output_style"] == "explanatory"
-    commands.handle_command("/style default", state)
+    commands.handle_command("/output default", state)
     assert "OUTPUT STYLE" not in state["messages"][0]["content"]
 
 
@@ -83,7 +83,7 @@ def test_rejected_value_leaves_state_untouched(monkeypatch, tmp_path):
     from meshapi import commands
     cfg = dict(config.DEFAULT_CONFIG, output_style="concise")
     state = {"cfg": cfg, "messages": [{"role": "system", "content": "x"}]}
-    commands.handle_command("/style nonsense", state)
+    commands.handle_command("/output nonsense", state)
     assert state["cfg"]["output_style"] == "concise"
     assert state["messages"][0]["content"] == "x"
 
@@ -92,9 +92,9 @@ def test_style_is_registered_everywhere():
     from meshapi.completer import COMMANDS
     from meshapi.commands import resolve_command
     from meshapi.cli import LIVE_CONTROL_COMMANDS
-    assert "/style" in COMMANDS
-    assert "/style" in LIVE_CONTROL_COMMANDS
-    assert resolve_command("/sty")[0] == "/style"
+    assert "/output" in COMMANDS
+    assert "/output" in LIVE_CONTROL_COMMANDS
+    assert resolve_command("/out")[0] == "/output"
 
 
 def test_no_tool_names_in_style_prose():
