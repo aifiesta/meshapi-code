@@ -252,6 +252,62 @@ shows instantly. Unfinished text prefills your next prompt.
 Suggestions pop as you type — every model on Mesh, fuzzy-matched. `/models`
 prints the full catalog with context windows and $/1M pricing.
 
+### 🧠 Smart routing — the right model per prompt, for free
+
+`/route auto` lets the *gateway* choose, which costs you a classifier call on every
+prompt (~1.4k tokens on a three-word question). `/route smart` does the choosing
+**locally instead**: ~0 ms, $0, and deterministic — the same prompt always picks the
+same model.
+
+```
+› /route smart
+Smart routing on — the CLI picks a model per prompt locally (no classifier tokens,
+no extra latency). Weights: cost=0.50 cap=0.30 speed=0.20 · effort=auto
+
+› build a REST API with auth and rate limiting
+⚙ smart route: agentic/high → anthropic/claude-sonnet-4.6  (/route why)
+
+› what's 17 * 23?
+⚙ smart route: reasoning-math/low → qwen/qwen-2.5-7b-instruct
+```
+
+It ships with a routing table covering **923 models across 16 task cohorts**, built
+from measured evidence rather than vendor metadata — 471 models probed live for real
+tool-calling, structured-output, vision and context support. That matters because the
+published flags are wrong often enough to hurt: `supports_thinking` is `False` for
+opus-4.8, and 47 models publish `context_window` instead of `context_length`, which
+made a 2M-context model look like it had none.
+
+You steer it with three weights, and the knobs stay honest — each cohort keeps a
+Pareto frontier, so a model that's worse on *every* axis can never be selected at any
+setting, and a quality floor blocks "fast, cheap and useless":
+
+```
+› /route weights cost=0.6 cap=0.3 speed=0.1
+› /route why
+cohort agentic · difficulty high · picked anthropic/claude-sonnet-4.6
+  runner-up  deepseek/deepseek-v4-flash   cost 92  cap 85  speed 73
+```
+
+Routing also **reacts** rather than only predicting: if the model leaves placeholders
+in a file, emits two malformed tool calls in a row, or starts looping, the CLI steps
+up a rung — then settles back down after three clean hops. Inside a multi-step plan
+each step is re-routed on its own, so scaffolding rides a cheap model and the hard
+step gets a strong one. Anything unexpected fails open to your pinned `/model`.
+
+### ✍️ Output styles
+
+`/output` changes how answers are *written* — never what the agent is allowed to do,
+and never how much work it actually does.
+
+```
+› /output concise      # answer first, under ~80 words, no lists, no "In summary"
+› /output explanatory  # mechanism and at least one explicit trade-off
+› /output learning     # analogy or worked example, ending in a "Try this:" line
+```
+
+Bare `/output` opens a picker. The change applies to the running session immediately.
+
 ### 🧭 Auto-routing & failover
 
 ```
@@ -345,7 +401,10 @@ meshapi --mode bypass     # start in bypass (macOS/Linux/Windows alike)
 |---|---|
 | `/model <name>` | Switch model — **fuzzy tab-completion** from the live catalog (inactive while `/route auto` is on; the CLI warns) |
 | `/models [free\|query]` | Browse the catalog: context, capabilities, $/1M pricing |
-| `/route auto\|off\|preview` | Gateway picks per prompt (`auto`) vs. use your pinned `/model` (`off`); `preview` shows the pick without running |
+| `/route smart\|auto\|off\|preview` | **`smart`** picks a model per prompt *locally* — free, ~0 ms, deterministic; `auto` lets the gateway pick (bills a classifier); `off` uses your pinned `/model`; `preview` shows the pick without running. Bare `/route` opens a picker |
+| `/route weights cost=…\|why` | Tune the cost / capability / speed balance, or explain the last pick and its runner-ups |
+| `/effort [auto\|low…max]` | Routing depth — `auto` detects per prompt; interactive slider |
+| `/output [style]` | Writing style: `concise`, `default`, `explanatory`, `learning` |
 | `/fallback <m1> <m2>\|off` | Ordered fallback models if the primary fails |
 | `/reasoning <level>` | `high`/`medium`/`low`/`none`/`off` reasoning effort |
 | `/mode <perm>` | `default`, `accept-edits`, `auto`, `bypass` (Shift+Tab cycles) |
@@ -357,7 +416,12 @@ meshapi --mode bypass     # start in bypass (macOS/Linux/Windows alike)
 | `/memory [notes\|clear\|on\|off]` | Repo memory: map + notes from past sessions |
 | `/login` | Set or replace your API key |
 | `/update` | Check PyPI and upgrade |
+| `/hops <n\|off>` | Pause a turn after n tool hops (default: unlimited) |
+| `/compact [now\|auto on\|off]` | Context usage and history compaction |
+| `/stall pause\|keep-going` | What to do when the model repeats itself |
 | `/cost` `/clear` `/help` `/exit` | The usual |
+
+Most commands accept a **unique prefix** — `/eff` runs `/effort`, `/ou` runs `/output`. An ambiguous prefix lists the candidates instead of guessing.
 
 ## Keyboard & live controls
 
