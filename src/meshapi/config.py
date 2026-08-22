@@ -60,6 +60,8 @@ DEFAULT_CONFIG = {
     "route_effort": "auto",
     # How the assistant writes (prose only — never tool access or scope).
     "output_style": "default",
+    # Last version whose "what's new" line was shown (see whatsnew.py).
+    "last_seen_version": "",
     # Models observed rejecting reasoning_effort (with tools) — skipped
     # without a doomed retry in future sessions. Evidence-based cache.
     "reasoning_rejected_models": [],
@@ -142,7 +144,13 @@ _OLD_ROUTE_WEIGHTS = {"cost": 0.5, "cap": 0.3, "speed": 0.2}
 def load_config() -> dict:
     _secure_dir(CONFIG_DIR)
     if not CONFIG_FILE.exists():
-        CONFIG_FILE.write_text(json.dumps(DEFAULT_CONFIG, indent=2))
+        # Stamp the current version on a FRESH install so the "what's new"
+        # note stays quiet on day one — there is nothing new to a first-time
+        # user. An existing config with no such key is a real upgrade, and
+        # that is exactly when the note should fire.
+        from . import __version__ as _v
+        CONFIG_FILE.write_text(
+            json.dumps(dict(DEFAULT_CONFIG, last_seen_version=_v), indent=2))
     secure_file(CONFIG_FILE)
     # A corrupt/non-object config.json must NEVER brick launch (a truncated
     # write, a bad hand-edit). Every other loader here already degrades to a

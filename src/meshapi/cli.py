@@ -129,6 +129,22 @@ def render_banner(cfg: dict) -> None:
             line.append(info)
         console.print(line)
     console.print()
+    # One-line upgrade note, once per version. Best-effort: a note must
+    # never be the reason a session fails to start.
+    try:
+        from . import whatsnew
+        if whatsnew.should_show(cfg):
+            head = f"✦ new in {__version__} "
+            note = whatsnew.fit(whatsnew.note_for(),
+                                max(20, console.width - len(head) - 1))
+            console.print(
+                Text.from_markup(
+                    f"[bold {BRAND}]{head}[/bold {BRAND}]"
+                    f"[{BRAND_DIM}]{note}[/{BRAND_DIM}]"))
+            console.print()
+            whatsnew.mark_seen(cfg)
+    except Exception:
+        pass
     console.print("type /help for commands, /exit to quit", style=BRAND_DIM)
     console.print()
 
