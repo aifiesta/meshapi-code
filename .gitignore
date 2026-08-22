@@ -27,3 +27,6 @@ meshroute-lab/
 
 # Internal routing reference (models + criteria) — not shipped
 ROUTING.md
+
+# Session handoff / working notes — internal, not shipped
+HANDOFF.md
